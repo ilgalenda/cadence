@@ -1,0 +1,270 @@
+---
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+
+const agents = [
+  {
+    index: '01',
+    href: '/agents/calls',
+    name: 'Calls Support',
+    description: 'In-call & onboarding partner — knowledge chat, call analysis, glossary, product catalogue.',
+    status: 'active',
+  },
+  {
+    index: '02',
+    href: '/agents/lead',
+    name: 'Lead',
+    description: 'Campaign creation and outreach — research, sequencing, draft generation across Timebeat channels.',
+    status: 'active',
+  },
+];
+---
+<DashboardLayout title="Dashboard">
+  <div class="px-10 py-12 max-w-5xl mx-auto">
+
+    <!-- Heading -->
+    <div class="mb-16">
+      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Workspace</p>
+      <h1 id="greeting" class="text-3xl font-semibold tracking-tightest leading-tight mb-3">Good to see you.</h1>
+      <p class="text-base text-ink-secondary max-w-xl leading-relaxed">
+        A quiet workspace for the work that matters. Choose an agent to begin.
+      </p>
+    </div>
+
+    <!-- Section header -->
+    <div class="flex items-baseline justify-between mb-2 pb-3 border-b border-rule-strong">
+      <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Agents</h2>
+      <span data-agents-counter class="font-mono text-[11px] tabular text-ink-muted">{agents.length.toString().padStart(2, '0')} total</span>
+    </div>
+
+    <!-- Agent rows -->
+    <ul id="agents-list" class="hidden">
+      {agents.map(agent => (
+        <li data-agent-href={agent.href} data-agent-slug={agent.href.split('/').pop()}>
+          <a
+            href={agent.href}
+            class="group grid grid-cols-[auto_1fr_auto] gap-8 items-start py-8 border-b border-rule-subtle hover:bg-surface-1 transition-colors duration-150 ease-decelerate -mx-4 px-4"
+          >
+            <span class="font-mono text-xs tabular text-ink-muted pt-2">{agent.index}</span>
+
+            <div class="min-w-0">
+              <h3 class="text-2xl font-semibold tracking-tightest leading-tight group-hover:text-accent transition-colors duration-150 ease-decelerate">
+                {agent.name}
+              </h3>
+              <p class="text-sm text-ink-secondary mt-2 leading-relaxed max-w-xl">
+                {agent.description}
+              </p>
+              <div class="flex items-center gap-2 mt-4">
+                {agent.status === 'active' ? (
+                  <>
+                    <span class="w-1.5 h-1.5 rounded-full bg-signal-success animate-signal-pulse"></span>
+                    <span class="font-mono text-[11px] uppercase tracking-label text-ink-secondary">Status · Active</span>
+                  </>
+                ) : (
+                  <>
+                    <span class="w-1.5 h-1.5 rounded-full bg-ink-muted/60"></span>
+                    <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Status · Coming soon</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <span class="font-mono text-sm text-ink-muted group-hover:text-accent pt-2 transition-colors duration-150 ease-decelerate">
+              →
+            </span>
+          </a>
+        </li>
+      ))}
+    </ul>
+
+    <p class="font-mono text-[11px] text-ink-muted mt-16">// more agents arriving as Cadence grows</p>
+
+    <!-- Owl Memory -->
+    <div class="mt-20" id="owl-memory-section">
+      <div class="flex items-baseline justify-between mb-2 pb-3 border-b border-rule-strong">
+        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Owl memory</h2>
+        <button id="owl-open-btn" class="font-mono text-[11px] text-ink-muted hover:text-accent transition-colors duration-150 ease-decelerate">Open Owl →</button>
+      </div>
+
+      <!-- Graph canvas -->
+      <div class="relative w-full h-52 mt-5 mb-6 rounded border border-rule-subtle bg-surface-1 overflow-hidden" id="owl-graph-wrap">
+        <svg id="owl-graph" class="w-full h-full" xmlns="http://www.w3.org/2000/svg"></svg>
+        <p id="owl-graph-empty" class="absolute inset-0 flex items-center justify-center font-mono text-[11px] text-ink-muted hidden">
+          // Your Owl conversations will appear here as you use it
+        </p>
+      </div>
+
+      <!-- Session list -->
+      <ul id="owl-session-list" class="space-y-px">
+        <li class="font-mono text-[11px] text-ink-muted py-3">// loading…</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <script>
+    (async () => {
+      const list = document.getElementById('agents-list');
+      try {
+        const res = await fetch('/api/auth/status');
+        const data = await res.json();
+        if (!data.authed) {
+          list?.classList.remove('hidden');
+          return;
+        }
+
+        const greetingEl = document.getElementById('greeting');
+        const firstName = (data.name || data.username || '').split(' ')[0];
+        if (greetingEl && firstName) greetingEl.textContent = `Good to see you, ${firstName}.`;
+
+        const allowed = new Set<string>(data.agents || []);
+        document.querySelectorAll<HTMLElement>('#agents-list > li[data-agent-slug]').forEach(li => {
+          const slug = li.dataset.agentSlug || '';
+          if (!allowed.has(slug)) li.remove();
+        });
+        const visible = document.querySelectorAll<HTMLElement>('#agents-list > li').length;
+        const counter = document.querySelector<HTMLElement>('[data-agents-counter]');
+        if (counter) counter.textContent = `${String(visible).padStart(2, '0')} total`;
+      } catch {}
+      list?.classList.remove('hidden');
+    })();
+
+    // Owl memory section
+    (async () => {
+      const sessionList = document.getElementById('owl-session-list')!;
+      const graph = document.getElementById('owl-graph') as unknown as SVGSVGElement;
+      const graphEmpty = document.getElementById('owl-graph-empty')!;
+
+      document.getElementById('owl-open-btn')?.addEventListener('click', () => {
+        document.dispatchEvent(new CustomEvent('owl:open'));
+      });
+
+      let sessions: any[] = [];
+      try {
+        const res = await fetch('/api/owl/sessions');
+        if (res.ok) sessions = await res.json();
+      } catch {}
+
+      if (sessions.length === 0) {
+        sessionList.innerHTML = '<li class="font-mono text-[11px] text-ink-muted py-3">// No Owl conversations yet. Open Owl and ask your first question.</li>';
+        graphEmpty.classList.remove('hidden');
+        return;
+      }
+
+      // Render session list (most recent 5)
+      function relativeTime(ts: string): string {
+        try {
+          const parts = ts.split(', ');
+          const date = new Date(`${parts[0].split(' ').reverse().join('-')} ${parts[1] || '00:00'}`)
+          const diff = Date.now() - date.getTime();
+          const mins = Math.floor(diff / 60000);
+          if (mins < 2) return 'just now';
+          if (mins < 60) return `${mins}m ago`;
+          const hrs = Math.floor(mins / 60);
+          if (hrs < 24) return `${hrs}h ago`;
+          return `${Math.floor(hrs / 24)}d ago`;
+        } catch { return ts; }
+      }
+
+      sessionList.innerHTML = '';
+      const recent = sessions.slice(0, 5);
+      recent.forEach((s: any) => {
+        const modelLabel = s.model_used || 'owl';
+        const modelColour = modelLabel === 'sonnet' ? 'bg-accent' : 'bg-ink-muted';
+        const li = document.createElement('li');
+        li.className = 'group flex items-center gap-3 py-2.5 border-b border-rule-subtle cursor-pointer hover:bg-surface-1 -mx-4 px-4 transition-colors duration-150 ease-decelerate';
+        li.innerHTML = `
+          <span class="w-1.5 h-1.5 rounded-full shrink-0 ${modelColour}"></span>
+          <span class="flex-1 text-sm text-ink-secondary truncate">${s.title || 'Chat'}</span>
+          <span class="font-mono text-[10px] text-ink-muted shrink-0">${relativeTime(s.timestamp || '')}</span>
+          <span class="font-mono text-[10px] text-ink-muted shrink-0 uppercase tracking-label">${modelLabel}</span>
+        `;
+        li.addEventListener('click', () => document.dispatchEvent(new CustomEvent('owl:load', { detail: { id: s.id } })));
+        sessionList.appendChild(li);
+      });
+
+      // Render SVG graph
+      if (sessions.length < 2) {
+        graphEmpty.classList.remove('hidden');
+        return;
+      }
+
+      const wrap = document.getElementById('owl-graph-wrap')!;
+      const W = wrap.clientWidth || 600;
+      const H = wrap.clientHeight || 208;
+      const PAD = 28;
+      const R = 7;
+
+      // Topic-to-colour mapping (index into a small palette)
+      const topicColours: Record<string, string> = {};
+      const palette = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#3b82f6','#ec4899'];
+      let colourIdx = 0;
+      function topicColour(t: string): string {
+        if (!topicColours[t]) topicColours[t] = palette[colourIdx++ % palette.length];
+        return topicColours[t];
+      }
+
+      // Position nodes: spread across width, staggered by row
+      const nodeCount = Math.min(sessions.length, 30);
+      const cols = Math.ceil(Math.sqrt(nodeCount * (W / H)));
+      const rows = Math.ceil(nodeCount / cols);
+      const cellW = (W - PAD * 2) / cols;
+      const cellH = (H - PAD * 2) / rows;
+
+      type Node = { x: number; y: number; session: any; idx: number };
+      const nodes: Node[] = sessions.slice(0, nodeCount).map((s, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        const jitter = (Math.sin(i * 7.3) * 0.3 + 0.5);
+        return {
+          x: PAD + col * cellW + cellW * jitter,
+          y: PAD + row * cellH + cellH * 0.5,
+          session: s,
+          idx: i,
+        };
+      });
+
+      // Draw edges between nodes sharing a topic
+      nodes.forEach((a, ai) => {
+        nodes.slice(ai + 1).forEach(b => {
+          const aTopics: string[] = a.session.topics || [];
+          const bTopics: string[] = b.session.topics || [];
+          const shared = aTopics.filter((t: string) => bTopics.includes(t));
+          if (shared.length === 0) return;
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', String(a.x));
+          line.setAttribute('y1', String(a.y));
+          line.setAttribute('x2', String(b.x));
+          line.setAttribute('y2', String(b.y));
+          line.setAttribute('stroke', topicColour(shared[0]));
+          line.setAttribute('stroke-width', '1');
+          line.setAttribute('stroke-opacity', '0.25');
+          graph.appendChild(line);
+        });
+      });
+
+      // Draw nodes
+      const maxAge = nodes.length;
+      nodes.forEach((n, i) => {
+        const recency = 1 - (i / maxAge) * 0.65;
+        const mainTopic: string = (n.session.topics || [])[0] || '';
+        const fill = mainTopic ? topicColour(mainTopic) : '#6b7280';
+
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', String(n.x));
+        circle.setAttribute('cy', String(n.y));
+        circle.setAttribute('r', String(R));
+        circle.setAttribute('fill', fill);
+        circle.setAttribute('fill-opacity', String(recency));
+        circle.setAttribute('class', 'cursor-pointer');
+        graph.appendChild(circle);
+
+        // Hover title
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = `${n.session.title || 'Chat'} · ${n.session.timestamp || ''}`;
+        circle.appendChild(title);
+
+        circle.addEventListener('click', () => document.dispatchEvent(new CustomEvent('owl:load', { detail: { id: n.session.id } })));
+      });
+    })();
+  </script>
+</DashboardLayout>

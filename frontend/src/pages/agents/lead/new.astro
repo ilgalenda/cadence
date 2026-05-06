@@ -1,0 +1,1688 @@
+---
+import AgentLayout from '../../../layouts/AgentLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import OwlInline from '../../../components/lead/OwlInline.astro';
+import { LEAD_AGENT_NAME, LEAD_AGENT_TAGLINE, LEAD_NAV } from '../../../agents/lead/config';
+---
+<AgentLayout title="New campaign" agentName={LEAD_AGENT_NAME} agentTagline={LEAD_AGENT_TAGLINE} navItems={LEAD_NAV}>
+  <div class="px-10 py-12 max-w-4xl" id="wizard-root">
+
+    <PageHeader
+      label="Workspace · Lead · New"
+      heading="New campaign."
+      lead="Paste, upload, or type. Owl will analyse the lead and walk you through the rest."
+    />
+
+    <!-- ====== STEP 0 — LEAD INPUT ====== -->
+    <section data-step="0" class="step active mb-10">
+      <div class="step-summary hidden bg-surface-1 border border-rule-subtle px-5 py-4 cursor-pointer" data-edit="0">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Step 0 · Lead input</p>
+        <p class="text-sm text-ink-primary mt-1" data-summary="0">—</p>
+      </div>
+      <div class="step-active">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Step 0 · Lead input</h2>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-1 mb-4 border-b border-rule-subtle">
+          <button type="button" class="tab-btn px-4 py-2 text-sm border-b-2 border-accent text-ink-primary" data-tab="free">Free text / image</button>
+          <button type="button" class="tab-btn px-4 py-2 text-sm border-b-2 border-transparent text-ink-muted hover:text-ink-primary" data-tab="structured">LinkedIn / CRM fields</button>
+        </div>
+
+        <!-- Free tab -->
+        <div data-pane="free" class="space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Lead text</label>
+            <OwlInline field="lead_summary" target="#lead-text" hint="Tighten this into a clean summary" buttonLabel="Tidy" />
+          </div>
+          <textarea
+            id="lead-text"
+            rows="8"
+            placeholder="Paste lead info — email, CRM export, LinkedIn profile text, form submission, anything"
+            class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"
+          ></textarea>
+
+          <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted block">Optional image (LinkedIn screenshot, PDF page)</label>
+          <input id="lead-image" type="file" accept="image/png,image/jpeg,application/pdf" class="text-xs" />
+          <p id="lead-image-status" class="text-[11px] font-mono text-ink-muted"></p>
+        </div>
+
+        <!-- Structured tab -->
+        <div data-pane="structured" class="hidden grid grid-cols-2 gap-3">
+          <input data-sf="first_name"    placeholder="First name"     class="bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm" />
+          <input data-sf="last_name"     placeholder="Last name"      class="bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm" />
+          <input data-sf="job_title"     placeholder="Job title"      class="bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm" />
+          <input data-sf="company"       placeholder="Company"        class="bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm" />
+          <input data-sf="industry"      placeholder="Industry"       class="bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm" />
+          <input data-sf="company_size"  placeholder="Company size"   class="bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm" />
+          <input data-sf="linkedin_url"  placeholder="LinkedIn URL"   class="col-span-2 bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm" />
+          <select data-sf="source" class="bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm">
+            <option value="">Source…</option>
+            <option>Inbound form</option>
+            <option>Pricing page visit</option>
+            <option>Software download</option>
+            <option>Quote request</option>
+            <option>Cold — no signal</option>
+            <option>Other</option>
+          </select>
+          <textarea data-sf="notes" rows="2" placeholder="Notes" class="col-span-2 bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm"></textarea>
+        </div>
+
+        <button id="analyse-btn" class="mt-5 px-5 py-2 bg-accent text-ink-inverse text-sm rounded hover:opacity-90">
+          Analyse lead
+        </button>
+        <p id="step0-error" class="mt-3 text-xs font-mono text-signal-danger hidden"></p>
+      </div>
+    </section>
+
+    <!-- ====== STEP 1 — SIGNAL ANALYSIS ====== -->
+    <section data-step="1" class="step hidden mb-10">
+      <div class="step-summary hidden bg-surface-1 border border-rule-subtle px-5 py-4 cursor-pointer" data-edit="1">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Step 1 · Signal analysis</p>
+        <p class="text-sm text-ink-primary mt-1" data-summary="1">—</p>
+      </div>
+      <div class="step-active">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Step 1 · Signal analysis</h2>
+          <span id="owl-applied-flag" class="font-mono text-[10px] uppercase tracking-label text-accent hidden">🦉 owl refined</span>
+        </div>
+
+        <div id="signal-fields" class="grid grid-cols-2 gap-3 text-sm"></div>
+
+        <button id="signal-continue" class="mt-5 px-5 py-2 bg-accent text-ink-inverse text-sm rounded hover:opacity-90">
+          Save & continue
+        </button>
+      </div>
+    </section>
+
+    <!-- ====== STEP 1.5 — X-RAY (LinkedIn / public web prospect discovery) ====== -->
+    <section data-step="1.5" class="step hidden mb-10">
+      <div class="step-active">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Step 1.5 · X-Ray prospect discovery</h2>
+          <span id="xray-status" class="font-mono text-[10px] uppercase tracking-label text-ink-muted">Searching…</span>
+        </div>
+
+        <p id="xray-loading" class="text-sm text-ink-muted">Searching public sources for matching people…</p>
+        <p id="xray-empty" class="text-sm text-ink-muted hidden">No matching profiles found. Continue to campaign selection below.</p>
+        <p id="xray-error" class="text-xs font-mono text-signal-danger hidden"></p>
+
+        <div id="xray-toolbar" class="hidden flex items-center gap-3 mb-4">
+          <button id="xray-use-contacts" type="button"
+            class="px-4 py-2 bg-accent text-ink-inverse text-sm rounded hover:opacity-90 disabled:opacity-50">
+            Use selected contacts
+          </button>
+          <button id="xray-open-lusha" type="button"
+            class="px-4 py-2 border border-rule-subtle text-sm rounded hover:border-accent hover:bg-surface-1">
+            Open in Lusha
+          </button>
+          <span id="xray-selected-count" class="font-mono text-[11px] text-ink-muted">0 selected</span>
+          <span id="xray-toast" class="font-mono text-[11px] text-accent hidden">contacts added</span>
+        </div>
+
+        <div id="xray-buckets" class="hidden space-y-5">
+          <div data-xray-bucket="linkedin_direct">
+            <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Ready for LinkedIn outreach</p>
+            <ul class="space-y-2" data-xray-list="linkedin_direct"></ul>
+          </div>
+          <div data-xray-bucket="email_enrichment">
+            <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Needs email enrichment</p>
+            <ul class="space-y-2" data-xray-list="email_enrichment"></ul>
+          </div>
+          <div data-xray-bucket="campaign_context">
+            <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Campaign context only</p>
+            <ul class="space-y-2" data-xray-list="campaign_context"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== STEP 2 — CAMPAIGN TYPE ====== -->
+    <section data-step="2" class="step hidden mb-10">
+      <div class="step-summary hidden bg-surface-1 border border-rule-subtle px-5 py-4 cursor-pointer" data-edit="2">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Step 2 · Campaign type</p>
+        <p class="text-sm text-ink-primary mt-1" data-summary="2">—</p>
+      </div>
+      <div class="step-active">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Step 2 · Campaign type</h2>
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <button data-type="email" class="campaign-type-btn text-left p-5 border border-rule-subtle hover:border-accent hover:bg-surface-1">
+            <p class="text-base font-semibold tracking-tightest">Email outreach sequence</p>
+            <p class="text-sm text-ink-secondary mt-2">Personalised multi-touch email campaign.</p>
+            <p id="suggested-touches" class="font-mono text-[11px] text-ink-muted mt-3">Suggested touches: 4</p>
+          </button>
+          <button data-type="linkedin" class="campaign-type-btn text-left p-5 border border-rule-subtle hover:border-accent hover:bg-surface-1">
+            <p class="text-base font-semibold tracking-tightest">LinkedIn (Dripify)</p>
+            <p class="text-sm text-ink-secondary mt-2">Boolean search + connection message + drip follow-ups for Dripify.</p>
+          </button>
+          <button data-type="abm" class="campaign-type-btn text-left p-5 border border-rule-subtle hover:border-accent hover:bg-surface-1">
+            <p class="text-base font-semibold tracking-tightest">Multi-Channel ABM</p>
+            <p class="text-sm text-ink-secondary mt-2">4-week LinkedIn + email account push. Includes contact identification when needed.</p>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== STEP 3A — EMAIL CONFIG ====== -->
+    <section data-step="3a" class="step hidden mb-10">
+      <div class="step-summary hidden bg-surface-1 border border-rule-subtle px-5 py-4 cursor-pointer" data-edit="3a">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Step 3A · Email configuration</p>
+        <p class="text-sm text-ink-primary mt-1" data-summary="3a">—</p>
+      </div>
+      <div class="step-active">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Step 3A · Email configuration</h2>
+        </div>
+
+        <div class="space-y-4 text-sm">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Recipients</label>
+              <button id="add-recipient" type="button" class="px-2 py-1 text-[11px] border border-rule-subtle hover:border-accent">+ Add recipient</button>
+            </div>
+            <p class="text-[12px] text-ink-muted mb-2">Each recipient gets a personalised sequence. LinkedIn URL is optional but adds context.</p>
+            <table class="w-full border border-rule-subtle">
+              <thead class="bg-surface-1">
+                <tr class="text-left">
+                  <th class="px-2 py-2 font-mono text-[11px] uppercase tracking-label text-ink-muted w-1/4">Name</th>
+                  <th class="px-2 py-2 font-mono text-[11px] uppercase tracking-label text-ink-muted w-1/3">Role</th>
+                  <th class="px-2 py-2 font-mono text-[11px] uppercase tracking-label text-ink-muted">LinkedIn URL <span class="text-ink-muted/60">(optional)</span></th>
+                  <th class="w-8"></th>
+                </tr>
+              </thead>
+              <tbody id="recipients-rows"></tbody>
+            </table>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Touches</label>
+              <div class="seg mt-1" data-name="touches">
+                <button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button>
+              </div>
+            </div>
+            <div>
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Tone</label>
+              <div class="seg mt-1" data-name="tone">
+                <button data-v="Consultative">Consultative</button><button data-v="Technical">Technical</button><button data-v="Direct">Direct</button>
+              </div>
+            </div>
+            <div>
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Focus</label>
+              <div class="seg mt-1" data-name="focus">
+                <button data-v="Sales">Sales</button><button data-v="Technical">Technical</button><button data-v="Thought leadership">Thought leadership</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between">
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Materials to reference</label>
+              <OwlInline field="materials" target="#cfg-materials" hint="Suggest Timebeat materials for this lead" />
+            </div>
+            <textarea id="cfg-materials" rows="2" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1"></textarea>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <input id="cfg-case-toggle" type="checkbox" />
+            <label for="cfg-case-toggle" class="text-sm">Include a case study</label>
+            <input id="cfg-case-name" type="text" placeholder="Case study name / URL" class="ml-2 flex-1 bg-surface-1 border border-rule-subtle rounded px-3 py-2 hidden" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Start date</label>
+              <input id="cfg-start" type="date" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+            </div>
+            <div>
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Cadence</label>
+              <div class="seg mt-1" data-name="cadence">
+                <button data-v="Daily">Daily</button><button data-v="Every 2 days">2d</button><button data-v="Every 3 days">3d</button><button data-v="Weekly">Weekly</button>
+              </div>
+            </div>
+          </div>
+
+          <button id="generate-sequence" class="mt-3 px-5 py-2 bg-accent text-ink-inverse text-sm rounded hover:opacity-90">Generate campaign</button>
+          <p id="step3a-error" class="text-xs font-mono text-signal-danger hidden"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== STEP 3B — LINKEDIN CONFIG ====== -->
+    <section data-step="3b" class="step hidden mb-10">
+      <div class="step-summary hidden bg-surface-1 border border-rule-subtle px-5 py-4 cursor-pointer" data-edit="3b">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Step 3B · LinkedIn boolean</p>
+        <p class="text-sm text-ink-primary mt-1" data-summary="3b">—</p>
+      </div>
+      <div class="step-active">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Step 3B · LinkedIn search configuration</h2>
+        </div>
+
+        <div class="space-y-4 text-sm">
+          <div>
+            <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Target industry</label>
+            <input id="li-industry" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+          </div>
+          <div>
+            <div class="flex items-center justify-between">
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Target roles (comma-separated)</label>
+              <OwlInline field="linkedin_roles" target="#li-roles" hint="Add Timebeat-relevant role variants" />
+            </div>
+            <input id="li-roles" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+          </div>
+          <div>
+            <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Company size</label>
+            <div class="flex gap-2 mt-1 flex-wrap">
+              <label><input type="checkbox" data-li-size value="SMB" /> SMB</label>
+              <label><input type="checkbox" data-li-size value="Mid-market" /> Mid-market</label>
+              <label><input type="checkbox" data-li-size value="Enterprise" /> Enterprise</label>
+              <label><input type="checkbox" data-li-size value="Government" /> Government</label>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Geography</label>
+              <input id="li-geo" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+            </div>
+            <div>
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Keywords to include</label>
+              <input id="li-include" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+            </div>
+          </div>
+          <div>
+            <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Keywords to exclude (optional)</label>
+            <input id="li-exclude" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+          </div>
+          <button id="generate-boolean" class="mt-3 px-5 py-2 bg-accent text-ink-inverse text-sm rounded hover:opacity-90">Generate search string</button>
+          <p id="step3b-error" class="text-xs font-mono text-signal-danger hidden"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== STEP 3C — ABM CONFIG ====== -->
+    <section data-step="3c" class="step hidden mb-10">
+      <div class="step-summary hidden bg-surface-1 border border-rule-subtle px-5 py-4 cursor-pointer" data-edit="3c">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Step 3C · ABM configuration</p>
+        <p class="text-sm text-ink-primary mt-1" data-summary="3c">—</p>
+      </div>
+      <div class="step-active">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Step 3C · Multi-Channel ABM</h2>
+        </div>
+        <div class="space-y-4 text-sm">
+          <div class="border border-rule-subtle p-4 bg-surface-1">
+            <div class="flex items-center gap-3">
+              <input id="abm-has-contacts" type="checkbox" />
+              <label for="abm-has-contacts" class="text-sm">I already have named contacts inside this account</label>
+            </div>
+            <p class="text-[12px] text-ink-muted mt-2">Leave unchecked if you only have an organisation-level signal (e.g. an anonymous download). Owl will run identification first — LinkedIn boolean scoped to the company plus a Lusha enrichment checklist — before generating the 4-week sequence.</p>
+          </div>
+
+          <div>
+            <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Target account / organisation</label>
+            <input id="abm-account" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Geography</label>
+              <input id="abm-geo" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+            </div>
+            <div>
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Account context / "why now"</label>
+              <input id="abm-context" placeholder="Regulation, project, stack change…" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+            </div>
+          </div>
+
+          <div data-abm-contacts-block>
+            <div class="flex items-center justify-between mb-2">
+              <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Contacts (one row per persona)</label>
+              <button id="abm-add-contact" type="button" class="px-2 py-1 text-[11px] border border-rule-subtle hover:border-accent">+ Add contact</button>
+            </div>
+            <table class="w-full border border-rule-subtle">
+              <thead class="bg-surface-1">
+                <tr class="text-left">
+                  <th class="px-2 py-2 font-mono text-[11px] uppercase tracking-label text-ink-muted w-1/4">Name</th>
+                  <th class="px-2 py-2 font-mono text-[11px] uppercase tracking-label text-ink-muted w-1/4">Role</th>
+                  <th class="px-2 py-2 font-mono text-[11px] uppercase tracking-label text-ink-muted">LinkedIn URL</th>
+                  <th class="px-2 py-2 font-mono text-[11px] uppercase tracking-label text-ink-muted w-1/5">Email</th>
+                  <th class="w-8"></th>
+                </tr>
+              </thead>
+              <tbody id="abm-contacts-rows"></tbody>
+            </table>
+          </div>
+
+          <div class="flex gap-2">
+            <button id="abm-identify" class="px-5 py-2 border border-rule-subtle text-sm hover:border-accent hidden">Identify contacts (Owl)</button>
+            <button id="abm-generate" class="px-5 py-2 bg-accent text-ink-inverse text-sm rounded hover:opacity-90">Generate 4-week sequence</button>
+          </div>
+          <p id="step3c-error" class="text-xs font-mono text-signal-danger hidden"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== STEP 3.5C — ABM IDENTIFICATION OUTPUT ====== -->
+    <section data-step="3-5c" class="step hidden mb-10">
+      <div class="step-active">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Step 3.5C · Identification plan</h2>
+        </div>
+        <div id="abm-identify-result" class="space-y-4"></div>
+        <div class="mt-6 flex gap-3">
+          <button id="abm-identify-back" class="px-3 py-1 text-xs border border-rule-subtle">Back to ABM config</button>
+          <p class="text-[12px] text-ink-muted self-center">Once you have enriched contacts, add them in Step 3C and generate the sequence.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== STEP 4C — ABM 4-WEEK MATRIX ====== -->
+    <section data-step="4c" class="step hidden mb-10">
+      <div class="step-active">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Step 4C · 4-week ABM matrix</h2>
+          <div class="flex gap-2">
+            <button id="abm-export-txt" class="px-3 py-1 text-xs border border-rule-subtle hover:border-accent">Export .txt</button>
+          </div>
+        </div>
+        <div id="abm-matrix" class="space-y-6"></div>
+        <p id="abm-coordination" class="text-sm text-ink-secondary italic mt-4"></p>
+      </div>
+    </section>
+
+    <!-- ====== STEP 4A — EMAIL SEQUENCE ====== -->
+    <section data-step="4a" class="step hidden mb-10">
+      <div class="step-summary hidden bg-surface-1 border border-rule-subtle px-5 py-4 cursor-pointer" data-edit="4a">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Step 4A · Email sequence</p>
+        <p class="text-sm text-ink-primary mt-1" data-summary="4a">—</p>
+      </div>
+      <div class="step-active">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Step 4A · Email sequence</h2>
+          <div class="flex gap-2">
+            <button id="export-txt" class="px-3 py-1 text-xs border border-rule-subtle hover:border-accent">Export .txt</button>
+            <button id="open-calendar" class="px-3 py-1 text-xs bg-accent text-ink-inverse">Add to Google Calendar →</button>
+          </div>
+        </div>
+        <div id="sequence-list" class="space-y-4"></div>
+      </div>
+    </section>
+
+    <!-- ====== STEP 4B — BOOLEAN STRING ====== -->
+    <section data-step="4b" class="step hidden mb-10">
+      <div class="step-active">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Step 4B · Boolean search</h2>
+        </div>
+        <div id="boolean-result" class="space-y-4"></div>
+        <div class="mt-6 flex gap-3">
+          <a href="/agents/lead/new" class="px-3 py-1 text-xs border border-rule-subtle">Start a new campaign</a>
+          <button id="boolean-back-step2" class="px-3 py-1 text-xs border border-rule-subtle">New campaign for this lead</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== STEP 5A — GOOGLE CALENDAR ====== -->
+    <section data-step="5a" class="step hidden mb-10">
+      <div class="step-active">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Step 5A · Google Calendar</h2>
+          <span id="gcal-state" class="font-mono text-[11px] uppercase tracking-label text-ink-muted">// checking…</span>
+        </div>
+        <div id="gcal-controls" class="space-y-3"></div>
+        <div id="gcal-progress" class="mt-6 space-y-2"></div>
+      </div>
+    </section>
+
+  </div>
+
+
+  <style>
+    .seg { display: inline-flex; border: 1px solid var(--tw-border, #e5e5e5); border-radius: 4px; overflow: hidden; }
+    .seg button { padding: 0.4rem 0.75rem; font-size: 12px; background: transparent; }
+    .seg button.active { background: rgba(216, 90, 42, 0.1); color: #d8 5a 2a; }
+    .step.completed .step-active { display: none; }
+    .step.completed .step-summary { display: block; }
+  </style>
+
+  <script>
+    import { defaultTouchesFor } from '../../../agents/lead/config';
+    // -----------------------------------------------------------------------
+    // Wizard state
+    // -----------------------------------------------------------------------
+    type Recipient = { id: string; name: string; role: string; linkedin_url: string; sequence: any[] };
+    type AbmContact = { id: string; name: string; role: string; linkedin_url: string; email: string };
+    type State = {
+      campaign_id: string | null;
+      analysis: any;
+      campaign_type: 'email' | 'linkedin' | 'abm' | null;
+      email_config: any;
+      linkedin_config: any;
+      abm_config: any;
+      abm_identification: any;
+      abm_matrix: any;
+      recipients: Recipient[];
+      active_recipient_id: string | null;
+      boolean: any;
+      image_b64: string | null;
+      image_media_type: string | null;
+    };
+    const state: State = {
+      campaign_id: null,
+      analysis: null,
+      campaign_type: null,
+      email_config: null,
+      linkedin_config: null,
+      abm_config: null,
+      abm_identification: null,
+      abm_matrix: null,
+      recipients: [],
+      active_recipient_id: null,
+      boolean: null,
+      image_b64: null,
+      image_media_type: null,
+    };
+    function activeRecipient(): Recipient | null {
+      return state.recipients.find(r => r.id === state.active_recipient_id) || state.recipients[0] || null;
+    }
+    function rid() { return Math.random().toString(36).slice(2, 14); }
+    (window as any).leadWizardState = () => ({ ...state });
+
+    // -----------------------------------------------------------------------
+    // Step navigation helpers
+    // -----------------------------------------------------------------------
+    function $(s: string) { return document.querySelector(s) as HTMLElement; }
+    function $$(s: string) { return Array.from(document.querySelectorAll(s)) as HTMLElement[]; }
+    function getStep(id: string) { return document.querySelector(`[data-step="${id}"]`) as HTMLElement; }
+
+    function showStep(id: string) {
+      const el = getStep(id);
+      if (!el) return;
+      el.classList.remove('hidden');
+      el.classList.add('active');
+      el.classList.remove('completed');
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    function completeStep(id: string, summary: string) {
+      const el = getStep(id);
+      if (!el) return;
+      el.classList.add('completed');
+      const s = el.querySelector(`[data-summary="${id}"]`);
+      if (s) s.textContent = summary;
+    }
+    document.querySelectorAll('[data-edit]').forEach(el => {
+      el.addEventListener('click', () => {
+        const id = (el as HTMLElement).dataset.edit!;
+        getStep(id).classList.remove('completed');
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Tabs
+    // -----------------------------------------------------------------------
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.classList.remove('border-accent', 'text-ink-primary');
+          b.classList.add('border-transparent', 'text-ink-muted');
+        });
+        btn.classList.add('border-accent', 'text-ink-primary');
+        btn.classList.remove('border-transparent', 'text-ink-muted');
+        const tab = (btn as HTMLElement).dataset.tab;
+        document.querySelectorAll('[data-pane]').forEach(p => p.classList.add('hidden'));
+        $(`[data-pane="${tab}"]`).classList.remove('hidden');
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Segmented controls
+    // -----------------------------------------------------------------------
+    function setupSeg(name: string, defaultVal?: string) {
+      const root = document.querySelector(`.seg[data-name="${name}"]`) as HTMLElement;
+      if (!root) return null;
+      const btns = Array.from(root.querySelectorAll('button')) as HTMLButtonElement[];
+      function set(v: string) {
+        btns.forEach(b => b.classList.toggle('active', b.dataset.v === v));
+        (root as any)._value = v;
+      }
+      btns.forEach(b => b.addEventListener('click', () => set(b.dataset.v!)));
+      if (defaultVal) set(defaultVal);
+      return { get: () => (root as any)._value, set };
+    }
+    const segTouches = setupSeg('touches', '4');
+    const segTone = setupSeg('tone', 'Consultative');
+    const segFocus = setupSeg('focus', 'Sales');
+    const segCadence = setupSeg('cadence', 'Every 2 days');
+
+    // -----------------------------------------------------------------------
+    // Recipients table (Step 3A)
+    // -----------------------------------------------------------------------
+    type RecipientDraft = { id: string; name: string; role: string; linkedin_url: string };
+    const draftRecipients: RecipientDraft[] = [];
+
+    function renderRecipients() {
+      const tbody = document.getElementById('recipients-rows')!;
+      tbody.innerHTML = draftRecipients.map((r, i) => `
+        <tr data-rid="${r.id}" class="border-t border-rule-subtle">
+          <td class="px-2 py-1"><input data-rf="name"        value="${escapeAttr(r.name)}"        class="w-full bg-transparent border-0 px-1 py-1 text-sm focus:outline-none focus:bg-surface-1" placeholder="Name" /></td>
+          <td class="px-2 py-1"><input data-rf="role"        value="${escapeAttr(r.role)}"        class="w-full bg-transparent border-0 px-1 py-1 text-sm focus:outline-none focus:bg-surface-1" placeholder="Role" /></td>
+          <td class="px-2 py-1"><input data-rf="linkedin_url" value="${escapeAttr(r.linkedin_url)}" class="w-full bg-transparent border-0 px-1 py-1 text-sm focus:outline-none focus:bg-surface-1" placeholder="https://linkedin.com/in/…" /></td>
+          <td class="px-2 py-1 text-right">
+            ${draftRecipients.length > 1 ? `<button class="rm-recipient text-ink-muted hover:text-signal-danger text-sm" type="button" aria-label="Remove">×</button>` : ''}
+          </td>
+        </tr>
+      `).join('');
+      tbody.querySelectorAll('[data-rid]').forEach(row => {
+        const id = (row as HTMLElement).dataset.rid!;
+        row.querySelectorAll('[data-rf]').forEach(input => {
+          input.addEventListener('input', e => {
+            const f = (input as HTMLElement).dataset.rf as keyof RecipientDraft;
+            const r = draftRecipients.find(x => x.id === id);
+            if (r) (r as any)[f] = (e.target as HTMLInputElement).value;
+          });
+        });
+        const rm = row.querySelector('.rm-recipient');
+        if (rm) rm.addEventListener('click', () => {
+          const idx = draftRecipients.findIndex(x => x.id === id);
+          if (idx >= 0) { draftRecipients.splice(idx, 1); renderRecipients(); }
+        });
+      });
+    }
+    function escapeAttr(s: string) { return (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
+
+    document.getElementById('add-recipient')!.addEventListener('click', () => {
+      draftRecipients.push({ id: rid(), name: '', role: '', linkedin_url: '' });
+      renderRecipients();
+      // Focus the name field of the newly added row
+      const rows = document.querySelectorAll('#recipients-rows tr');
+      const last = rows[rows.length - 1] as HTMLElement | undefined;
+      const inp = last?.querySelector('input[data-rf="name"]') as HTMLInputElement | undefined;
+      inp?.focus();
+    });
+
+    // Case study toggle
+    document.getElementById('cfg-case-toggle')!.addEventListener('change', (e) => {
+      const on = (e.target as HTMLInputElement).checked;
+      document.getElementById('cfg-case-name')!.classList.toggle('hidden', !on);
+    });
+
+    // -----------------------------------------------------------------------
+    // Step 0 — image upload (base64)
+    // -----------------------------------------------------------------------
+    document.getElementById('lead-image')!.addEventListener('change', async (e) => {
+      const f = (e.target as HTMLInputElement).files?.[0];
+      const status = document.getElementById('lead-image-status')!;
+      if (!f) { state.image_b64 = null; state.image_media_type = null; status.textContent = ''; return; }
+      if (f.size > 8 * 1024 * 1024) {
+        status.textContent = '// image too large (max 8 MB)';
+        (e.target as HTMLInputElement).value = '';
+        return;
+      }
+      const buf = await f.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      state.image_b64 = btoa(bin);
+      state.image_media_type = f.type === 'application/pdf' ? 'image/png' : f.type;
+      status.textContent = `// loaded ${f.name} (${Math.round(f.size / 1024)} KB)`;
+    });
+
+    // -----------------------------------------------------------------------
+    // Step 0 → analyse
+    // -----------------------------------------------------------------------
+    document.getElementById('analyse-btn')!.addEventListener('click', async () => {
+      const btn = document.getElementById('analyse-btn') as HTMLButtonElement;
+      const errEl = document.getElementById('step0-error')!;
+      errEl.classList.add('hidden');
+
+      const text = (document.getElementById('lead-text') as HTMLTextAreaElement).value.trim();
+      const structured: Record<string, string> = {};
+      document.querySelectorAll('[data-sf]').forEach(el => {
+        const k = (el as HTMLElement).dataset.sf!;
+        const v = (el as HTMLInputElement | HTMLTextAreaElement).value.trim();
+        if (v) structured[k] = v;
+      });
+
+      if (!text && Object.keys(structured).length === 0 && !state.image_b64) {
+        errEl.textContent = '// add some lead info first';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true; btn.textContent = 'Analysing…';
+      try {
+        const res = await fetch('/api/lead/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: text || null,
+            structured: Object.keys(structured).length ? structured : null,
+            image_b64: state.image_b64,
+            image_media_type: state.image_media_type,
+          }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Analysis failed');
+        const data = await res.json();
+        state.campaign_id = data.campaign_id;
+        state.analysis = data.final;
+        if (data.owl_applied) document.getElementById('owl-applied-flag')!.classList.remove('hidden');
+        renderSignal(data.final);
+        completeStep('0', text.slice(0, 80) || 'Structured fields submitted');
+        showStep('1');
+        triggerXray(data.campaign_id, (data.final && data.final.company) || '');
+      } catch (e: any) {
+        errEl.textContent = '// ' + (e?.message || 'failed');
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Analyse lead';
+      }
+    });
+
+    // -----------------------------------------------------------------------
+    // Step 1 — render & edit
+    // -----------------------------------------------------------------------
+    const SIGNAL_FIELDS: { key: string; label: string }[] = [
+      { key: 'contact_name', label: 'Contact' },
+      { key: 'company', label: 'Company' },
+      { key: 'role', label: 'Inferred role' },
+      { key: 'signal_strength', label: 'Signal strength' },
+      { key: 'signal_strength_reasoning', label: 'Reasoning' },
+      { key: 'confidence', label: 'Confidence' },
+      { key: 'signal_type', label: 'Signal type' },
+      { key: 'product_fit', label: 'Product fit' },
+      { key: 'suggested_campaign_type', label: 'Suggested campaign' },
+      { key: 'suggested_campaign_reasoning', label: 'Reasoning' },
+      { key: 'source', label: 'Source' },
+    ];
+    function renderSignal(a: any) {
+      const root = document.getElementById('signal-fields')!;
+      root.innerHTML = SIGNAL_FIELDS.map(f => `
+        <div>
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-1">${f.label}</p>
+          <input data-sa="${f.key}" value="${(a[f.key] || '').toString().replace(/"/g, '&quot;')}"
+            class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm" />
+        </div>
+      `).join('');
+    }
+    document.getElementById('signal-continue')!.addEventListener('click', async () => {
+      const updated: Record<string, string> = { ...state.analysis };
+      document.querySelectorAll('[data-sa]').forEach(el => {
+        updated[(el as HTMLElement).dataset.sa!] = (el as HTMLInputElement).value;
+      });
+      state.analysis = updated;
+      try {
+        await fetch(`/api/lead/campaigns/${state.campaign_id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signal_analysis: updated, current_step: 2 }),
+        });
+      } catch {}
+      const summary = `${updated.contact_name || '?'} at ${updated.company || '?'} — ${updated.signal_strength || '?'} signal`;
+      completeStep('1', summary);
+
+      // Suggested touches based on signal strength (KB Section 2.1).
+      const suggested = defaultTouchesFor(updated.signal_strength);
+      document.getElementById('suggested-touches')!.textContent = `Suggested touches: ${suggested}`;
+      segTouches?.set(String(suggested));
+
+      // Pre-fill 3A: one recipient seeded from the analysis (only if we don't already have any)
+      if (draftRecipients.length === 0) {
+        draftRecipients.push({
+          id: rid(),
+          name: updated.contact_name || '',
+          role: updated.role || '',
+          linkedin_url: '',
+        });
+        renderRecipients();
+      }
+      const today = new Date(); today.setDate(today.getDate() + 1);
+      (document.getElementById('cfg-start') as HTMLInputElement).value = today.toISOString().slice(0, 10);
+
+      // Pre-fill 3B defaults
+      (document.getElementById('li-industry') as HTMLInputElement).value = updated.company || '';
+      (document.getElementById('li-roles') as HTMLInputElement).value = updated.role || '';
+
+      showStep('2');
+    });
+
+    // -----------------------------------------------------------------------
+    // Step 1.5 — X-Ray prospect discovery
+    // -----------------------------------------------------------------------
+    type XRayRow = {
+      full_name: string; job_title: string; company: string; linkedin_url: string;
+      confidence: 'high' | 'medium' | 'low';
+      recommended_path: 'linkedin_direct' | 'email_enrichment' | 'campaign_context';
+      match_reason: string; source_query: string;
+    };
+    type XRayGrouped = { linkedin_direct: XRayRow[]; email_enrichment: XRayRow[]; campaign_context: XRayRow[] };
+    const xrayState: { rows: XRayRow[]; selected: Set<string>; targetCompany: string } = {
+      rows: [], selected: new Set(), targetCompany: '',
+    };
+
+    function escHtml(s: string) {
+      return (s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c] as string));
+    }
+
+    function renderXrayBuckets(grouped: XRayGrouped) {
+      const buckets: (keyof XRayGrouped)[] = ['linkedin_direct', 'email_enrichment', 'campaign_context'];
+      let total = 0;
+      xrayState.rows = [];
+      buckets.forEach(b => {
+        const list = document.querySelector(`[data-xray-list="${b}"]`)!;
+        const bucketWrap = document.querySelector(`[data-xray-bucket="${b}"]`) as HTMLElement;
+        const rows = grouped[b] || [];
+        if (!rows.length) {
+          bucketWrap.classList.add('hidden');
+          list.innerHTML = '';
+          return;
+        }
+        bucketWrap.classList.remove('hidden');
+        list.innerHTML = rows.map(r => {
+          const key = r.linkedin_url || `${r.full_name}::${r.job_title}`;
+          xrayState.rows.push(r);
+          // Pre-check linkedin_direct rows.
+          if (b === 'linkedin_direct') xrayState.selected.add(key);
+          const checked = xrayState.selected.has(key) ? 'checked' : '';
+          const linkHtml = r.linkedin_url
+            ? `<a href="${escHtml(r.linkedin_url)}" target="_blank" rel="noopener" class="text-accent hover:underline">${escHtml(r.linkedin_url)}</a>`
+            : '<span class="text-ink-muted">no link</span>';
+          return `
+            <li class="border border-rule-subtle bg-surface-1 px-4 py-3" data-xray-row data-key="${escHtml(key)}">
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" class="xray-check mt-1" data-key="${escHtml(key)}" ${checked} />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-baseline justify-between gap-3">
+                    <p class="text-sm font-semibold text-ink-primary truncate">${escHtml(r.full_name)}</p>
+                    <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted">${escHtml(r.confidence)}</span>
+                  </div>
+                  <p class="text-sm text-ink-secondary">${escHtml(r.job_title)}${r.company ? ' — ' + escHtml(r.company) : ''}</p>
+                  <p class="text-sm text-ink-primary mt-2">${escHtml(r.match_reason)}</p>
+                  <p class="text-[11px] text-ink-muted mt-2">${linkHtml}</p>
+                  ${r.source_query ? `<p class="font-mono text-[10px] text-ink-muted mt-1 truncate">${escHtml(r.source_query)}</p>` : ''}
+                </div>
+              </label>
+            </li>
+          `;
+        }).join('');
+        total += rows.length;
+      });
+      document.getElementById('xray-buckets')!.classList.toggle('hidden', total === 0);
+      document.getElementById('xray-empty')!.classList.toggle('hidden', total !== 0);
+      document.getElementById('xray-toolbar')!.classList.toggle('hidden', total === 0);
+      document.getElementById('xray-toolbar')!.classList.toggle('flex', total !== 0);
+      updateXraySelectedCount();
+    }
+
+    function updateXraySelectedCount() {
+      const n = xrayState.selected.size;
+      document.getElementById('xray-selected-count')!.textContent = `${n} selected`;
+      (document.getElementById('xray-use-contacts') as HTMLButtonElement).disabled = n === 0;
+    }
+
+    document.getElementById('xray-buckets')!.addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (!t.classList.contains('xray-check')) return;
+      const key = t.dataset.key!;
+      if (t.checked) xrayState.selected.add(key);
+      else xrayState.selected.delete(key);
+      updateXraySelectedCount();
+    });
+
+    document.getElementById('xray-open-lusha')!.addEventListener('click', () => {
+      const q = xrayState.targetCompany ? encodeURIComponent(xrayState.targetCompany) : '';
+      const url = q ? `https://www.lusha.com/?q=${q}` : 'https://www.lusha.com/';
+      window.open(url, '_blank', 'noopener');
+    });
+
+    document.getElementById('xray-use-contacts')!.addEventListener('click', async () => {
+      if (!state.campaign_id || xrayState.selected.size === 0) return;
+      const selectedRows = xrayState.rows.filter(r => {
+        const key = r.linkedin_url || `${r.full_name}::${r.job_title}`;
+        return xrayState.selected.has(key);
+      });
+      // Map to recipients shape; ABM target if user has chosen ABM (still campaign-type-agnostic at this point).
+      const target = state.campaign_type === 'abm' ? 'contacts' : 'recipients';
+      const btn = document.getElementById('xray-use-contacts') as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = 'Adding…';
+      try {
+        const res = await fetch(`/api/lead/campaigns/${state.campaign_id}/contacts/from-xray`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ selected: selectedRows, target }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Failed');
+        const data = await res.json();
+        // Mirror into local state so Step 3A's recipients table picks them up.
+        if (target === 'recipients') {
+          draftRecipients.length = 0;
+          (data.campaign?.recipients || []).forEach((r: any) => {
+            draftRecipients.push({
+              id: r.id || rid(),
+              name: r.name || '',
+              role: r.role || '',
+              linkedin_url: r.linkedin_url || '',
+            });
+          });
+          renderRecipients();
+        }
+        const toast = document.getElementById('xray-toast')!;
+        toast.textContent = `${data.added} added`;
+        toast.classList.remove('hidden');
+        setTimeout(() => toast.classList.add('hidden'), 2500);
+      } catch (e: any) {
+        const err = document.getElementById('xray-error')!;
+        err.textContent = '// ' + (e?.message || 'failed');
+        err.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Use selected contacts';
+      }
+    });
+
+    async function triggerXray(campaignId: string, company: string) {
+      xrayState.targetCompany = company || '';
+      xrayState.rows = [];
+      xrayState.selected.clear();
+      const status = document.getElementById('xray-status')!;
+      const loading = document.getElementById('xray-loading')!;
+      const errEl = document.getElementById('xray-error')!;
+      const buckets = document.getElementById('xray-buckets')!;
+      const toolbar = document.getElementById('xray-toolbar')!;
+      const empty = document.getElementById('xray-empty')!;
+
+      status.textContent = 'Searching…';
+      status.classList.remove('hidden');
+      loading.classList.remove('hidden');
+      buckets.classList.add('hidden');
+      toolbar.classList.add('hidden');
+      empty.classList.add('hidden');
+      errEl.classList.add('hidden');
+      showStep('1.5');
+
+      try {
+        const res = await fetch(`/api/lead/campaigns/${campaignId}/xray`, { method: 'POST' });
+        if (!res.ok) throw new Error((await res.json()).detail || 'X-Ray failed');
+        const data = await res.json();
+        loading.classList.add('hidden');
+        if (data.error) {
+          errEl.textContent = '// ' + data.error;
+          errEl.classList.remove('hidden');
+          status.textContent = 'failed';
+        } else {
+          status.textContent = 'done';
+        }
+        renderXrayBuckets(data.xray_results || { linkedin_direct: [], email_enrichment: [], campaign_context: [] });
+      } catch (e: any) {
+        loading.classList.add('hidden');
+        errEl.textContent = '// ' + (e?.message || 'failed');
+        errEl.classList.remove('hidden');
+        status.textContent = 'failed';
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Step 2 — campaign type
+    // -----------------------------------------------------------------------
+    document.querySelectorAll('.campaign-type-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const t = (btn as HTMLElement).dataset.type as 'email' | 'linkedin' | 'abm';
+        state.campaign_type = t;
+        const summary = t === 'email' ? 'Email outreach sequence'
+          : t === 'linkedin' ? 'LinkedIn (Dripify)'
+          : 'Multi-Channel ABM';
+        completeStep('2', summary);
+        try {
+          await fetch(`/api/lead/campaigns/${state.campaign_id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ campaign_type: t, current_step: 3 }),
+          });
+        } catch {}
+        if (t === 'abm') {
+          // Pre-fill ABM account + seed one contact row from the analysis if any.
+          const a = state.analysis || {};
+          const accInput = document.getElementById('abm-account') as HTMLInputElement;
+          if (accInput && !accInput.value) accInput.value = a.company || '';
+          if (abmContacts.length === 0 && a.contact_name) {
+            abmContacts.push({ id: rid(), name: a.contact_name || '', role: a.role || '', linkedin_url: '', email: '' });
+            (document.getElementById('abm-has-contacts') as HTMLInputElement).checked = true;
+          }
+          renderAbmContacts();
+          syncAbmContactsVisibility();
+          showStep('3c');
+        } else {
+          showStep(t === 'email' ? '3a' : '3b');
+        }
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Step 3A — generate sequence
+    // -----------------------------------------------------------------------
+    document.getElementById('generate-sequence')!.addEventListener('click', async () => {
+      const btn = document.getElementById('generate-sequence') as HTMLButtonElement;
+      const errEl = document.getElementById('step3a-error')!;
+      errEl.classList.add('hidden');
+
+      // Validate recipients: at least one with a non-empty role.
+      const validRecipients = draftRecipients
+        .map(r => ({ ...r, name: r.name.trim(), role: r.role.trim(), linkedin_url: r.linkedin_url.trim() }))
+        .filter(r => r.role || r.name);
+      if (validRecipients.length === 0) {
+        errEl.textContent = '// add at least one recipient with a role';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      const config: any = {
+        touches: parseInt(segTouches!.get() || '4', 10),
+        tone: segTone!.get(),
+        focus: segFocus!.get(),
+        materials: (document.getElementById('cfg-materials') as HTMLTextAreaElement).value,
+        case_study: (document.getElementById('cfg-case-toggle') as HTMLInputElement).checked
+          ? (document.getElementById('cfg-case-name') as HTMLInputElement).value
+          : null,
+        start_date: (document.getElementById('cfg-start') as HTMLInputElement).value,
+        cadence: segCadence!.get(),
+      };
+      state.email_config = config;
+
+      btn.disabled = true;
+      btn.textContent = `Generating ${validRecipients.length} sequence${validRecipients.length > 1 ? 's' : ''}…`;
+      try {
+        const res = await fetch(`/api/lead/campaigns/${state.campaign_id}/sequence`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ config, recipients: validRecipients }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Generation failed');
+        const data = await res.json();
+        state.recipients = (data.recipients || []).map((r: any) => ({
+          id: r.id, name: r.name || '', role: r.role || '', linkedin_url: r.linkedin_url || '',
+          sequence: r.sequence || [],
+        }));
+        state.active_recipient_id = state.recipients[0]?.id || null;
+        renderSequence();
+        const summary = state.recipients.length === 1
+          ? `${config.touches} touches · ${config.tone} · ${config.focus}`
+          : `${state.recipients.length} recipients · ${config.touches} touches each · ${config.tone} · ${config.focus}`;
+        completeStep('3a', summary);
+        showStep('4a');
+      } catch (e: any) {
+        errEl.textContent = '// ' + (e?.message || 'failed');
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Generate campaign';
+      }
+    });
+
+    // -----------------------------------------------------------------------
+    // Step 4A — render sequence
+    // -----------------------------------------------------------------------
+    function escapeHtml(s: string) { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!)); }
+
+    function renderRecipientTabs() {
+      // Render tabs only when there is more than one recipient.
+      const root = document.getElementById('sequence-list')!;
+      let tabs = document.getElementById('recipient-tabs');
+      if (!tabs) {
+        tabs = document.createElement('div');
+        tabs.id = 'recipient-tabs';
+        tabs.className = 'flex gap-1 mb-4 border-b border-rule-subtle overflow-x-auto';
+        root.parentElement!.insertBefore(tabs, root);
+      }
+      if (state.recipients.length <= 1) {
+        tabs.innerHTML = '';
+        return;
+      }
+      tabs.innerHTML = state.recipients.map(r => {
+        const active = r.id === state.active_recipient_id;
+        const label = (r.name || r.role || 'Unnamed').slice(0, 28);
+        const sub = r.role && r.name ? r.role.slice(0, 22) : '';
+        return `<button data-rcp-tab="${r.id}" class="px-3 py-2 text-sm shrink-0 border-b-2 ${active ? 'border-accent text-ink-primary' : 'border-transparent text-ink-muted hover:text-ink-primary'}">
+          <span class="font-medium">${escapeHtml(label)}</span>
+          ${sub ? `<span class="ml-1 text-[11px] text-ink-muted">· ${escapeHtml(sub)}</span>` : ''}
+        </button>`;
+      }).join('');
+      tabs.querySelectorAll('[data-rcp-tab]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.active_recipient_id = (btn as HTMLElement).dataset.rcpTab!;
+          renderSequence();
+        });
+      });
+    }
+
+    function renderSequence() {
+      renderRecipientTabs();
+      const root = document.getElementById('sequence-list')!;
+      const r = activeRecipient();
+      if (!r) { root.innerHTML = '<p class="text-sm text-ink-muted">// no sequence yet</p>'; return; }
+      const sequence = r.sequence;
+      root.innerHTML = sequence.map((t, idx) => `
+        <article class="border border-rule-subtle p-4" data-touch-card="${t.touch}">
+          <header class="flex items-baseline justify-between mb-2">
+            <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted">
+              ${state.recipients.length > 1 ? `${escapeHtml(r.name || r.role || '?')} · ` : ''}Touch ${t.touch} · ${escapeHtml(t.angle || '')} · ${escapeHtml(t.suggested_day || '')} · ${escapeHtml(t.send_time || '')}
+            </p>
+            <div class="flex gap-2">
+              <button class="touch-edit px-2 py-1 text-[11px] border border-rule-subtle">Edit</button>
+              <button class="touch-regen px-2 py-1 text-[11px] border border-rule-subtle">Regenerate</button>
+              <button class="touch-copy px-2 py-1 text-[11px] border border-rule-subtle">Copy</button>
+            </div>
+          </header>
+          <p class="text-sm font-semibold mb-2 touch-subject" data-idx="${idx}">${escapeHtml(t.subject || '')}</p>
+          <p class="text-sm text-ink-secondary whitespace-pre-wrap leading-relaxed touch-body" data-idx="${idx}">${escapeHtml(t.body || '')}</p>
+        </article>
+      `).join('');
+      root.querySelectorAll('[data-touch-card]').forEach(card => {
+        const n = parseInt((card as HTMLElement).dataset.touchCard!, 10);
+        card.querySelector('.touch-edit')!.addEventListener('click', () => toggleEdit(card as HTMLElement));
+        card.querySelector('.touch-regen')!.addEventListener('click', () => regenTouch(n, card as HTMLElement));
+        card.querySelector('.touch-copy')!.addEventListener('click', () => {
+          const ar = activeRecipient(); if (!ar) return;
+          const t = ar.sequence.find(x => x.touch === n);
+          if (!t) return;
+          navigator.clipboard.writeText(`${t.subject}\n\n${t.body}`);
+        });
+      });
+    }
+    function toggleEdit(card: HTMLElement) {
+      const r = activeRecipient(); if (!r) return;
+      const subj = card.querySelector('.touch-subject') as HTMLElement;
+      const body = card.querySelector('.touch-body') as HTMLElement;
+      const editing = subj.getAttribute('contenteditable') === 'true';
+      [subj, body].forEach(el => el.setAttribute('contenteditable', editing ? 'false' : 'true'));
+      if (editing) {
+        const idx = parseInt(subj.dataset.idx!, 10);
+        r.sequence[idx].subject = subj.textContent || '';
+        r.sequence[idx].body = body.textContent || '';
+        fetch(`/api/lead/campaigns/${state.campaign_id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recipients: state.recipients }),
+        });
+      } else {
+        subj.focus();
+      }
+    }
+    async function regenTouch(n: number, card: HTMLElement) {
+      const r = activeRecipient(); if (!r) return;
+      const btn = card.querySelector('.touch-regen') as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = '…';
+      try {
+        const res = await fetch(`/api/lead/campaigns/${state.campaign_id}/sequence/touch/${n}/regenerate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ recipient_id: r.id }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Regen failed');
+        const data = await res.json();
+        r.sequence = data.sequence || [];
+        renderSequence();
+      } catch (e: any) {
+        btn.textContent = '// ' + (e?.message || 'failed');
+      }
+    }
+
+    // Export .txt — every recipient, every touch
+    document.getElementById('export-txt')!.addEventListener('click', () => {
+      const blocks: string[] = [];
+      for (const r of state.recipients) {
+        if (state.recipients.length > 1) {
+          blocks.push(`============================================================`);
+          blocks.push(`Recipient: ${r.name || '(unnamed)'} — ${r.role || '(no role)'}${r.linkedin_url ? ' — ' + r.linkedin_url : ''}`);
+          blocks.push(`============================================================\n`);
+        }
+        for (const t of r.sequence) {
+          blocks.push(`--- Touch ${t.touch} (${t.angle}) — ${t.suggested_day} ${t.send_time} ---`);
+          blocks.push(`Subject: ${t.subject}\n`);
+          blocks.push(`${t.body}\n`);
+        }
+        blocks.push('');
+      }
+      const blob = new Blob([blocks.join('\n')], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `campaign-${state.campaign_id || 'lead'}.txt`; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('open-calendar')!.addEventListener('click', () => {
+      showStep('5a');
+      initCalendar();
+    });
+
+    // -----------------------------------------------------------------------
+    // Step 3B → boolean
+    // -----------------------------------------------------------------------
+    document.getElementById('generate-boolean')!.addEventListener('click', async () => {
+      const btn = document.getElementById('generate-boolean') as HTMLButtonElement;
+      const errEl = document.getElementById('step3b-error')!;
+      errEl.classList.add('hidden');
+
+      const sizes = Array.from(document.querySelectorAll('[data-li-size]:checked')).map(c => (c as HTMLInputElement).value);
+      const config = {
+        industry: (document.getElementById('li-industry') as HTMLInputElement).value,
+        roles: (document.getElementById('li-roles') as HTMLInputElement).value.split(',').map(s => s.trim()).filter(Boolean),
+        company_size: sizes,
+        geography: (document.getElementById('li-geo') as HTMLInputElement).value,
+        keywords_include: (document.getElementById('li-include') as HTMLInputElement).value,
+        keywords_exclude: (document.getElementById('li-exclude') as HTMLInputElement).value,
+      };
+      state.linkedin_config = config;
+
+      btn.disabled = true; btn.textContent = 'Generating…';
+      try {
+        const res = await fetch(`/api/lead/campaigns/${state.campaign_id}/boolean`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ config }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Generation failed');
+        const data = await res.json();
+        state.boolean = data.final;
+        renderBoolean();
+        completeStep('3b', `${config.roles.length} roles · ${sizes.join(', ') || 'all sizes'}`);
+        showStep('4b');
+      } catch (e: any) {
+        errEl.textContent = '// ' + (e?.message || 'failed');
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Generate search string';
+      }
+    });
+
+    function renderBoolean() {
+      const b = state.boolean || {};
+      const filters = (b.filters || []).map((f: any) => `<li class="text-sm"><label><input type="checkbox" /> <strong>${f.name}:</strong> ${(f.values || []).join(', ')}</label></li>`).join('');
+      const cm = (b.connection_message || '').trim();
+      const cmLen = cm.length;
+      const cmOver = cmLen > 300;
+      const drip = (b.drip_sequence || []).map((s: any) => `
+        <article class="border border-rule-subtle p-3">
+          <p class="font-mono text-[10px] uppercase tracking-label text-ink-muted mb-1">Drip step ${s.step} · +${s.delay_days || 0} day${s.delay_days === 1 ? '' : 's'} after previous</p>
+          <p class="text-sm whitespace-pre-wrap">${escapeHtml(s.body || '')}</p>
+          <div class="mt-2"><button class="copy-btn px-2 py-1 text-[11px] border border-rule-subtle" data-copy="${escapeAttr(s.body || '')}">Copy</button></div>
+        </article>
+      `).join('');
+      document.getElementById('boolean-result')!.innerHTML = `
+        <div>
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-1">Primary search string</p>
+          <pre class="bg-surface-1 border border-rule-subtle rounded p-3 text-xs whitespace-pre-wrap font-mono">${escapeHtml(b.primary || '')}</pre>
+          <button class="copy-btn mt-2 px-2 py-1 text-[11px] border border-rule-subtle" data-copy="${escapeAttr(b.primary || '')}">Copy primary</button>
+        </div>
+        <div>
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-1">Alternative (broader)</p>
+          <pre class="bg-surface-1 border border-rule-subtle rounded p-3 text-xs whitespace-pre-wrap font-mono">${escapeHtml(b.alternative || '')}</pre>
+          <button class="copy-btn mt-2 px-2 py-1 text-[11px] border border-rule-subtle" data-copy="${escapeAttr(b.alternative || '')}">Copy alternative</button>
+        </div>
+        <div>
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-1">Suggested filters</p>
+          <ul class="space-y-1">${filters}</ul>
+        </div>
+        <p class="text-sm text-ink-secondary italic">${escapeHtml(b.audience_note || '')}</p>
+
+        ${cm ? `
+        <div class="border-t border-rule-subtle pt-4 mt-4">
+          <div class="flex items-baseline justify-between mb-1">
+            <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Connection message (Dripify)</p>
+            <span class="font-mono text-[11px] ${cmOver ? 'text-signal-danger' : 'text-ink-muted'}">${cmLen}/300</span>
+          </div>
+          <pre class="bg-surface-1 border border-rule-subtle rounded p-3 text-xs whitespace-pre-wrap">${escapeHtml(cm)}</pre>
+          <button class="copy-btn mt-2 px-2 py-1 text-[11px] border border-rule-subtle" data-copy="${escapeAttr(cm)}">Copy connection message</button>
+        </div>` : ''}
+
+        ${drip ? `
+        <div class="border-t border-rule-subtle pt-4 mt-4 space-y-3">
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Post-connection drip sequence (Dripify)</p>
+          ${drip}
+        </div>` : ''}
+      `;
+      document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => navigator.clipboard.writeText((btn as HTMLElement).dataset.copy || ''));
+      });
+    }
+    document.getElementById('boolean-back-step2')!.addEventListener('click', () => showStep('2'));
+
+    // -----------------------------------------------------------------------
+    // Step 5A — Google Calendar
+    // -----------------------------------------------------------------------
+    async function initCalendar() {
+      const stateEl = document.getElementById('gcal-state')!;
+      const ctrls = document.getElementById('gcal-controls')!;
+      const progress = document.getElementById('gcal-progress')!;
+      stateEl.textContent = '// checking…';
+      ctrls.innerHTML = '';
+      progress.innerHTML = '';
+
+      try {
+        const res = await fetch('/api/lead/google/status');
+        const d = await res.json();
+        if (!d.configured) {
+          stateEl.textContent = '// not configured';
+          ctrls.innerHTML = '<p class="text-sm text-ink-secondary">Google OAuth credentials are not set on the backend. Add <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> to <code>~/.env</code>.</p>';
+          return;
+        }
+        if (d.available === false) {
+          stateEl.textContent = '// unavailable on this host';
+          ctrls.innerHTML = '<p class="text-sm text-ink-secondary">Google Calendar sync is only available from the platform admin host during this internal testing window. Sequences are still saved on this campaign — admin can sync later.</p>';
+          return;
+        }
+        if (!d.connected) {
+          stateEl.textContent = '// not connected';
+          ctrls.innerHTML = `<a href="/api/lead/google/connect" class="inline-block px-4 py-2 bg-accent text-ink-inverse text-sm rounded">Connect Google Calendar</a>`;
+          return;
+        }
+        const totalEvents = state.recipients.reduce((sum, r) => sum + r.sequence.length, 0);
+        const breakdown = state.recipients.length > 1
+          ? ` (${state.recipients.length} recipients × ${state.recipients[0]?.sequence.length || 0} touches)`
+          : '';
+        stateEl.textContent = `// connected as ${d.email}`;
+        ctrls.innerHTML = `
+          <div class="flex items-center justify-between">
+            <p class="text-sm">Ready to sync ${totalEvents} event${totalEvents === 1 ? '' : 's'}${breakdown}.</p>
+            <div class="flex gap-2">
+              <button id="sync-all" class="px-3 py-1 text-xs bg-accent text-ink-inverse">Sync ${totalEvents} events</button>
+              <button id="gcal-disconnect" class="px-3 py-1 text-xs border border-rule-subtle">Disconnect</button>
+            </div>
+          </div>
+        `;
+        document.getElementById('sync-all')!.addEventListener('click', syncAll);
+        document.getElementById('gcal-disconnect')!.addEventListener('click', async () => {
+          await fetch('/api/lead/google/disconnect', { method: 'POST' });
+          initCalendar();
+        });
+      } catch (e: any) {
+        stateEl.textContent = '// ' + (e?.message || 'failed');
+      }
+    }
+
+    async function syncOne(recipient_id: string, touch: number, status: HTMLElement) {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      const res = await fetch(`/api/lead/campaigns/${state.campaign_id}/calendar/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ touch, recipient_id, timezone }),
+      });
+      if (!res.ok) {
+        const detail = (await res.json()).detail || 'failed';
+        if (res.status === 409 && detail === 'calendar_not_connected') {
+          throw new Error('Google Calendar not connected — connect it above first.');
+        }
+        throw new Error(detail);
+      }
+      const d = await res.json();
+      status.innerHTML = `<a href="${d.html_link}" target="_blank" class="text-accent">view event ↗</a>`;
+    }
+
+    async function syncAll() {
+      const progress = document.getElementById('gcal-progress')!;
+      const rows: string[] = [];
+      for (const r of state.recipients) {
+        if (state.recipients.length > 1) {
+          rows.push(`<p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mt-3 mb-1">${escapeHtml(r.name || r.role || 'Recipient')}</p>`);
+        }
+        for (const t of r.sequence) {
+          rows.push(`<div data-sync="${r.id}-${t.touch}" class="flex items-center justify-between text-sm py-0.5"><span>Touch ${t.touch} · ${escapeHtml(t.subject || '')}</span><span class="status text-ink-muted">…</span></div>`);
+        }
+      }
+      progress.innerHTML = rows.join('');
+
+      for (const r of state.recipients) {
+        for (const t of r.sequence) {
+          const row = progress.querySelector(`[data-sync="${r.id}-${t.touch}"]`)!;
+          const status = row.querySelector('.status') as HTMLElement;
+          status.textContent = 'syncing…';
+          try {
+            await syncOne(r.id, t.touch, status);
+          } catch (e: any) {
+            status.innerHTML = `<span class="text-signal-danger">// ${e?.message || 'failed'}</span> <button class="retry text-[11px] underline">retry</button>`;
+            (status.querySelector('.retry') as HTMLElement)?.addEventListener('click', async () => {
+              status.textContent = 'retrying…';
+              try { await syncOne(r.id, t.touch, status); }
+              catch (err: any) { status.innerHTML = `<span class="text-signal-danger">// ${err?.message || 'failed again'}</span>`; }
+            });
+          }
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Step 3C — ABM config + identification + sequence generation
+    // -----------------------------------------------------------------------
+    const abmContacts: AbmContact[] = [];
+
+    function renderAbmContacts() {
+      const tbody = document.getElementById('abm-contacts-rows');
+      if (!tbody) return;
+      tbody.innerHTML = abmContacts.map(c => `
+        <tr data-cid="${c.id}" class="border-t border-rule-subtle">
+          <td class="px-2 py-1"><input data-cf="name"         value="${escapeAttr(c.name)}"         class="w-full bg-transparent border-0 px-1 py-1 text-sm focus:outline-none focus:bg-surface-1" placeholder="Name" /></td>
+          <td class="px-2 py-1"><input data-cf="role"         value="${escapeAttr(c.role)}"         class="w-full bg-transparent border-0 px-1 py-1 text-sm focus:outline-none focus:bg-surface-1" placeholder="Role" /></td>
+          <td class="px-2 py-1"><input data-cf="linkedin_url" value="${escapeAttr(c.linkedin_url)}" class="w-full bg-transparent border-0 px-1 py-1 text-sm focus:outline-none focus:bg-surface-1" placeholder="https://linkedin.com/in/…" /></td>
+          <td class="px-2 py-1"><input data-cf="email"        value="${escapeAttr(c.email)}"        class="w-full bg-transparent border-0 px-1 py-1 text-sm focus:outline-none focus:bg-surface-1" placeholder="email@…" /></td>
+          <td class="px-2 py-1 text-right"><button class="abm-rm-contact text-ink-muted hover:text-signal-danger text-sm" type="button" aria-label="Remove">×</button></td>
+        </tr>
+      `).join('');
+      tbody.querySelectorAll('[data-cid]').forEach(row => {
+        const id = (row as HTMLElement).dataset.cid!;
+        row.querySelectorAll('[data-cf]').forEach(input => {
+          input.addEventListener('input', e => {
+            const f = (input as HTMLElement).dataset.cf as keyof AbmContact;
+            const c = abmContacts.find(x => x.id === id);
+            if (c) (c as any)[f] = (e.target as HTMLInputElement).value;
+          });
+        });
+        row.querySelector('.abm-rm-contact')?.addEventListener('click', () => {
+          const idx = abmContacts.findIndex(x => x.id === id);
+          if (idx >= 0) { abmContacts.splice(idx, 1); renderAbmContacts(); }
+        });
+      });
+    }
+
+    function syncAbmContactsVisibility() {
+      const has = (document.getElementById('abm-has-contacts') as HTMLInputElement)?.checked;
+      const block = document.querySelector('[data-abm-contacts-block]') as HTMLElement;
+      const idBtn = document.getElementById('abm-identify') as HTMLButtonElement;
+      const seqBtn = document.getElementById('abm-generate') as HTMLButtonElement;
+      if (block) block.style.display = has ? '' : 'none';
+      if (idBtn) idBtn.classList.toggle('hidden', !!has);
+      if (seqBtn) seqBtn.classList.toggle('hidden', !has);
+    }
+
+    document.getElementById('abm-has-contacts')?.addEventListener('change', syncAbmContactsVisibility);
+    document.getElementById('abm-add-contact')?.addEventListener('click', () => {
+      abmContacts.push({ id: rid(), name: '', role: '', linkedin_url: '', email: '' });
+      renderAbmContacts();
+    });
+
+    function readAbmConfig() {
+      return {
+        account: (document.getElementById('abm-account') as HTMLInputElement)?.value || '',
+        geography: (document.getElementById('abm-geo') as HTMLInputElement)?.value || '',
+        why_now: (document.getElementById('abm-context') as HTMLInputElement)?.value || '',
+      };
+    }
+
+    document.getElementById('abm-identify')?.addEventListener('click', async () => {
+      const btn = document.getElementById('abm-identify') as HTMLButtonElement;
+      const errEl = document.getElementById('step3c-error')!;
+      errEl.classList.add('hidden');
+      const config = readAbmConfig();
+      state.abm_config = config;
+      btn.disabled = true; btn.textContent = 'Identifying…';
+      try {
+        const res = await fetch(`/api/lead/campaigns/${state.campaign_id}/abm/identify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ config }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Identification failed');
+        const data = await res.json();
+        state.abm_identification = data.final;
+        renderAbmIdentification();
+        showStep('3-5c');
+      } catch (e: any) {
+        errEl.textContent = '// ' + (e?.message || 'failed');
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Identify contacts (Owl)';
+      }
+    });
+
+    function renderAbmIdentification() {
+      const i = state.abm_identification || {};
+      const personas = (i.personas || []).map((p: any) => `
+        <li class="text-sm"><strong>P${p.priority}: ${escapeHtml(p.title || '')}</strong> — ${escapeHtml(p.why || '')}</li>
+      `).join('');
+      const checklist = (i.lusha_checklist || []).map((s: string) => `<li class="text-sm">${escapeHtml(s)}</li>`).join('');
+      document.getElementById('abm-identify-result')!.innerHTML = `
+        <div>
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-1">Boolean — primary (technical evaluator first)</p>
+          <pre class="bg-surface-1 border border-rule-subtle rounded p-3 text-xs whitespace-pre-wrap font-mono">${escapeHtml(i.boolean_primary || '')}</pre>
+          <button class="copy-btn mt-2 px-2 py-1 text-[11px] border border-rule-subtle" data-copy="${escapeAttr(i.boolean_primary || '')}">Copy</button>
+        </div>
+        <div>
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-1">Boolean — alternative (economic buyer)</p>
+          <pre class="bg-surface-1 border border-rule-subtle rounded p-3 text-xs whitespace-pre-wrap font-mono">${escapeHtml(i.boolean_alternative || '')}</pre>
+          <button class="copy-btn mt-2 px-2 py-1 text-[11px] border border-rule-subtle" data-copy="${escapeAttr(i.boolean_alternative || '')}">Copy</button>
+        </div>
+        <div>
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-1">Persona priority</p>
+          <ol class="space-y-1 list-decimal pl-5">${personas}</ol>
+        </div>
+        <div>
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-1">Lusha enrichment checklist</p>
+          <ol class="space-y-1 list-decimal pl-5">${checklist}</ol>
+        </div>
+        ${i.notes ? `<p class="text-sm text-ink-secondary italic">${escapeHtml(i.notes)}</p>` : ''}
+      `;
+      document.querySelectorAll('#abm-identify-result .copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => navigator.clipboard.writeText((btn as HTMLElement).dataset.copy || ''));
+      });
+    }
+
+    document.getElementById('abm-identify-back')?.addEventListener('click', () => showStep('3c'));
+
+    document.getElementById('abm-generate')?.addEventListener('click', async () => {
+      const btn = document.getElementById('abm-generate') as HTMLButtonElement;
+      const errEl = document.getElementById('step3c-error')!;
+      errEl.classList.add('hidden');
+      const config = readAbmConfig();
+      const contacts = abmContacts
+        .map(c => ({ ...c, name: c.name.trim(), role: c.role.trim(), linkedin_url: c.linkedin_url.trim(), email: c.email.trim() }))
+        .filter(c => c.name || c.role);
+      if (contacts.length === 0) {
+        errEl.textContent = '// add at least one contact (or use Identify contacts first)';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      state.abm_config = { ...config, contacts };
+      btn.disabled = true; btn.textContent = 'Generating 4-week matrix…';
+      try {
+        const res = await fetch(`/api/lead/campaigns/${state.campaign_id}/abm/sequence`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ config, contacts }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Sequence failed');
+        const data = await res.json();
+        state.abm_matrix = data.final;
+        renderAbmMatrix();
+        completeStep('3c', `${contacts.length} contact${contacts.length === 1 ? '' : 's'} · 4-week ABM`);
+        showStep('4c');
+      } catch (e: any) {
+        errEl.textContent = '// ' + (e?.message || 'failed');
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Generate 4-week sequence';
+      }
+    });
+
+    function renderAbmMatrix() {
+      const m = state.abm_matrix || {};
+      const weeks = m.matrix || [];
+      const root = document.getElementById('abm-matrix')!;
+      root.innerHTML = weeks.map((w: any) => {
+        const li = (w.linkedin || []).map((x: any) => `
+          <article class="border border-rule-subtle p-3 mb-2">
+            <p class="font-mono text-[10px] uppercase tracking-label text-ink-muted mb-1">LinkedIn · ${escapeHtml(x.contact_name || x.contact_id || '—')}</p>
+            <p class="text-sm whitespace-pre-wrap">${escapeHtml(x.body || '')}</p>
+            <div class="mt-2"><button class="copy-btn px-2 py-1 text-[11px] border border-rule-subtle" data-copy="${escapeAttr(x.body || '')}">Copy</button></div>
+          </article>
+        `).join('');
+        const em = (w.email || []).map((x: any) => `
+          <article class="border border-rule-subtle p-3 mb-2">
+            <p class="font-mono text-[10px] uppercase tracking-label text-ink-muted mb-1">Email · ${escapeHtml(x.contact_name || x.contact_id || '—')}</p>
+            <p class="text-sm font-semibold mb-1">${escapeHtml(x.subject || '')}</p>
+            <p class="text-sm whitespace-pre-wrap">${escapeHtml(x.body || '')}</p>
+            <div class="mt-2"><button class="copy-btn px-2 py-1 text-[11px] border border-rule-subtle" data-copy="${escapeAttr((x.subject || '') + '\n\n' + (x.body || ''))}">Copy</button></div>
+          </article>
+        `).join('');
+        return `
+          <section class="border border-rule-strong p-4">
+            <h3 class="font-mono text-[11px] uppercase tracking-label text-ink-primary mb-3">Week ${w.week}</h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">LinkedIn (Dripify)</p>
+                ${li || '<p class="text-xs text-ink-muted italic">— none —</p>'}
+              </div>
+              <div>
+                <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Email</p>
+                ${em || '<p class="text-xs text-ink-muted italic">— none —</p>'}
+              </div>
+            </div>
+          </section>
+        `;
+      }).join('');
+      document.getElementById('abm-coordination')!.textContent = m.coordination_note || '';
+      document.querySelectorAll('#abm-matrix .copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => navigator.clipboard.writeText((btn as HTMLElement).dataset.copy || ''));
+      });
+    }
+
+    document.getElementById('abm-export-txt')?.addEventListener('click', () => {
+      const m = state.abm_matrix || {};
+      const lines: string[] = [];
+      for (const w of (m.matrix || [])) {
+        lines.push(`============================================================`);
+        lines.push(`Week ${w.week}`);
+        lines.push(`============================================================`);
+        for (const x of (w.linkedin || [])) {
+          lines.push(`--- LinkedIn — ${x.contact_name || x.contact_id || ''} ---`);
+          lines.push(x.body || '');
+          lines.push('');
+        }
+        for (const x of (w.email || [])) {
+          lines.push(`--- Email — ${x.contact_name || x.contact_id || ''} ---`);
+          lines.push(`Subject: ${x.subject || ''}`);
+          lines.push('');
+          lines.push(x.body || '');
+          lines.push('');
+        }
+      }
+      if (m.coordination_note) {
+        lines.push('---');
+        lines.push(`Coordination: ${m.coordination_note}`);
+      }
+      const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `abm-${state.campaign_id || 'campaign'}.txt`; a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // -----------------------------------------------------------------------
+    // Resume on load: if URL has ?id=, load campaign
+    // -----------------------------------------------------------------------
+    (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/lead/campaigns/${id}`);
+        if (!res.ok) return;
+        const c = await res.json();
+        state.campaign_id = c.id;
+        state.analysis = c.signal_analysis || null;
+        state.campaign_type = c.campaign_type || null;
+        state.email_config = c.email_config || null;
+        state.linkedin_config = c.linkedin_config || null;
+        // Prefer the new recipients array; fall back to legacy single email_sequence.
+        if (Array.isArray(c.recipients) && c.recipients.length > 0) {
+          state.recipients = c.recipients.map((r: any) => ({
+            id: r.id || rid(),
+            name: r.name || '',
+            role: r.role || '',
+            linkedin_url: r.linkedin_url || '',
+            sequence: r.sequence || [],
+          }));
+        } else if (Array.isArray(c.email_sequence) && c.email_sequence.length > 0) {
+          state.recipients = [{
+            id: rid(),
+            name: (c.signal_analysis || {}).contact_name || '',
+            role: (c.email_config || {}).target_role || (c.signal_analysis || {}).role || '',
+            linkedin_url: '',
+            sequence: c.email_sequence,
+          }];
+        } else {
+          state.recipients = [];
+        }
+        state.active_recipient_id = state.recipients[0]?.id || null;
+        // Seed Step 3A draft from saved recipients, so editing a saved campaign shows them.
+        draftRecipients.length = 0;
+        for (const r of state.recipients) {
+          draftRecipients.push({ id: r.id, name: r.name, role: r.role, linkedin_url: r.linkedin_url });
+        }
+        renderRecipients();
+        state.boolean = c.boolean_search || null;
+
+        const li = c.lead_input || {};
+        if (li.text) (document.getElementById('lead-text') as HTMLTextAreaElement).value = li.text;
+        completeStep('0', (li.text || '').slice(0, 80) || 'Imported lead');
+
+        if (state.analysis) {
+          renderSignal(state.analysis);
+          completeStep('1', `${state.analysis.contact_name || '?'} at ${state.analysis.company || '?'} — ${state.analysis.signal_strength || '?'}`);
+          getStep('1').classList.remove('hidden');
+        }
+        // Rehydrate X-Ray panel from saved results, if any.
+        if (c.xray_results && (c.xray_results.linkedin_direct?.length || c.xray_results.email_enrichment?.length || c.xray_results.campaign_context?.length)) {
+          xrayState.targetCompany = (state.analysis && state.analysis.company) || '';
+          xrayState.selected.clear();
+          getStep('1.5').classList.remove('hidden');
+          document.getElementById('xray-loading')!.classList.add('hidden');
+          document.getElementById('xray-status')!.textContent = 'done';
+          renderXrayBuckets(c.xray_results);
+        }
+        if (state.campaign_type) {
+          const summary = state.campaign_type === 'email' ? 'Email outreach sequence'
+            : state.campaign_type === 'linkedin' ? 'LinkedIn (Dripify)'
+            : 'Multi-Channel ABM';
+          completeStep('2', summary);
+          getStep('2').classList.remove('hidden');
+        }
+        // Rehydrate ABM state if present.
+        state.abm_config = c.abm_config || null;
+        state.abm_identification = c.abm_identification || null;
+        state.abm_matrix = c.abm_matrix || null;
+        if (state.abm_config) {
+          (document.getElementById('abm-account') as HTMLInputElement).value = state.abm_config.account || '';
+          (document.getElementById('abm-geo') as HTMLInputElement).value = state.abm_config.geography || '';
+          (document.getElementById('abm-context') as HTMLInputElement).value = state.abm_config.why_now || '';
+          for (const ct of (state.abm_config.contacts || [])) {
+            abmContacts.push({ id: ct.id || rid(), name: ct.name || '', role: ct.role || '', linkedin_url: ct.linkedin_url || '', email: ct.email || '' });
+          }
+          if (abmContacts.length) (document.getElementById('abm-has-contacts') as HTMLInputElement).checked = true;
+          renderAbmContacts();
+          syncAbmContactsVisibility();
+          getStep('3c').classList.remove('hidden');
+        }
+        if (state.abm_matrix) {
+          renderAbmMatrix();
+          getStep('4c').classList.remove('hidden');
+          completeStep('3c', `${(state.abm_config?.contacts || []).length} contacts · 4-week ABM`);
+        }
+        if (state.recipients.length && state.recipients.some(r => r.sequence.length)) {
+          renderSequence();
+          getStep('3a').classList.remove('hidden');
+          getStep('4a').classList.remove('hidden');
+          const touches = state.recipients[0]?.sequence.length || 0;
+          completeStep(
+            '3a',
+            state.recipients.length === 1
+              ? `${touches} touches`
+              : `${state.recipients.length} recipients · ${touches} touches each`,
+          );
+        }
+        if (state.boolean) {
+          renderBoolean();
+          getStep('3b').classList.remove('hidden');
+          getStep('4b').classList.remove('hidden');
+        }
+      } catch {}
+    })();
+  </script>
+</AgentLayout>

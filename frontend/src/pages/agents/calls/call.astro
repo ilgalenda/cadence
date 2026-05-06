@@ -1,0 +1,54 @@
+---
+import AgentLayout from '../../../layouts/AgentLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import AnalysisResult from '../../../components/AnalysisResult.astro';
+import { CALLS_AGENT_NAME, CALLS_AGENT_TAGLINE, CALLS_NAV } from '../../../agents/calls/config';
+---
+<AgentLayout
+  title="Call analysis"
+  agentName={CALLS_AGENT_NAME}
+  agentTagline={CALLS_AGENT_TAGLINE}
+  navItems={CALLS_NAV}
+>
+  <div class="px-10 py-12 max-w-4xl">
+    <PageHeader
+      label="Calls · Analysed"
+      heading="Call analysis."
+      lead="Stored analysis — Summary, Sales Intel, Recommendation, Learning, and Quiz."
+    >
+      <a slot="meta" href="/agents/calls/analysed" class="font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">← all calls</a>
+    </PageHeader>
+
+    <div id="load-state" class="py-8 font-mono text-xs text-ink-muted">// loading analysis…</div>
+
+    <!-- Shared results component (hidden until loaded). -->
+    <AnalysisResult showClear={false} />
+
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    const loadState = document.getElementById('load-state')!;
+
+    if (!id) {
+      loadState.textContent = '// no call id provided';
+      loadState.className = 'py-8 font-mono text-xs text-signal-danger';
+    } else {
+      fetch(`/api/calls/${encodeURIComponent(id)}`)
+        .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
+        .then(session => {
+          const result = session.result || {};
+          result._title = session.title || 'Call Analysis';
+          (window as any).renderAnalysisResult(result);
+          loadState.remove();
+          const heading = document.getElementById('ar-heading');
+          if (heading) heading.textContent = (session.title || 'Call Analysis') + ' · ' + (session.timestamp || '');
+        })
+        .catch(() => {
+          loadState.textContent = '// analysis not found';
+          loadState.className = 'py-8 font-mono text-xs text-signal-danger';
+        });
+    }
+  </script>
+</AgentLayout>

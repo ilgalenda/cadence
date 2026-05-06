@@ -1,0 +1,307 @@
+---
+import AgentLayout from '../../../layouts/AgentLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import LeadHandoffButton from '../../../components/LeadHandoffButton.astro';
+import { CALLS_AGENT_NAME, CALLS_AGENT_TAGLINE, CALLS_NAV } from '../../../agents/calls/config';
+---
+<AgentLayout
+  title="Glossary"
+  agentName={CALLS_AGENT_NAME}
+  agentTagline={CALLS_AGENT_TAGLINE}
+  navItems={CALLS_NAV}
+>
+  <div class="px-10 py-12 max-w-4xl">
+
+    <PageHeader
+      label="Calls · Glossary"
+      heading="Glossary."
+      lead="Alphabetical reference — core terms and protocols, plus learning topics Owl has extracted from your analysed calls."
+    >
+      <span slot="meta" id="count">—</span>
+    </PageHeader>
+
+    <!-- View tabs -->
+    <div class="border-b border-rule-subtle flex items-center gap-6 mb-6">
+      <button id="view-terms" class="view-tab relative py-3 text-sm font-medium text-ink-primary transition-colors" data-view="terms">
+        <span>Terms</span>
+        <span class="tab-rule absolute left-0 right-0 -bottom-px h-[2px] bg-accent"></span>
+      </button>
+      <button id="view-learnings" class="view-tab relative py-3 text-sm font-medium text-ink-muted hover:text-ink-primary transition-colors" data-view="learnings">
+        <span>Learning topics</span>
+      </button>
+    </div>
+
+    <!-- Search -->
+    <div class="mb-4 pb-2 border-b border-rule-strong">
+      <input
+        id="search"
+        type="text"
+        placeholder="search…"
+        class="w-full bg-transparent border-0 focus:outline-none focus:ring-0 py-2 text-base text-ink-primary font-mono placeholder-ink-muted"
+      />
+    </div>
+
+    <!-- A–Z jump strip -->
+    <div id="az-strip" class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-6 leading-loose"></div>
+
+    <!-- Terms panel -->
+    <div id="panel-terms">
+      <div id="terms-list">
+        <p class="py-12 text-center font-mono text-xs text-ink-muted">// loading glossary…</p>
+      </div>
+    </div>
+
+    <!-- Learnings panel -->
+    <div id="panel-learnings" class="hidden">
+      <div id="learnings-list">
+        <p class="py-12 text-center font-mono text-xs text-ink-muted">// loading learnings…</p>
+      </div>
+    </div>
+
+    <!-- Static safelist for JS-injected classes -->
+    <div class="hidden" aria-hidden="true">
+      <span class="bg-accent-soft"></span>
+      <span class="highlight-term"></span>
+    </div>
+
+  </div>
+
+  <script>
+    type Term = { term: string; definition: string; protocol?: string; products?: string[] };
+    type Learning = { id: string; title: string; content: string; category: string; source_call_id: string; source_call_title: string; created_at: string };
+
+    let allTerms: Term[] = [];
+    let allLearnings: Learning[] = [];
+    let currentView: 'terms' | 'learnings' = 'terms';
+
+    function escHtml(str: string) {
+      return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function setTabActive(btn: HTMLElement, isActive: boolean) {
+      btn.classList.toggle('text-ink-primary', isActive);
+      btn.classList.toggle('text-ink-muted', !isActive);
+      const existing = btn.querySelector('.tab-rule');
+      if (isActive && !existing) {
+        const rule = document.createElement('span');
+        rule.className = 'tab-rule absolute left-0 right-0 -bottom-px h-[2px] bg-accent';
+        btn.appendChild(rule);
+      } else if (!isActive && existing) {
+        existing.remove();
+      }
+    }
+
+    function groupAlpha<T>(items: T[], keyFn: (item: T) => string): Record<string, T[]> {
+      const groups: Record<string, T[]> = {};
+      for (const item of items) {
+        const key = (keyFn(item).charAt(0) || '#').toUpperCase();
+        const letter = /[A-Z]/.test(key) ? key : '#';
+        (groups[letter] = groups[letter] || []).push(item);
+      }
+      return groups;
+    }
+
+    function renderAzStrip(letters: string[]) {
+      const strip = document.getElementById('az-strip')!;
+      if (!letters.length) { strip.innerHTML = ''; return; }
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      const parts = alphabet.map(l => letters.includes(l)
+        ? `<a href="#letter-${l}" class="hover:text-accent transition-colors">${l}</a>`
+        : `<span class="text-ink-muted/40">${l}</span>`);
+      if (letters.includes('#')) parts.push(`<a href="#letter-%23" class="hover:text-accent transition-colors">#</a>`);
+      strip.innerHTML = parts.join(' · ');
+    }
+
+    function renderTerms(terms: Term[]) {
+      const list = document.getElementById('terms-list')!;
+      const sorted = [...terms].sort((a, b) => a.term.localeCompare(b.term));
+      const groups = groupAlpha(sorted, t => t.term);
+      const letters = Object.keys(groups).sort();
+
+      if (currentView === 'terms') renderAzStrip(letters);
+
+      if (!sorted.length) {
+        list.innerHTML = '<p class="py-12 text-center font-mono text-xs text-ink-muted">// no matches</p>';
+        return;
+      }
+
+      list.innerHTML = letters.map(letter => `
+        <section class="mb-10">
+          <h2 id="letter-${letter === '#' ? '%23' : letter}" class="font-mono text-[11px] uppercase tracking-label text-ink-muted pb-2 mb-2 border-b border-rule-strong scroll-mt-8">${letter}</h2>
+          <ul>
+            ${groups[letter].map((t: Term) => `
+              <li id="term-${encodeURIComponent(t.term)}" class="grid grid-cols-[minmax(180px,_1fr)_2.2fr] gap-10 items-start py-6 border-b border-rule-subtle transition-colors duration-300 ease-decelerate scroll-mt-8">
+                <div class="min-w-0">
+                  <h3 class="font-semibold text-ink-primary text-base leading-tight tracking-tightest">${escHtml(t.term)}</h3>
+                  ${t.protocol ? `<p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mt-2">${escHtml(t.protocol)}</p>` : ''}
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm text-ink-secondary leading-relaxed">${escHtml(t.definition)}</p>
+                  ${t.products?.length ? `
+                    <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mt-4">
+                      Related products ·
+                      ${t.products.map(p => `<a href="/agents/calls/products#${encodeURIComponent(p)}" class="text-accent hover:underline">${escHtml(p)}</a>`).join(' · ')}
+                    </p>
+                  ` : ''}
+                  <button class="ask-btn mt-4 font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors duration-150" data-q="${escHtml(`Tell me more about "${t.term}" in the context of selling Timebeat.`)}">ask owl →</button>
+                </div>
+              </li>
+            `).join('')}
+          </ul>
+        </section>
+      `).join('');
+
+      document.querySelectorAll<HTMLButtonElement>('#terms-list .ask-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          window.location.href = `/agents/calls/chat?q=${encodeURIComponent(btn.dataset.q!)}`;
+        });
+      });
+
+      // Hash jump
+      const hash = decodeURIComponent(window.location.hash.slice(1));
+      if (hash && !hash.startsWith('letter-')) {
+        const el = document.getElementById('term-' + encodeURIComponent(hash));
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.classList.add('bg-accent-soft');
+          setTimeout(() => el.classList.remove('bg-accent-soft'), 1800);
+        }
+      }
+    }
+
+    function renderLearnings(items: Learning[]) {
+      const list = document.getElementById('learnings-list')!;
+      const sorted = [...items].sort((a, b) => a.title.localeCompare(b.title));
+      const groups = groupAlpha(sorted, l => l.title);
+      const letters = Object.keys(groups).sort();
+
+      if (currentView === 'learnings') renderAzStrip(letters);
+
+      if (!sorted.length) {
+        list.innerHTML = '<p class="py-12 text-center font-mono text-xs text-ink-muted">// no learning topics yet — analyse a call and Owl will start building this up</p>';
+        return;
+      }
+
+      const fmtDate = (iso: string) => {
+        try { return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
+        catch { return iso; }
+      };
+
+      list.innerHTML = letters.map(letter => `
+        <section class="mb-10">
+          <h2 id="letter-${letter === '#' ? '%23' : letter}" class="font-mono text-[11px] uppercase tracking-label text-ink-muted pb-2 mb-2 border-b border-rule-strong scroll-mt-8">${letter}</h2>
+          <ul>
+            ${groups[letter].map((l: Learning) => `
+              <li class="py-6 border-b border-rule-subtle scroll-mt-8">
+                <div class="grid grid-cols-[minmax(180px,_1fr)_2.2fr] gap-10 items-start">
+                  <div class="min-w-0">
+                    <h3 class="font-semibold text-ink-primary text-base leading-tight tracking-tightest">${escHtml(l.title)}</h3>
+                    <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mt-2">${escHtml(l.category || 'general')}</p>
+                    <p class="font-mono text-[11px] text-ink-muted mt-1">${escHtml(fmtDate(l.created_at))}</p>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm text-ink-secondary leading-relaxed">${escHtml(l.content)}</p>
+                    <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mt-4">
+                      Source · <a href="/agents/calls/call?id=${encodeURIComponent(l.source_call_id)}" class="text-accent hover:underline">${escHtml(l.source_call_title || 'Call')}</a>
+                    </p>
+                    <div class="mt-4 flex flex-wrap items-center gap-5">
+                      <button class="ask-learning-btn font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors" data-q="${escHtml(`What have we learned about "${l.title}" from analysed calls? Expand with sales-relevant context.`)}">ask owl →</button>
+                      <button type="button" class="lead-handoff-btn inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors" data-topic="${escHtml(l.title)}" data-source="learning-topic">
+                        <span>Launch campaign</span><span class="font-mono">→</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            `).join('')}
+          </ul>
+        </section>
+      `).join('');
+
+      document.querySelectorAll<HTMLButtonElement>('#learnings-list .ask-learning-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          window.location.href = `/agents/calls/chat?q=${encodeURIComponent(btn.dataset.q!)}`;
+        });
+      });
+    }
+
+    function updateCount() {
+      const countEl = document.getElementById('count')!;
+      if (currentView === 'terms') {
+        const n = allTerms.length;
+        countEl.textContent = `${n.toString().padStart(2, '0')} term${n !== 1 ? 's' : ''}`;
+      } else {
+        const n = allLearnings.length;
+        countEl.textContent = `${n.toString().padStart(2, '0')} topic${n !== 1 ? 's' : ''}`;
+      }
+    }
+
+    function applySearch() {
+      const q = (document.getElementById('search') as HTMLInputElement).value.toLowerCase();
+      if (currentView === 'terms') {
+        const filtered = !q ? allTerms : allTerms.filter(t =>
+          t.term.toLowerCase().includes(q) ||
+          t.definition.toLowerCase().includes(q) ||
+          (t.protocol || '').toLowerCase().includes(q) ||
+          (t.products || []).some(p => p.toLowerCase().includes(q))
+        );
+        renderTerms(filtered);
+      } else {
+        const filtered = !q ? allLearnings : allLearnings.filter(l =>
+          l.title.toLowerCase().includes(q) ||
+          l.content.toLowerCase().includes(q) ||
+          (l.category || '').toLowerCase().includes(q) ||
+          (l.source_call_title || '').toLowerCase().includes(q)
+        );
+        renderLearnings(filtered);
+      }
+    }
+
+    function switchView(view: 'terms' | 'learnings') {
+      currentView = view;
+      document.querySelectorAll<HTMLButtonElement>('.view-tab').forEach(b => {
+        setTabActive(b, b.dataset.view === view);
+      });
+      document.getElementById('panel-terms')!.classList.toggle('hidden', view !== 'terms');
+      document.getElementById('panel-learnings')!.classList.toggle('hidden', view !== 'learnings');
+      (document.getElementById('search') as HTMLInputElement).placeholder = view === 'terms' ? 'search terms…' : 'search learnings…';
+      updateCount();
+      applySearch();
+    }
+
+    document.querySelectorAll<HTMLButtonElement>('.view-tab').forEach(btn => {
+      btn.addEventListener('click', () => switchView(btn.dataset.view as 'terms' | 'learnings'));
+    });
+
+    document.getElementById('search')!.addEventListener('input', applySearch);
+
+    async function loadAll() {
+      try {
+        const [terms, learnings] = await Promise.all([
+          fetch('/api/glossary').then(r => r.json()),
+          fetch('/api/learnings').then(r => r.json()).catch(() => []),
+        ]);
+        allTerms = terms || [];
+        allLearnings = learnings || [];
+        updateCount();
+        renderTerms(allTerms);
+        renderLearnings(allLearnings);
+
+        // Deep link via ?tab=learnings
+        const urlTab = new URLSearchParams(window.location.search).get('tab');
+        if (urlTab === 'learnings') switchView('learnings');
+
+        const urlQ = new URLSearchParams(window.location.search).get('q');
+        if (urlQ) {
+          (document.getElementById('search') as HTMLInputElement).value = urlQ;
+          applySearch();
+        }
+      } catch {
+        document.getElementById('terms-list')!.innerHTML =
+          '<p class="py-8 text-center font-mono text-xs text-signal-danger">// could not load — is the backend running?</p>';
+      }
+    }
+
+    loadAll();
+  </script>
+</AgentLayout>

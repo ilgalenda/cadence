@@ -1,0 +1,126 @@
+# ============================================================
+# SECRETS & CREDENTIALS — never commit these
+# ============================================================
+backend/.env
+backend/agents/users.json
+backend/agents/lead/data/google_tokens.json
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+*_secret*
+*_credentials*
+*apikey*
+*api_key*
+
+# ============================================================
+# CLAUDE CODE — internal tooling files
+# ============================================================
+.claude/
+**/.claude/
+.claude/settings.json
+.claude/settings.local.json
+
+# ============================================================
+# PYTHON
+# ============================================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.so
+.venv/
+venv/
+env/
+ENV/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ============================================================
+# NODE / FRONTEND
+# ============================================================
+frontend/node_modules/
+frontend/dist/
+node_modules/
+.npm/
+.yarn/
+.pnp.*
+
+# ============================================================
+# VAULT — contains proprietary call/campaign knowledge data
+# ============================================================
+backend/vault/
+
+# ============================================================
+# AGENT RUNTIME DATA — sessions, learnings, campaign & lead data
+# ============================================================
+backend/agents/*/data/sessions.json
+backend/agents/*/data/learnings/
+backend/agents/calls/knowledge/_user/
+backend/agents/calls/knowledge/timebeat-*.md
+backend/agents/lead/data/campaigns.json
+backend/agents/lead/data/leads.json
+backend/agents/lead/knowledge/
+
+# ============================================================
+# MEDIA & UPLOADS (large/generated files)
+# ============================================================
+backend/data/uploads/
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# ============================================================
+# macOS
+# ============================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ============================================================
+# EDITORS
+# ============================================================
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# ============================================================
+# LOGS & TEMP
+# ============================================================
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig

@@ -1,0 +1,61 @@
+---
+interface Tab {
+  id: string;
+  label: string;
+}
+interface Props {
+  tabs: Tab[];
+  group: string;
+  active?: string;
+  size?: 'sm' | 'md';
+}
+const { tabs, group, active, size = 'md' } = Astro.props;
+const activeId = active ?? tabs[0]?.id;
+
+const padding = size === 'sm' ? 'py-2' : 'py-3';
+const fontSize = size === 'sm' ? 'text-xs' : 'text-sm';
+---
+<div class={`tabs border-b border-rule-subtle flex items-center gap-6`} data-tab-group={group}>
+  {tabs.map(tab => (
+    <button
+      type="button"
+      class={`tab-btn relative ${padding} ${fontSize} font-medium transition-colors duration-150 ease-decelerate focus:outline-none ${
+        tab.id === activeId ? 'tab-active text-ink-primary' : 'text-ink-muted hover:text-ink-primary'
+      }`}
+      data-tab={tab.id}
+    >
+      <span>{tab.label}</span>
+      {tab.id === activeId && (
+        <span class="absolute left-0 right-0 -bottom-px h-[2px] bg-accent"></span>
+      )}
+    </button>
+  ))}
+</div>
+
+<script>
+  document.querySelectorAll<HTMLDivElement>('[data-tab-group]').forEach(group => {
+    const buttons = group.querySelectorAll<HTMLButtonElement>('.tab-btn');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.tab;
+        if (!id) return;
+        buttons.forEach(b => {
+          const isActive = b.dataset.tab === id;
+          b.classList.toggle('tab-active', isActive);
+          b.classList.toggle('text-ink-primary', isActive);
+          b.classList.toggle('text-ink-muted', !isActive);
+          // Underline rule
+          const existing = b.querySelector('span.accent-rule');
+          if (isActive && !existing) {
+            const rule = document.createElement('span');
+            rule.className = 'accent-rule absolute left-0 right-0 -bottom-px h-[2px] bg-accent';
+            b.appendChild(rule);
+          } else if (!isActive && existing) {
+            existing.remove();
+          }
+        });
+        group.dispatchEvent(new CustomEvent('tab-change', { detail: { id }, bubbles: true }));
+      });
+    });
+  });
+</script>

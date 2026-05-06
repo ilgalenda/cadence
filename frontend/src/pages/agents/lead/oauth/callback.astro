@@ -1,0 +1,25 @@
+---
+import AgentLayout from '../../../../layouts/AgentLayout.astro';
+import { LEAD_AGENT_NAME, LEAD_AGENT_TAGLINE, LEAD_NAV } from '../../../../agents/lead/config';
+---
+<AgentLayout title="Google Calendar" agentName={LEAD_AGENT_NAME} agentTagline={LEAD_AGENT_TAGLINE} navItems={LEAD_NAV}>
+  <div class="px-10 py-12 max-w-2xl">
+    <div id="msg" class="font-mono text-sm">// completing Google sign-in…</div>
+    <a id="back-link" href="/agents/lead/campaigns" class="hidden mt-6 inline-block text-accent text-sm">← Back to campaigns</a>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const msg = document.getElementById('msg')!;
+    const back = document.getElementById('back-link')!;
+    if (params.get('ok')) {
+      msg.textContent = '// connected — you can close this tab and return to your campaign.';
+      back.classList.remove('hidden');
+    } else if (params.get('error')) {
+      msg.innerHTML = '// connection failed — <span class="text-signal-danger">' + (params.get('error') || 'unknown error') + '</span>';
+      back.classList.remove('hidden');
+    } else {
+      msg.textContent = '// no result — try again from the campaign.';
+      back.classList.remove('hidden');
+    }
+  </script>
+</AgentLayout>

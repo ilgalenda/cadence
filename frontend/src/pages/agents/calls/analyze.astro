@@ -1,0 +1,309 @@
+---
+import AgentLayout from '../../../layouts/AgentLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import AnalysisResult from '../../../components/AnalysisResult.astro';
+import { CALLS_AGENT_NAME, CALLS_AGENT_TAGLINE, CALLS_NAV } from '../../../agents/calls/config';
+---
+<AgentLayout
+  title="Call Analyser"
+  agentName={CALLS_AGENT_NAME}
+  agentTagline={CALLS_AGENT_TAGLINE}
+  navItems={CALLS_NAV}
+>
+  <div class="px-10 py-12 max-w-4xl">
+
+    <PageHeader
+      label="Calls · Analyser"
+      heading="Call analyser."
+      lead="Paste a transcript or upload an MP4 — Owl extracts sales intelligence, learning points, a product recommendation, and generates a quiz. Every analysis is saved under Calls analysed."
+    />
+
+    <!-- Input tabs -->
+    <div class="border-b border-rule-subtle flex items-center gap-6 mb-6">
+      <button id="tab-text" class="tab-btn relative py-3 text-sm font-medium text-ink-primary transition-colors duration-150">
+        <span>Paste transcript</span>
+        <span class="tab-rule absolute left-0 right-0 -bottom-px h-[2px] bg-accent"></span>
+      </button>
+      <button id="tab-mp4" class="tab-btn relative py-3 text-sm font-medium text-ink-muted hover:text-ink-primary transition-colors duration-150">
+        <span>Upload MP4</span>
+      </button>
+    </div>
+
+    <!-- Panel: text -->
+    <div id="panel-text" class="mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Paste below, or upload a .txt / .md file</p>
+        <label class="cursor-pointer font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">
+          upload transcript →
+          <input id="transcript-file-input" type="file" accept=".txt,.md" class="hidden" />
+        </label>
+      </div>
+      <textarea
+        id="transcript-input"
+        rows="10"
+        placeholder="Paste the call transcript here…"
+        class="w-full bg-surface-1 border border-rule-subtle focus:border-accent focus:outline-none focus:ring-0 rounded-sm px-4 py-3 text-sm text-ink-primary placeholder-ink-muted resize-none font-mono leading-relaxed transition-colors duration-150"
+      ></textarea>
+    </div>
+
+    <!-- Panel: mp4 -->
+    <div id="panel-mp4" class="hidden mb-6">
+      <div id="drop-zone" class="border border-dashed border-rule-subtle px-10 py-12 text-center hover:border-accent transition-colors duration-150 cursor-pointer">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Drop MP4 or click to browse</p>
+        <p class="text-sm text-ink-secondary">Transcribed locally on your Mac — no data sent to external servers</p>
+        <input id="file-input" type="file" accept=".mp4" class="hidden" />
+      </div>
+      <div id="file-info" class="hidden mt-4 flex items-center justify-between py-3 border-b border-rule-subtle">
+        <div class="min-w-0">
+          <p id="file-name" class="text-sm text-ink-primary font-medium truncate"></p>
+          <p id="file-size" class="font-mono text-xs tabular text-ink-muted mt-0.5"></p>
+        </div>
+        <button id="remove-file" class="font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">Remove →</button>
+      </div>
+
+      <!-- ffmpeg attention block -->
+      <div id="ffmpeg-error" class="hidden relative bg-surface-1 border border-rule-subtle pl-5 pr-5 py-4 mt-4">
+        <span class="absolute left-0 top-0 bottom-0 w-[2px] bg-accent"></span>
+        <div class="flex items-baseline justify-between mb-3">
+          <p class="font-mono text-[11px] uppercase tracking-label text-accent">// ffmpeg not found</p>
+          <button id="copy-ffmpeg" class="font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">[copy]</button>
+        </div>
+        <p class="text-xs text-ink-secondary mb-3 leading-relaxed">MP4 transcription requires ffmpeg. Install it with:</p>
+        <div class="bg-surface-0 border border-rule-subtle rounded-sm px-3 py-2 font-mono text-xs text-ink-secondary space-y-1">
+          <p class="text-ink-muted"># 1. Install Homebrew (if not already installed):</p>
+          <p class="break-all text-ink-primary" id="ffmpeg-cmd-1">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</p>
+          <p class="text-ink-muted mt-2"># 2. Install ffmpeg:</p>
+          <p class="text-ink-primary" id="ffmpeg-cmd-2">brew install ffmpeg</p>
+        </div>
+        <p class="font-mono text-[11px] text-ink-muted mt-3">// restart the backend server after installing</p>
+      </div>
+
+      <!-- Transcript preview -->
+      <div id="transcript-preview" class="hidden mt-4">
+        <div class="flex items-center justify-between mb-2">
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Extracted transcript</p>
+          <button id="edit-transcript" class="font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">Edit</button>
+        </div>
+        <textarea id="transcript-from-video" rows="6" readonly
+          class="w-full bg-surface-1 border border-rule-subtle focus:border-accent focus:outline-none focus:ring-0 rounded-sm px-4 py-3 text-xs text-ink-primary font-mono leading-relaxed resize-none"></textarea>
+      </div>
+    </div>
+
+    <!-- Title + action -->
+    <div class="flex items-end gap-4 mb-6 pb-6 border-b border-rule-strong">
+      <div class="flex-1">
+        <label for="call-title" class="block font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Call title (optional)</label>
+        <input id="call-title" type="text" placeholder="e.g. Microsoft Azure Discovery Call"
+          class="w-full bg-transparent border-0 border-b border-rule-strong/30 focus:border-accent focus:outline-none focus:ring-0 py-2 text-sm text-ink-primary placeholder-ink-muted transition-colors" />
+      </div>
+      <button id="analyze-btn" class="bg-surface-ink hover:bg-accent disabled:opacity-50 text-ink-inverse px-5 py-2 rounded-sm text-sm font-medium transition-colors duration-150 flex items-center gap-2">
+        <span>Analyse call</span>
+        <span class="font-mono">→</span>
+      </button>
+    </div>
+
+    <!-- Progress -->
+    <div id="progress" class="hidden py-4 border-b border-rule-subtle mb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-3 h-3 border border-accent border-t-transparent rounded-full animate-spin"></div>
+        <p id="progress-text" class="font-mono text-xs text-ink-secondary">Analysing…</p>
+      </div>
+    </div>
+
+    <!-- Shared results component (hidden until analysis is produced) -->
+    <AnalysisResult showClear={true} />
+
+  </div>
+
+  <script>
+    let currentMode: 'text' | 'mp4' = 'text';
+    let uploadedFile: File | null = null;
+
+    // ── Input mode tabs ───────────────────────────────────────────────────
+    const tabTextBtn = document.getElementById('tab-text')!;
+    const tabMp4Btn = document.getElementById('tab-mp4')!;
+    tabTextBtn.addEventListener('click', () => setMode('text'));
+    tabMp4Btn.addEventListener('click', () => setMode('mp4'));
+
+    function setTabActive(btn: HTMLElement, isActive: boolean) {
+      btn.classList.toggle('text-ink-primary', isActive);
+      btn.classList.toggle('text-ink-muted', !isActive);
+      const existing = btn.querySelector('.tab-rule');
+      if (isActive && !existing) {
+        const rule = document.createElement('span');
+        rule.className = 'tab-rule absolute left-0 right-0 -bottom-px h-[2px] bg-accent';
+        btn.appendChild(rule);
+      } else if (!isActive && existing) {
+        existing.remove();
+      }
+    }
+
+    function setMode(mode: 'text' | 'mp4') {
+      currentMode = mode;
+      document.getElementById('panel-text')!.classList.toggle('hidden', mode !== 'text');
+      document.getElementById('panel-mp4')!.classList.toggle('hidden', mode !== 'mp4');
+      setTabActive(tabTextBtn, mode === 'text');
+      setTabActive(tabMp4Btn, mode === 'mp4');
+    }
+
+    // ── ffmpeg copy ───────────────────────────────────────────────────────
+    document.getElementById('copy-ffmpeg')?.addEventListener('click', () => {
+      const a = document.getElementById('ffmpeg-cmd-1')!.textContent;
+      const b = document.getElementById('ffmpeg-cmd-2')!.textContent;
+      navigator.clipboard.writeText(`${a}\n${b}`).catch(() => {});
+    });
+
+    // ── File handling ─────────────────────────────────────────────────────
+    const dropZone = document.getElementById('drop-zone')!;
+    const fileInput = document.getElementById('file-input') as HTMLInputElement;
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('bg-accent-soft'); dropZone.classList.add('border-accent'); });
+    dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('bg-accent-soft'); dropZone.classList.remove('border-accent'); });
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('bg-accent-soft');
+      dropZone.classList.remove('border-accent');
+      handleFile(e.dataTransfer!.files[0]);
+    });
+    fileInput.addEventListener('change', e => handleFile((e.target as HTMLInputElement).files![0]));
+
+    function handleFile(file: File) {
+      if (!file || !file.name.endsWith('.mp4')) return;
+      uploadedFile = file;
+      document.getElementById('drop-zone')!.classList.add('hidden');
+      document.getElementById('file-info')!.classList.remove('hidden');
+      document.getElementById('file-name')!.textContent = file.name;
+      document.getElementById('file-size')!.textContent = (file.size / 1024 / 1024).toFixed(1) + ' MB';
+      document.getElementById('ffmpeg-error')!.classList.add('hidden');
+      startTranscribeAndAnalyse();
+    }
+
+    document.getElementById('remove-file')!.addEventListener('click', () => {
+      uploadedFile = null;
+      fileInput.value = '';
+      document.getElementById('drop-zone')!.classList.remove('hidden');
+      document.getElementById('file-info')!.classList.add('hidden');
+      document.getElementById('transcript-preview')!.classList.add('hidden');
+      document.getElementById('ffmpeg-error')!.classList.add('hidden');
+    });
+
+    document.getElementById('edit-transcript')!.addEventListener('click', () => {
+      const ta = document.getElementById('transcript-from-video') as HTMLTextAreaElement;
+      ta.readOnly = !ta.readOnly;
+      document.getElementById('edit-transcript')!.textContent = ta.readOnly ? 'Edit' : 'Lock';
+    });
+
+    // ── Transcript file upload ────────────────────────────────────────────
+    document.getElementById('transcript-file-input')!.addEventListener('change', (e) => {
+      const file = (e.target as HTMLInputElement).files![0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        (document.getElementById('transcript-input') as HTMLTextAreaElement).value = ev.target!.result as string;
+      };
+      reader.readAsText(file);
+      (e.target as HTMLInputElement).value = '';
+    });
+
+    // ── Transcribe + auto-analyse ─────────────────────────────────────────
+    async function startTranscribeAndAnalyse() {
+      if (!uploadedFile) return;
+      document.getElementById('analysis-result')!.classList.add('hidden');
+      document.getElementById('ffmpeg-error')!.classList.add('hidden');
+      (document.getElementById('analyze-btn') as HTMLButtonElement).disabled = true;
+
+      setProgress('Transcribing video… this may take a minute');
+
+      const formData = new FormData();
+      formData.append('file', uploadedFile);
+
+      let transcript: string;
+      try {
+        const res = await fetch('/api/transcribe', { method: 'POST', body: formData });
+        if (!res.ok) {
+          const err = await res.json();
+          if (err.detail && err.detail.includes('ffmpeg')) {
+            document.getElementById('ffmpeg-error')!.classList.remove('hidden');
+            hideProgress();
+            return;
+          }
+          throw new Error(err.detail || 'Transcription failed');
+        }
+        const data = await res.json();
+        transcript = data.transcript;
+        (document.getElementById('transcript-from-video') as HTMLTextAreaElement).value = transcript;
+        document.getElementById('transcript-preview')!.classList.remove('hidden');
+      } catch (e: any) {
+        hideProgress();
+        alert('Transcription error: ' + e.message);
+        return;
+      }
+
+      const title = (document.getElementById('call-title') as HTMLInputElement).value.trim() || uploadedFile.name.replace(/\.mp4$/i, '') || 'Call Analysis';
+      setProgress('Transcription complete — Owl is analysing the call…');
+
+      try {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: transcript, title }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Analysis failed');
+        }
+        const analysis = await res.json();
+        analysis._title = title;
+        (window as any).renderAnalysisResult(analysis);
+        hideProgress();
+      } catch (e: any) {
+        hideProgress();
+        alert('Analysis error: ' + e.message);
+      }
+    }
+
+    // ── Analyse (from text paste) ─────────────────────────────────────────
+    document.getElementById('analyze-btn')!.addEventListener('click', async () => {
+      const text = currentMode === 'text'
+        ? (document.getElementById('transcript-input') as HTMLTextAreaElement).value.trim()
+        : (document.getElementById('transcript-from-video') as HTMLTextAreaElement).value.trim();
+      if (!text) { alert('Please provide a transcript to analyse.'); return; }
+
+      const title = (document.getElementById('call-title') as HTMLInputElement).value.trim() || 'Call Analysis';
+      setProgress('Owl is analysing the call…');
+      document.getElementById('analysis-result')!.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, title }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.detail || 'Analysis failed');
+        }
+        const analysis = await res.json();
+        analysis._title = title;
+        (window as any).renderAnalysisResult(analysis);
+        hideProgress();
+      } catch (e: any) {
+        hideProgress();
+        alert('Analysis error: ' + e.message);
+      }
+    });
+
+    // ── Progress helpers ──────────────────────────────────────────────────
+    function setProgress(text: string) {
+      document.getElementById('progress-text')!.textContent = text;
+      document.getElementById('progress')!.classList.remove('hidden');
+      (document.getElementById('analyze-btn') as HTMLButtonElement).disabled = true;
+    }
+
+    function hideProgress() {
+      document.getElementById('progress')!.classList.add('hidden');
+      (document.getElementById('analyze-btn') as HTMLButtonElement).disabled = false;
+    }
+  </script>
+</AgentLayout>

@@ -1,0 +1,401 @@
+---
+import LeadHandoffButton from './LeadHandoffButton.astro';
+interface Props {
+  /** When set, the component fetches /api/calls/{id} on mount and renders it. */
+  analysisId?: string;
+  /** Show the "Clear" button (hide on standalone detail pages). */
+  showClear?: boolean;
+}
+const { analysisId, showClear = true } = Astro.props;
+---
+<div id="analysis-result" data-analysis-id={analysisId ?? ''} class={analysisId ? '' : 'hidden'}>
+
+  <div class="flex items-center justify-between pb-3 mb-2 border-b border-rule-strong">
+    <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary" id="ar-heading">Analysis</h2>
+    <div class="flex items-center gap-5">
+      <button id="download-report" class="font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">Download report →</button>
+      {showClear && (
+        <button id="clear-results" class="font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-signal-danger transition-colors">Clear</button>
+      )}
+    </div>
+  </div>
+
+  <!-- Result tabs -->
+  <div class="border-b border-rule-subtle flex items-center gap-6 mb-6 overflow-x-auto">
+    <button class="result-tab active relative py-3 text-sm font-medium text-ink-primary transition-colors whitespace-nowrap" data-tab="summary">
+      <span>Summary</span>
+      <span class="tab-rule absolute left-0 right-0 -bottom-px h-[2px] bg-accent"></span>
+    </button>
+    <button class="result-tab relative py-3 text-sm font-medium text-ink-muted hover:text-ink-primary transition-colors whitespace-nowrap" data-tab="sales"><span>Sales intel</span></button>
+    <button class="result-tab relative py-3 text-sm font-medium text-ink-muted hover:text-ink-primary transition-colors whitespace-nowrap" data-tab="recommendation"><span>Recommendation</span></button>
+    <button class="result-tab relative py-3 text-sm font-medium text-ink-muted hover:text-ink-primary transition-colors whitespace-nowrap" data-tab="knowledge"><span>Learning</span></button>
+    <button class="result-tab relative py-3 text-sm font-medium text-ink-muted hover:text-ink-primary transition-colors whitespace-nowrap" data-tab="quiz"><span>Quiz</span></button>
+  </div>
+
+  <!-- Summary -->
+  <div id="tab-summary" class="result-panel">
+    <section class="mb-8">
+      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Summary</p>
+      <p id="result-summary" class="text-base text-ink-primary leading-relaxed max-w-2xl"></p>
+    </section>
+    <section class="mb-8">
+      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Concepts mentioned</p>
+      <div id="result-concepts" class="font-mono text-xs text-ink-secondary leading-loose"></div>
+    </section>
+    <section>
+      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Next step</p>
+      <LeadHandoffButton source="call-analysis" label="Start outreach from this call" variant="primary" />
+    </section>
+  </div>
+
+  <!-- Sales intel -->
+  <div id="tab-sales" class="result-panel hidden space-y-8">
+    <section>
+      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Buying signals</p>
+      <ul id="result-signals" class="space-y-2"></ul>
+    </section>
+    <section>
+      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Objections</p>
+      <ul id="result-objections" class="space-y-2"></ul>
+    </section>
+    <section>
+      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Follow-up talking points</p>
+      <ul id="result-talking" class="space-y-2"></ul>
+    </section>
+  </div>
+
+  <!-- Recommendation -->
+  <div id="tab-recommendation" class="result-panel hidden space-y-8">
+    <section id="result-primary-rec" class="relative bg-surface-1 border border-rule-subtle pl-5 pr-5 py-5">
+      <span class="absolute left-0 top-0 bottom-0 w-[2px] bg-accent"></span>
+      <p class="font-mono text-[11px] uppercase tracking-label text-accent mb-2">Primary recommendation</p>
+      <p id="rec-product-name" class="text-xl font-semibold tracking-tightest text-ink-primary mb-2"></p>
+      <p id="rec-product-reasoning" class="text-sm text-ink-secondary leading-relaxed max-w-2xl"></p>
+      <button id="rec-ask-claude" class="mt-4 font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">ask owl more →</button>
+    </section>
+    <section>
+      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">All product fits</p>
+      <div id="result-all-fits"></div>
+    </section>
+  </div>
+
+  <!-- Learning -->
+  <div id="tab-knowledge" class="result-panel hidden">
+    <div id="result-knowledge" class="space-y-6"></div>
+  </div>
+
+  <!-- Quiz -->
+  <div id="tab-quiz" class="result-panel hidden">
+    <div id="quiz-container" class="space-y-6"></div>
+    <div id="quiz-score" class="hidden mt-8 relative bg-surface-1 border border-rule-subtle pl-5 pr-5 py-5">
+      <span class="absolute left-0 top-0 bottom-0 w-[2px] bg-signal-success"></span>
+      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Score</p>
+      <p class="font-mono text-2xl tabular text-ink-primary" id="score-text"></p>
+      <p class="text-sm text-ink-secondary mt-2">Keep practising to reinforce what you learned on this call.</p>
+      <button id="quiz-retry" class="mt-4 font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">Retry quiz →</button>
+    </div>
+  </div>
+
+  <!-- Static safelist for JS-injected classes -->
+  <div class="hidden" aria-hidden="true">
+    <span class="border-signal-success text-signal-success bg-signal-success/10"></span>
+    <span class="border-signal-danger text-signal-danger bg-signal-danger/10"></span>
+    <span class="border-accent text-accent bg-accent/10"></span>
+    <span class="border-l-2"></span>
+    <span class="bg-accent-soft"></span>
+  </div>
+</div>
+
+<script is:inline>
+  (function () {
+    let currentAnalysis = null;
+    let quizState = [];
+
+    function esc(s) {
+      return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function setTabActive(btn, isActive) {
+      btn.classList.toggle('text-ink-primary', isActive);
+      btn.classList.toggle('text-ink-muted', !isActive);
+      const existing = btn.querySelector('.tab-rule');
+      if (isActive && !existing) {
+        const rule = document.createElement('span');
+        rule.className = 'tab-rule absolute left-0 right-0 -bottom-px h-[2px] bg-accent';
+        btn.appendChild(rule);
+      } else if (!isActive && existing) {
+        existing.remove();
+      }
+    }
+
+    document.querySelectorAll('.result-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.result-tab').forEach(b => setTabActive(b, false));
+        setTabActive(btn, true);
+        document.querySelectorAll('.result-panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+      });
+    });
+
+    function renderList(id, items, bullet) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.innerHTML = (items && items.length)
+        ? items.map(item => `<li class="grid grid-cols-[auto_1fr] gap-3 text-sm text-ink-secondary leading-relaxed"><span class="font-mono text-ink-muted">${bullet}</span><span>${esc(item)}</span></li>`).join('')
+        : '<li class="font-mono text-xs text-ink-muted">// none identified</li>';
+    }
+
+    window.renderAnalysisResult = function (data) {
+      currentAnalysis = data;
+      document.getElementById('result-summary').textContent = data.summary || '—';
+
+      const conceptsEl = document.getElementById('result-concepts');
+      conceptsEl.innerHTML = (data.concepts_mentioned && data.concepts_mentioned.length)
+        ? data.concepts_mentioned.map((c, i) =>
+            `<a href="/agents/calls/glossary#${encodeURIComponent(c)}" class="text-ink-secondary hover:text-accent transition-colors">${esc(c)}</a>${i < data.concepts_mentioned.length - 1 ? '<span class="text-ink-muted"> · </span>' : ''}`
+          ).join('')
+        : '<p class="font-mono text-xs text-ink-muted">// none identified</p>';
+
+      renderList('result-signals', data.buying_signals, '→');
+      renderList('result-objections', data.objections, '⚠');
+      renderList('result-talking', data.talking_points, '·');
+
+      const rec = data.product_recommendation;
+      if (rec && rec.primary) {
+        document.getElementById('rec-product-name').textContent = rec.primary;
+        document.getElementById('rec-product-reasoning').textContent = rec.reasoning || '';
+        const askBtn = document.getElementById('rec-ask-claude');
+        if (askBtn) {
+          askBtn.onclick = () => {
+            const q = `Give me a full sales briefing on the ${rec.primary} for a customer with this profile: ${data.summary || ''}`;
+            window.location.href = `/agents/calls/chat?q=${encodeURIComponent(q)}`;
+          };
+        }
+        const fitsEl = document.getElementById('result-all-fits');
+        fitsEl.innerHTML = (rec.all_fits || []).map(f => {
+          const cls = f.fit === 'high' ? 'text-signal-success' : f.fit === 'medium' ? 'text-signal-warning' : 'text-ink-muted';
+          return `<div class="grid grid-cols-[auto_1fr] gap-6 py-4 border-b border-rule-subtle last:border-0">
+            <span class="font-mono text-[11px] uppercase tracking-label ${cls} w-16 pt-0.5">${esc(f.fit)}</span>
+            <div>
+              <p class="text-sm text-ink-primary font-medium">${esc(f.product)}</p>
+              <p class="text-xs text-ink-secondary mt-1 leading-relaxed">${esc(f.reason)}</p>
+            </div>
+          </div>`;
+        }).join('') || '<p class="font-mono text-xs text-ink-muted">// no fits identified</p>';
+      }
+
+      const knowledgeEl = document.getElementById('result-knowledge');
+      knowledgeEl.innerHTML = (data.knowledge_extracts && data.knowledge_extracts.length)
+        ? data.knowledge_extracts.map(k => `
+          <div class="py-5 border-b border-rule-subtle">
+            <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">${esc(k.category)} · ${esc(k.title)}</p>
+            <p class="text-sm text-ink-secondary leading-relaxed max-w-2xl">${esc(k.content)}</p>
+          </div>`).join('')
+        : '<p class="font-mono text-xs text-ink-muted py-8">// no learning extracts found</p>';
+
+      // Wire the lead-handoff button on the Summary tab with topic from recommendation.
+      document.querySelectorAll('#tab-summary .lead-handoff-btn').forEach(btn => {
+        btn.dataset.topic = (rec && rec.primary) ? rec.primary : (data._title || 'this call');
+      });
+
+      buildQuiz(data.flashcards || []);
+      const root = document.getElementById('analysis-result');
+      if (root) root.classList.remove('hidden');
+    };
+
+    function buildQuiz(cards) {
+      quizState = cards.map(c => ({ ...c, answered: false, correct: false }));
+      const container = document.getElementById('quiz-container');
+      document.getElementById('quiz-score').classList.add('hidden');
+
+      if (!cards.length) {
+        container.innerHTML = '<p class="font-mono text-xs text-ink-muted py-8">// no quiz questions generated</p>';
+        return;
+      }
+
+      container.innerHTML = cards.map((card, i) => {
+        if (card.type === 'mcq') {
+          return `<div class="quiz-card py-6 border-b border-rule-subtle" data-index="${i}">
+            <p class="text-base text-ink-primary mb-4 leading-relaxed max-w-2xl"><span class="font-mono text-xs text-ink-muted mr-3">${String(i+1).padStart(2, '0')}</span>${esc(card.question)}</p>
+            <div class="space-y-2 max-w-2xl">
+              ${(card.options || []).map((opt, oi) =>
+                `<button class="mcq-option relative w-full text-left pl-5 pr-4 py-2.5 border border-rule-subtle text-sm text-ink-secondary hover:border-accent hover:text-ink-primary transition-colors duration-150" data-qi="${i}" data-oi="${oi}">
+                  <span class="font-mono text-[11px] text-ink-muted mr-3">${['A','B','C','D'][oi]}</span>${esc(opt)}
+                </button>`
+              ).join('')}
+            </div>
+            <div class="quiz-feedback hidden mt-3 font-mono text-xs leading-relaxed" data-qi="${i}"></div>
+          </div>`;
+        } else {
+          return `<div class="quiz-card py-6 border-b border-rule-subtle" data-index="${i}">
+            <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Flashcard ${String(i+1).padStart(2, '0')}</p>
+            <p class="text-base text-ink-primary mb-3 leading-relaxed max-w-2xl">${esc(card.question)}</p>
+            <button class="reveal-btn font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors" data-qi="${i}">Show answer →</button>
+            <div class="flashcard-answer hidden mt-4 pl-4 border-l-2 border-accent max-w-2xl text-sm text-ink-secondary leading-relaxed" data-qi="${i}">
+              ${esc(card.answer)}
+            </div>
+          </div>`;
+        }
+      }).join('');
+
+      document.querySelectorAll('.mcq-option').forEach(btn => {
+        btn.addEventListener('click', () => handleMcqAnswer(parseInt(btn.dataset.qi), parseInt(btn.dataset.oi)));
+      });
+
+      document.querySelectorAll('.reveal-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const qi = btn.dataset.qi;
+          document.querySelector(`.flashcard-answer[data-qi="${qi}"]`).classList.remove('hidden');
+          btn.textContent = '✓ Revealed';
+          btn.disabled = true;
+          const idx = Number(qi);
+          quizState[idx].answered = true;
+          quizState[idx].correct = true;
+          checkQuizComplete();
+        });
+      });
+    }
+
+    function handleMcqAnswer(qi, oi) {
+      if (quizState[qi].answered) return;
+      quizState[qi].answered = true;
+      const card = quizState[qi];
+      const isCorrect = oi === card.correct;
+      quizState[qi].correct = isCorrect;
+
+      const cardEl = document.querySelector(`.quiz-card[data-index="${qi}"]`);
+      cardEl.querySelectorAll('.mcq-option').forEach((btn, i) => {
+        btn.disabled = true;
+        if (i === card.correct) {
+          btn.classList.remove('border-rule-subtle', 'text-ink-secondary', 'hover:border-accent', 'hover:text-ink-primary');
+          btn.classList.add('border-signal-success', 'text-signal-success', 'bg-signal-success/10');
+        } else if (i === oi && !isCorrect) {
+          btn.classList.remove('border-rule-subtle', 'text-ink-secondary', 'hover:border-accent', 'hover:text-ink-primary');
+          btn.classList.add('border-signal-danger', 'text-signal-danger', 'bg-signal-danger/10');
+        }
+      });
+
+      const feedback = document.querySelector(`.quiz-feedback[data-qi="${qi}"]`);
+      feedback.classList.remove('hidden');
+      if (isCorrect) {
+        feedback.classList.add('text-signal-success');
+        feedback.textContent = '// correct — ' + (card.explanation || '');
+      } else {
+        feedback.classList.add('text-signal-danger');
+        feedback.textContent = '// incorrect — ' + (card.explanation || `answer was ${card.options && card.options[card.correct]}`);
+      }
+
+      checkQuizComplete();
+    }
+
+    function checkQuizComplete() {
+      if (quizState.every(q => q.answered)) {
+        const correct = quizState.filter(q => q.correct).length;
+        const total = quizState.length;
+        document.getElementById('score-text').textContent = `${String(correct).padStart(2, '0')} / ${String(total).padStart(2, '0')} correct`;
+        document.getElementById('quiz-score').classList.remove('hidden');
+      }
+    }
+
+    document.getElementById('quiz-retry').addEventListener('click', () => {
+      if (currentAnalysis && currentAnalysis.flashcards) buildQuiz(currentAnalysis.flashcards);
+    });
+
+    // ── Report download ──
+    document.getElementById('download-report').addEventListener('click', () => {
+      if (!currentAnalysis) return;
+      const d = currentAnalysis;
+      const title = d._title || 'Call Analysis';
+      const date = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>${title} — Timebeat</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 24px; color: #1e293b; }
+    h1 { font-size: 24px; margin-bottom: 4px; }
+    .meta { color: #64748b; font-size: 13px; margin-bottom: 32px; }
+    h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; font-weight: 600; margin: 24px 0 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+    .summary { background: #f8fafc; border-left: 3px solid #3b82f6; padding: 12px 16px; border-radius: 4px; font-size: 14px; line-height: 1.6; }
+    ul { margin: 0; padding-left: 20px; }
+    li { font-size: 14px; margin-bottom: 4px; line-height: 1.5; }
+    .rec-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin: 8px 0; }
+    .rec-name { font-size: 18px; font-weight: 700; color: #1d4ed8; margin-bottom: 8px; }
+    .tag { display: inline-block; background: #f1f5f9; border-radius: 999px; padding: 2px 10px; font-size: 12px; margin: 2px; }
+    .know-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; }
+    .know-cat { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; background: #f1f5f9; padding: 2px 8px; border-radius: 999px; margin-bottom: 6px; }
+    .footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; }
+    @media print { body { margin: 0; } }
+  </style>
+</head>
+<body>
+  <h1>${title}</h1>
+  <p class="meta">Generated by Timebeat Onboarding Agent &nbsp;·&nbsp; ${date}</p>
+
+  <h2>Summary</h2>
+  <div class="summary">${d.summary || '–'}</div>
+
+  ${d.buying_signals && d.buying_signals.length ? `<h2>Buying Signals</h2><ul>${d.buying_signals.map(s => `<li>${s}</li>`).join('')}</ul>` : ''}
+  ${d.objections && d.objections.length ? `<h2>Objections</h2><ul>${d.objections.map(s => `<li>${s}</li>`).join('')}</ul>` : ''}
+  ${d.talking_points && d.talking_points.length ? `<h2>Follow-up Talking Points</h2><ul>${d.talking_points.map(s => `<li>${s}</li>`).join('')}</ul>` : ''}
+
+  ${d.product_recommendation && d.product_recommendation.primary ? `
+  <h2>Product Recommendation</h2>
+  <div class="rec-box">
+    <div class="rec-name">📦 ${d.product_recommendation.primary}</div>
+    <p style="font-size:14px;line-height:1.6;margin:0">${d.product_recommendation.reasoning || ''}</p>
+  </div>
+  ${d.product_recommendation.all_fits && d.product_recommendation.all_fits.length ? `
+  <h2>All Product Fits</h2>
+  <ul>${d.product_recommendation.all_fits.map(f => `<li><strong>${f.product}</strong> (${f.fit}) — ${f.reason}</li>`).join('')}</ul>
+  ` : ''}` : ''}
+
+  ${d.knowledge_extracts && d.knowledge_extracts.length ? `
+  <h2>Learning Points</h2>
+  ${d.knowledge_extracts.map(k => `<div class="know-card"><span class="know-cat">${k.category}</span><strong style="display:block;margin-bottom:4px;font-size:14px">${k.title}</strong><p style="font-size:14px;margin:0;line-height:1.6">${k.content}</p></div>`).join('')}
+  ` : ''}
+
+  ${d.concepts_mentioned && d.concepts_mentioned.length ? `<h2>Concepts Mentioned</h2><p>${d.concepts_mentioned.map(c => `<span class="tag">${c}</span>`).join(' ')}</p>` : ''}
+
+  <div class="footer">Timebeat Onboarding Agent &nbsp;·&nbsp; For internal sales use only</div>
+</body>
+</html>`;
+
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = title.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '-report.html';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    const clearBtn = document.getElementById('clear-results');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        document.getElementById('analysis-result').classList.add('hidden');
+        currentAnalysis = null;
+      });
+    }
+
+    // Auto-load when analysisId is provided.
+    const root = document.getElementById('analysis-result');
+    const id = root && root.dataset.analysisId;
+    if (id) {
+      fetch(`/api/calls/${encodeURIComponent(id)}`)
+        .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
+        .then(session => {
+          const result = session.result || {};
+          result._title = session.title || 'Call Analysis';
+          window.renderAnalysisResult(result);
+          const heading = document.getElementById('ar-heading');
+          if (heading) heading.textContent = (session.title || 'Call Analysis') + ' · ' + (session.timestamp || '');
+        })
+        .catch(() => {
+          root.innerHTML = '<p class="py-8 font-mono text-xs text-signal-danger">// analysis not found</p>';
+        });
+    }
+  })();
+</script>

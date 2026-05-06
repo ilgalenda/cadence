@@ -1,0 +1,10 @@
+{
+  "name": "cadence-timebeat",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npm run build --prefix frontend && npm run backend",
+    "backend": "PATH=\"$HOME/Library/Python/3.9/bin:$PATH\" python3 backend/main.py",
+    "build": "npm run build --prefix frontend"
+  }
+}

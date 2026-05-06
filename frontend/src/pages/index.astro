@@ -1,0 +1,139 @@
+---
+import LoginLayout from '../layouts/LoginLayout.astro';
+---
+<LoginLayout title="Login">
+  <div class="h-full grid grid-cols-1 md:grid-cols-[minmax(0,_1fr)_minmax(0,_1.1fr)]">
+
+    <!-- Ink panel -->
+    <section class="hidden md:flex flex-col justify-between bg-surface-ink text-ink-inverse p-12 relative overflow-hidden">
+      <div class="flex items-center gap-3">
+        <img
+          src="/images/timebeat-logo.png"
+          alt="Timebeat"
+          class="h-6 w-auto object-contain brightness-0 invert opacity-90"
+          onerror="this.style.display='none'"
+        />
+        <span class="font-mono text-[11px] uppercase tracking-label opacity-60">Timebeat</span>
+      </div>
+
+      <div class="space-y-6 max-w-md">
+        <p class="font-mono text-xs text-accent">// internal operations console</p>
+        <h2 class="text-3xl font-semibold leading-tight tracking-tightest">
+          A quiet workspace<br />for the work that matters.
+        </h2>
+        <p class="text-sm text-ink-inverse/70 leading-relaxed">
+          Cadence is a set of purpose-built agents — for calls, for leads, for what comes next — running on top of Timebeat's knowledge.
+        </p>
+      </div>
+
+      <div class="font-mono text-[11px] text-ink-inverse/40 flex items-center justify-between">
+        <span>V.1.1.0</span>
+        <span class="flex items-center gap-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-signal-success animate-signal-pulse"></span>
+          operational
+        </span>
+      </div>
+    </section>
+
+    <!-- Paper panel -->
+    <section class="flex items-center justify-center p-8 md:p-12">
+      <div class="w-full max-w-sm">
+        <div class="md:hidden flex items-center gap-3 mb-10">
+          <img
+            src="/images/timebeat-logo.png"
+            alt="Timebeat"
+            class="h-6 w-auto object-contain"
+            onerror="this.style.display='none'"
+          />
+          <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Timebeat</span>
+        </div>
+
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Sign in</p>
+        <h1 class="text-2xl font-semibold tracking-tightest mb-10">Enter Cadence.</h1>
+
+        <form id="login-form" class="space-y-8">
+          <div>
+            <label for="username" class="block font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Username</label>
+            <input
+              id="username"
+              type="text"
+              autofocus
+              autocomplete="username"
+              spellcheck="false"
+              class="w-full bg-transparent border-0 border-b border-rule-strong/30 focus:border-accent focus:outline-none focus:ring-0 py-2 text-base text-ink-primary placeholder-ink-muted transition-colors duration-150 ease-decelerate"
+              placeholder="ivan"
+            />
+          </div>
+
+          <div>
+            <label for="password" class="block font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Password</label>
+            <input
+              id="password"
+              type="password"
+              autocomplete="current-password"
+              class="w-full bg-transparent border-0 border-b border-rule-strong/30 focus:border-accent focus:outline-none focus:ring-0 py-2 text-base text-ink-primary placeholder-ink-muted transition-colors duration-150 ease-decelerate"
+              placeholder="••••••••"
+            />
+          </div>
+
+          <p id="error" class="hidden font-mono text-xs text-signal-danger"></p>
+
+          <button
+            type="submit"
+            id="submit-btn"
+            class="group w-full bg-surface-ink text-ink-inverse px-5 py-3 rounded-sm text-sm font-medium disabled:opacity-50 transition-all duration-150 ease-decelerate flex items-center justify-between hover:bg-accent"
+          >
+            <span>Enter</span>
+            <span class="font-mono">→</span>
+          </button>
+        </form>
+
+        <p class="font-mono text-[11px] text-ink-muted mt-16">
+          Timebeat · Cadence · {new Date().getFullYear()}
+        </p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/status');
+        const data = await res.json();
+        if (data.authed) window.location.href = '/dashboard';
+      } catch {}
+    })();
+
+    const form = document.getElementById('login-form') as HTMLFormElement;
+    const username = document.getElementById('username') as HTMLInputElement;
+    const pw = document.getElementById('password') as HTMLInputElement;
+    const btn = document.getElementById('submit-btn') as HTMLButtonElement;
+    const err = document.getElementById('error') as HTMLParagraphElement;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.classList.add('hidden');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: username.value.trim(), password: pw.value }),
+        });
+        if (res.ok) {
+          window.location.href = '/dashboard';
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        err.textContent = `// ${data.detail || 'incorrect credentials'}`;
+        err.classList.remove('hidden');
+        pw.select();
+      } catch {
+        err.textContent = '// could not reach server';
+        err.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</LoginLayout>

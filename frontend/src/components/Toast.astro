@@ -1,0 +1,42 @@
+---
+// Global toast host. Mount once per page (e.g. inside the agent page body).
+// Anywhere in scripts: window.toast('success' | 'danger' | 'warning' | 'info', 'message').
+---
+<div id="toast-host" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+<!-- Static safelist so Tailwind JIT keeps variant classes used only by JS. -->
+<div class="hidden" aria-hidden="true">
+  <span class="bg-signal-success"></span>
+  <span class="bg-signal-danger"></span>
+  <span class="bg-signal-warning"></span>
+  <span class="bg-accent"></span>
+</div>
+
+<script>
+  type Variant = 'success' | 'danger' | 'warning' | 'info';
+  const variantClass: Record<Variant, string> = {
+    success: 'bg-signal-success',
+    danger:  'bg-signal-danger',
+    warning: 'bg-signal-warning',
+    info:    'bg-accent',
+  };
+
+  (window as any).toast = (variant: Variant, message: string, ms = 3200) => {
+    const host = document.getElementById('toast-host');
+    if (!host) return;
+    const el = document.createElement('div');
+    el.className = 'toast pointer-events-auto relative bg-surface-1 border border-rule-subtle shadow-lift pl-4 pr-5 py-3 min-w-[240px] max-w-sm text-sm text-ink-primary translate-x-2 opacity-0 transition-all duration-150 ease-decelerate';
+    el.innerHTML = `
+      <span class="absolute left-0 top-0 bottom-0 w-[2px] ${variantClass[variant]}"></span>
+      <p class="leading-snug">${message}</p>
+    `;
+    host.appendChild(el);
+    requestAnimationFrame(() => {
+      el.classList.remove('translate-x-2', 'opacity-0');
+    });
+    setTimeout(() => {
+      el.classList.add('opacity-0', 'translate-x-2');
+      setTimeout(() => el.remove(), 200);
+    }, ms);
+  };
+</script>

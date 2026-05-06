@@ -1,0 +1,72 @@
+---
+// Contextual Owl helper for a single field.
+// Usage: <OwlInline field="target_role" target="#target-role-input" hint="Suggest a target role from the analysis" />
+interface Props {
+  field: string;
+  target: string;       // CSS selector of the input/textarea to fill
+  hint?: string;        // placeholder instruction
+  buttonLabel?: string;
+}
+const { field, target, hint = '', buttonLabel = 'Ask Owl' } = Astro.props;
+---
+<div class="inline-flex items-center gap-2" data-owl-inline data-field={field} data-target={target}>
+  <button
+    type="button"
+    class="owl-btn px-2 py-1 text-[11px] font-mono uppercase tracking-label text-accent border border-rule-subtle hover:bg-accent-soft transition-colors duration-150"
+  >🦉 {buttonLabel}</button>
+  <input
+    type="text"
+    class="owl-instr hidden bg-surface-1 border border-rule-subtle rounded px-2 py-1 text-xs w-64"
+    placeholder={hint || 'What should Owl do?'}
+  />
+  <span class="owl-status text-[11px] font-mono text-ink-muted hidden">…thinking</span>
+</div>
+
+<script>
+  document.querySelectorAll('[data-owl-inline]').forEach((root) => {
+    const btn = root.querySelector('.owl-btn') as HTMLButtonElement;
+    const instr = root.querySelector('.owl-instr') as HTMLInputElement;
+    const status = root.querySelector('.owl-status') as HTMLElement;
+    const field = (root as HTMLElement).dataset.field!;
+    const targetSel = (root as HTMLElement).dataset.target!;
+
+    btn.addEventListener('click', async () => {
+      if (instr.classList.contains('hidden')) {
+        instr.classList.remove('hidden');
+        instr.focus();
+        return;
+      }
+      await run();
+    });
+
+    instr.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); run(); }
+      if (e.key === 'Escape') instr.classList.add('hidden');
+    });
+
+    async function run() {
+      const target = document.querySelector(targetSel) as HTMLInputElement | HTMLTextAreaElement | null;
+      if (!target) return;
+      status.classList.remove('hidden');
+      try {
+        const current_state = (window as any).leadWizardState?.() || {};
+        const res = await fetch('/api/lead/owl/fill', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ field, instruction: instr.value, current_state }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Owl failed');
+        const { value } = await res.json();
+        target.value = value;
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        instr.value = '';
+        instr.classList.add('hidden');
+      } catch (e: any) {
+        status.textContent = '// ' + (e?.message || 'failed');
+        return;
+      } finally {
+        setTimeout(() => { status.classList.add('hidden'); status.textContent = '…thinking'; }, 1500);
+      }
+    }
+  });
+</script>

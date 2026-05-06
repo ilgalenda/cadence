@@ -1,0 +1,72 @@
+@import '@fontsource-variable/instrument-sans';
+@import '@fontsource-variable/jetbrains-mono';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --surface-0: 247 246 242;
+    --surface-1: 255 255 255;
+    --surface-2: 239 238 232;
+    --surface-ink: 13 13 15;
+
+    --text-primary: 20 21 26;
+    --text-secondary: 74 76 84;
+    --text-muted: 138 141 148;
+    --text-on-ink: 244 243 238;
+
+    --border-subtle: 227 225 216;
+    --border-strong: 26 27 31;
+
+    --accent: 216 90 42;
+    --accent-soft: 247 225 213;
+
+    --signal-success: 47 125 79;
+    --signal-warning: 184 134 27;
+    --signal-danger: 179 64 46;
+  }
+
+  html {
+    font-feature-settings: 'ss01', 'cv11';
+  }
+
+  body {
+    @apply bg-surface-0 text-ink-primary font-sans antialiased;
+    letter-spacing: -0.01em;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background-color: rgb(var(--accent) / 0.2);
+    color: rgb(var(--text-primary));
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .rule-x {
+    height: 1px;
+    background-color: rgb(var(--border-subtle));
+  }
+}

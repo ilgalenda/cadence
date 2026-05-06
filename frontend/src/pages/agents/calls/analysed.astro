@@ -1,0 +1,130 @@
+---
+import AgentLayout from '../../../layouts/AgentLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import { CALLS_AGENT_NAME, CALLS_AGENT_TAGLINE, CALLS_NAV } from '../../../agents/calls/config';
+---
+<AgentLayout
+  title="Calls analysed"
+  agentName={CALLS_AGENT_NAME}
+  agentTagline={CALLS_AGENT_TAGLINE}
+  navItems={CALLS_NAV}
+>
+  <div class="px-10 py-12 max-w-4xl">
+
+    <PageHeader
+      label="Calls · Analysed"
+      heading="Calls analysed."
+      lead="Every call you've analysed — each entry opens the full intelligence Owl extracted."
+    >
+      <span slot="meta" id="calls-count">—</span>
+    </PageHeader>
+
+    <div class="mb-8 pb-2 border-b border-rule-strong">
+      <input
+        id="search"
+        type="text"
+        placeholder="search calls…"
+        class="w-full bg-transparent border-0 focus:outline-none focus:ring-0 py-2 text-base text-ink-primary font-mono placeholder-ink-muted"
+      />
+    </div>
+
+    <ul id="calls-list">
+      <li class="py-12 text-center font-mono text-xs text-ink-muted">// loading…</li>
+    </ul>
+  </div>
+
+  <script>
+    type Call = { id: string; title: string; timestamp: string; summary: string; primary_product?: string };
+    let allCalls: Call[] = [];
+
+    function esc(s: string) {
+      return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function render(calls: Call[]) {
+      const list = document.getElementById('calls-list')!;
+      document.getElementById('calls-count')!.textContent = `${calls.length.toString().padStart(2, '0')} call${calls.length !== 1 ? 's' : ''}`;
+      if (!calls.length) {
+        list.innerHTML = '<li class="py-12 text-center font-mono text-xs text-ink-muted">// no calls analysed yet — head to the Call Analyser</li>';
+        return;
+      }
+      list.innerHTML = calls.map(c => `
+        <li>
+          <div class="group relative grid grid-cols-[auto_1fr_auto_auto] gap-6 items-start py-5 border-b border-rule-subtle hover:bg-surface-1 transition-colors -mx-4 px-4">
+            <a href="/agents/calls/call?id=${encodeURIComponent(c.id)}" class="absolute inset-0" aria-label="Open ${esc(c.title)}"></a>
+            <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted pt-1 whitespace-nowrap">${esc(c.timestamp || '')}</span>
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-ink-primary group-hover:text-accent transition-colors truncate">${esc(c.title)}</p>
+              <p class="text-sm text-ink-secondary mt-1 leading-relaxed line-clamp-2">${esc(c.summary || '—')}</p>
+              ${c.primary_product ? `<p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mt-2">Primary fit · ${esc(c.primary_product)}</p>` : ''}
+            </div>
+            <button type="button" data-delete-id="${esc(c.id)}" class="relative z-10 font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-signal-danger pt-1 transition-colors">delete</button>
+            <span class="font-mono text-sm text-ink-muted group-hover:text-accent pt-1 transition-colors">→</span>
+          </div>
+        </li>
+      `).join('');
+    }
+
+    async function handleDelete(id: string) {
+      if (!confirm('Delete this call analysis? This cannot be undone.')) return;
+      try {
+        const res = await fetch('/api/calls/' + encodeURIComponent(id), { method: 'DELETE' });
+        if (!res.ok) throw new Error(String(res.status));
+        allCalls = allCalls.filter(c => c.id !== id);
+        const search = document.getElementById('search') as HTMLInputElement | null;
+        const q = (search?.value || '').toLowerCase();
+        const filtered = q
+          ? allCalls.filter(c =>
+              c.title.toLowerCase().includes(q) ||
+              (c.summary || '').toLowerCase().includes(q) ||
+              (c.primary_product || '').toLowerCase().includes(q))
+          : allCalls;
+        render(filtered);
+      } catch {
+        const list = document.getElementById('calls-list')!;
+        const banner = document.createElement('li');
+        banner.className = 'py-3 text-center font-mono text-xs text-signal-danger';
+        banner.textContent = '// could not delete — is the backend running?';
+        list.prepend(banner);
+        setTimeout(() => banner.remove(), 4000);
+      }
+    }
+
+    document.getElementById('calls-list')!.addEventListener('click', e => {
+      const target = e.target as HTMLElement;
+      const btn = target.closest('[data-delete-id]') as HTMLElement | null;
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      handleDelete(btn.getAttribute('data-delete-id')!);
+    });
+
+    async function load() {
+      try {
+        const res = await fetch('/api/calls');
+        allCalls = await res.json();
+        render(allCalls);
+      } catch {
+        document.getElementById('calls-list')!.innerHTML =
+          '<li class="py-8 text-center font-mono text-xs text-signal-danger">// could not load — is the backend running?</li>';
+      }
+    }
+
+    document.getElementById('search')!.addEventListener('input', e => {
+      const q = (e.target as HTMLInputElement).value.toLowerCase();
+      const filtered = allCalls.filter(c =>
+        c.title.toLowerCase().includes(q) ||
+        (c.summary || '').toLowerCase().includes(q) ||
+        (c.primary_product || '').toLowerCase().includes(q)
+      );
+      render(filtered);
+    });
+
+    load();
+  </script>
+
+  <!-- Static safelist for injected classes -->
+  <div class="hidden" aria-hidden="true">
+    <span class="line-clamp-2"></span>
+  </div>
+</AgentLayout>

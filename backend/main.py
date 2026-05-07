@@ -21,7 +21,11 @@ load_dotenv()
 #   IVAN_PASSWORD=<plaintext, used by seed_users.py>
 #   TEST_PASSWORD=<plaintext, used by seed_users.py>
 # Users themselves live in backend/agents/users.json (gitignored).
-SESSION_SECRET = os.getenv("SESSION_SECRET", "dev-secret-change-me")
+SESSION_SECRET = os.getenv("SESSION_SECRET")
+if not SESSION_SECRET:
+    raise RuntimeError("SESSION_SECRET is not set. Add it to backend/.env before starting.")
+
+DEBUG = os.getenv("DEBUG", "").lower() in ("1", "true", "yes")
 
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR.parent / "frontend" / "dist"
@@ -59,7 +63,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET,
     session_cookie="cadence_session",
-    https_only=False,
+    https_only=not DEBUG,
     same_site="lax",
 )
 
@@ -127,4 +131,4 @@ if __name__ == "__main__":
         print("   Get your key at: https://console.anthropic.com\n")
 
     print("🚀  Cadence — Timebeat starting on http://localhost:8000")
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=DEBUG)

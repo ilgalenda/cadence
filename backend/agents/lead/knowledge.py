@@ -24,9 +24,14 @@ def lead_user_learnings_md(username: str) -> Path:
 def _strip_rtf_artifacts(text: str) -> str:
     """Clean stray RTF markers from a file that was pasted out of TextEdit.
 
-    Persona.md carries control words (\\f0 \\fs24 \\cf0), a trailing backslash on
-    each line, and a closing brace — but is otherwise plain markdown.
+    Persona.md is sometimes saved as RTF — control words (\\f0 \\fs24 \\cf0), a
+    trailing backslash on each line, and a closing brace — but is otherwise plain
+    markdown. Only strip when the content is genuinely RTF (every RTF document
+    begins with "{\\rtf"); a clean-markdown persona is returned untouched so
+    legitimate backslashes (paths, regexes) survive.
     """
+    if not text.lstrip().startswith("{\\rtf"):
+        return text.strip()
     text = re.sub(r"\\[a-zA-Z]+-?\d*", "", text)  # RTF control words
     text = text.replace("\\", "")                   # line-continuation backslashes
     text = text.rstrip().rstrip("}")                # closing RTF brace

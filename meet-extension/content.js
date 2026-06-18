@@ -24,6 +24,7 @@ const SPEAKER_SELECTORS = [
 let lines = [];
 let lastSpeaker = '';
 let lastText = '';
+let lastCaptionEl = null;
 let isRecording = false;
 let sessionId = null;
 
@@ -64,13 +65,20 @@ function onCaption(el) {
 
   const line = `[${ts}] ${speaker}: ${text}`;
 
-  // Replace the last line when the same speaker is still talking (in-place caption update)
-  if (speaker === lastSpeaker && lines.length > 0) {
+  // Google Meet mutates a SINGLE caption element in place as it refines the live
+  // transcription of the current utterance, then creates a NEW element for the
+  // next one. Replace the last line only when the same element (and speaker) is
+  // being refined; a different element — even from the same speaker — is a new
+  // utterance and must be appended. Keying on speaker alone would collapse
+  // back-to-back utterances from one uninterrupted speaker into just the last.
+  const isRefinement = el === lastCaptionEl && speaker === lastSpeaker && lines.length > 0;
+  if (isRefinement) {
     lines[lines.length - 1] = line;
   } else {
     lines.push(line);
   }
 
+  lastCaptionEl = el;
   lastSpeaker = speaker;
   lastText = text;
 
@@ -108,6 +116,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     lines = [];
     lastSpeaker = '';
     lastText = '';
+    lastCaptionEl = null;
     sessionId = ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
       (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)
     );

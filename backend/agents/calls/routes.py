@@ -229,6 +229,31 @@ def load_user_sessions(username: str, sandbox: bool = False) -> list[dict]:
     return [s for s in load_sessions(sandbox) if s.get("username") == username]
 
 
+def patch_session_result(call_id: str, username: str, key: str, value, sandbox: bool = False) -> bool:
+    """Re-read sessions, patch result[key] on the owning user's matching call, write back.
+
+    Re-reading immediately before the write (rather than reusing a snapshot a
+    caller loaded earlier) keeps a long-running caller — e.g. one that holds the
+    list across a multi-second LLM call — from clobbering sessions saved
+    concurrently. Returns False if no matching call is found.
+    """
+    sessions = load_sessions(sandbox)
+    for s in sessions:
+        if (
+            s.get("type") == "call_analysis"
+            and s.get("id") == call_id
+            and s.get("username") == username
+        ):
+            result = s.get("result")
+            if not isinstance(result, dict):
+                result = {}
+            result[key] = value
+            s["result"] = result
+            _sessions_file(sandbox).write_text(json.dumps(sessions, indent=2))
+            return True
+    return False
+
+
 def load_learnings(username: str, sandbox: bool = False) -> list[dict]:
     path = user_learnings_json(username, sandbox)
     if not path.exists():
@@ -774,10 +799,11 @@ Rules:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Product recommendation failed: {e}")
 
-    # Patch the stored session result in place.
-    result["product_recommendation"] = recommendation
-    target["result"] = result
-    _sessions_file(sandbox).write_text(json.dumps(sessions, indent=2))
+    # Re-read sessions immediately before writing so any session saved during
+    # the (multi-second) LLM call above is not clobbered by the stale snapshot
+    # loaded at the top of this handler.
+    if not patch_session_result(call_id, user["username"], "product_recommendation", recommendation, sandbox):
+        raise HTTPException(status_code=404, detail="Call analysis not found.")
 
     return recommendation
 

@@ -44,6 +44,22 @@ The example domain throughout (a timing-technology sales team) is just illustrat
 
 ---
 
+## Documentation
+
+Full reference docs live in [`docs/`](docs/README.md):
+
+- **[Architecture](docs/architecture.md)** — layers, request lifecycle, auth &
+  access control, the `DATA_ROOT` data model, the three-pillar vault, the shared
+  Claude client, and frontend conventions.
+- **[Agent Creator](docs/agent-creator.md)** — scaffold a new agent from a spec.
+- **Per-agent guides** — [Calls](docs/agents/calls.md) ·
+  [Lead](docs/agents/lead.md) · [Owl](docs/agents/owl.md) ·
+  [High-Intent](docs/agents/high-intent.md) · [Meet](docs/agents/meet.md) ·
+  [Duty & Tax](docs/agents/duty.md) · [Onboarding](docs/agents/onboarding.md) ·
+  [Forecasting](docs/agents/forecast.md) (incl. the Pipeline Manager).
+
+The sections below are a quick tour; the per-agent docs are the detail.
+
 ## Agents
 
 ### Calls Agent

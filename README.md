@@ -1,8 +1,12 @@
-# Cadence — Timebeat internal Agentic Platform
+# Cadence — an Agentic GTM Platform
 
-An internal AI-powered intelligence system built for the Sales team. Cadence gives sales and GTM teams purpose-built agents backed by a shared knowledge vault that grows with every interaction.
+Cadence gives sales and GTM teams purpose-built AI agents backed by a shared knowledge vault that grows with every interaction. Analyse calls, run prospect pipelines, and chat with an assistant that learns from both.
 
-> **INTERNAL NOTE.** This repo ships with operational data included: the Cadence knowledge vault (`backend/vault/`), agent runtime state (campaigns, leads, sessions, learnings), and seeded user records (with bcrypt-hashed passwords). Out-of-band you only need to supply credentials — see **First-boot for Timebeat IT** below.
+This repository is the **open architecture**, not a turnkey product with data inside. Clone it, point it at your own Anthropic key and your own knowledge, seed your own users, and you have your own system. It ships **code and structure only** — no vault content, no runtime data, no user records.
+
+> **What's included vs what you bring.** The repo contains the application, the agent logic, and an empty vault/knowledge skeleton. The knowledge vault, agent runtime state (campaigns, leads, sessions, learnings), and user accounts are **created at runtime under your `DATA_ROOT`** — see [Where runtime data lives](#where-runtime-data-lives) and [Getting started](#getting-started). Nothing proprietary is committed here.
+
+The example domain throughout (a timing-technology sales team) is just illustrative — Cadence is domain-agnostic. Swap in your own product knowledge and personas and it adapts.
 
 ---
 
@@ -75,12 +79,12 @@ A conversational assistant with intelligent model routing.
 
 ## Cadence Knowledge — three-pillar architecture
 
-Every agent writes to and reads from a shared vault at `backend/vault/`. It is a valid [Obsidian](https://obsidian.md) vault — open the directory directly to browse the full knowledge graph. `[[wikilinks]]` cross pillar boundaries freely, so Obsidian renders the three pillars as a single connected graph.
+Every agent writes to and reads from a shared vault at `${DATA_ROOT}/vault/`. It is a valid [Obsidian](https://obsidian.md) vault — open the directory directly to browse the full knowledge graph. `[[wikilinks]]` cross pillar boundaries freely, so Obsidian renders the three pillars as a single connected graph.
 
 The vault is split into three pillars, each with a distinct lifecycle:
 
 ```
-backend/vault/
+vault/
 ├── company/        # Pillar 1 — Company Truth (locked, canonical)
 │   ├── products/         # hardware, solutions, industries, datasheets
 │   ├── research/         # learn pillars, clusters, weekly digests
@@ -97,7 +101,7 @@ backend/vault/
     └── rejected/         # archived; never loaded
 ```
 
-**Pillar 1 — Company Truth.** Hand-curated, canonical Timebeat knowledge. Locked: the runtime never writes here. New folders are dropped into `company/` and normalised with `python3 backend/scripts/normalise_company_truth.py`, which adds the `tier: company`, `locked: true`, `description`, and `[[wikilink]]` injection in place. Idempotent — safe to re-run.
+**Pillar 1 — Company Truth.** Hand-curated, canonical knowledge for your organisation — products, protocols, research. Locked: the runtime never writes here. New folders are dropped into `company/` and normalised with `python3 backend/scripts/normalise_company_truth.py`, which adds the `tier: company`, `locked: true`, `description`, and `[[wikilink]]` injection in place. Idempotent — safe to re-run. This is the pillar you populate to make Cadence your own.
 
 **Pillar 2 — Dynamic Truth.** Empirical insights extracted by the Calls and Lead agents from real customer interactions. Every entry carries both a `title` and a one-sentence `description`, enforced by the vault writer.
 
@@ -128,6 +132,8 @@ cadence/
 ├── backend/
 │   ├── main.py                    # FastAPI app, auth middleware, router mounting
 │   ├── auth.py                    # Login, session, role helpers
+│   ├── paths.py                   # Resolves every mutable path under DATA_ROOT
+│   ├── seed_users.py              # Seeds your user accounts + credentials
 │   ├── .env.example               # Required environment variables
 │   ├── requirements.txt
 │   ├── agents/
@@ -149,7 +155,7 @@ cadence/
 │   │   │   └── storage.py         # Per-user session persistence
 │   │   └── shared/
 │   │       └── vault.py           # Vault read/write, entity linking, frontmatter
-│   └── vault/                     # Shared knowledge vault (populated at runtime)
+│   └── scripts/                   # Maintenance utilities (e.g. vault normalisation)
 └── frontend/
     ├── src/
     │   ├── pages/
@@ -165,51 +171,58 @@ cadence/
 
 ## Where runtime data lives
 
-Cadence stores all mutable state (vault, leads, sessions, Owl conversations, `users.json`, `users_credentials.json`, etc.) under a directory named by `DATA_ROOT`. The architecture is **data-in-git**: the live server's `DATA_ROOT` points at the repo's `backend/` directory, and a cron commits + pushes new ingested data back to git so every clone stays coherent.
+Cadence stores all mutable state (vault, leads, sessions, Owl conversations, `users.json`, `users_credentials.json`, etc.) under a directory named by the `DATA_ROOT` env var. **None of it is committed to this repo** — it is created the first time you run the app.
 
-| Variable | Purpose | Local dev | Production |
-|---|---|---|---|
-| `DATA_ROOT` | Where mutable state lives | path **outside** the repo, e.g. `~/cadence-data` | the repo's `backend/`, e.g. `/srv/cadence/backend` |
+| Variable | Purpose | Default |
+|---|---|---|
+| `DATA_ROOT` | Root for all mutable state | `~/cadence-data` if unset; set it explicitly for production, e.g. `/srv/cadence/backend` |
 
-Two files split the user model:
+Two files split the user model, and **neither is committed**:
 
-- `backend/agents/users.json` — **committed**. Profiles (name, role, access, agents). Versioned with the code that consumes them.
-- `${DATA_ROOT}/agents/users_credentials.json` — **gitignored**. Per-environment bcrypt password hashes. Each laptop/server runs `python backend/seed_users.py` once to populate it from the local `.env`.
+- `${DATA_ROOT}/agents/users.json` — profiles (name, role, access, agents). Generate it from your own roster with `python backend/seed_users.py --rewrite-profiles` (edit `_DEFAULT_PROFILES` in that file first).
+- `${DATA_ROOT}/agents/users_credentials.json` — per-environment bcrypt password hashes. Each machine runs `python backend/seed_users.py` once to populate it from the local `.env`.
 
-## First-boot for Timebeat - TO READ
+> **Optional: data-in-git.** If you want a team to share live data through the repo, you can point `DATA_ROOT` at the repo's own `backend/` directory and run a cron that commits and pushes new data back — every clone then stays coherent. This is an advanced, opt-in pattern; keep your repo **private** if you do this, since the vault and runtime state then contain your real data. By default `DATA_ROOT` lives outside the repo and nothing operational is ever committed.
 
-**Prerequisites:** Python 3.11+, Node 18+.
+---
 
-**Credentials Timebeat supplies (not in the repo):**
+## Getting started
+
+**Prerequisites:** Python 3.11+, Node 18+, an [Anthropic API key](https://console.anthropic.com/).
+
+**Environment variables you supply (see `backend/.env.example`):**
 
 | Variable | Where to get it |
 |---|---|
 | `ANTHROPIC_API_KEY` | console.anthropic.com → Settings → API Keys |
-| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | Google Cloud Console → APIs & Services → Credentials → Create OAuth client (Web). Add `GOOGLE_REDIRECT_URI` to "Authorised redirect URIs" |
-| `GOOGLE_REDIRECT_URI` | The deployment URL + `/api/lead/google/callback` (e.g. `https://your-deployment-host/api/lead/google/callback`) |
+| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` (optional) | Google Cloud Console → APIs & Services → Credentials → Create OAuth client (Web). Only needed for the Lead agent's Calendar integration. Add `GOOGLE_REDIRECT_URI` to "Authorised redirect URIs" |
+| `GOOGLE_REDIRECT_URI` (optional) | The deployment URL + `/api/lead/google/callback` (e.g. `https://your-deployment-host/api/lead/google/callback`) |
 | `SESSION_SECRET` | Generate: `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
-| `SMTP_*` (optional) | For admin approval emails. Gmail needs an App Password. System degrades gracefully if unset |
+| `SMTP_*` (optional) | For admin approval emails. Gmail needs an App Password. The system degrades gracefully if unset |
 
 **Steps:**
 
 ```bash
 # 1. Clone
-git clone <internal-repo-url> cadence
+git clone https://github.com/ilgalenda/cadence.git
 cd cadence
 
 # 2. Backend env
 cd backend
 cp .env.example .env
-# In .env:
-#   DATA_ROOT=/srv/cadence/backend         (point at the repo's backend dir)
-#   ADMIN_PASSWORD=..., USER1_PASSWORD=...    (one per user)
-#   SESSION_SECRET, ANTHROPIC_API_KEY, GOOGLE_*, SMTP_*, DEBUG=false
+# In .env, set at minimum:
+#   DATA_ROOT=/path/to/cadence-data        (a directory OUTSIDE the repo)
+#   SESSION_SECRET, ANTHROPIC_API_KEY
+#   DEBUG=true                             (false in production)
+#   A password per profile in seed_users.py, e.g. ADMIN_PASSWORD, USER1_PASSWORD
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# 3. Seed credentials (writes ${DATA_ROOT}/agents/users_credentials.json,
-#    which is gitignored — never enters the repo).
-python seed_users.py
+# 3. Seed your users
+#    --rewrite-profiles writes users.json from _DEFAULT_PROFILES (edit it first
+#    for your own team). Drop the flag on later runs to refresh credentials only.
+#    Both files land under DATA_ROOT and are gitignored.
+python seed_users.py --rewrite-profiles
 
 # 4. Start the backend
 python main.py                # starts on http://localhost:8000
@@ -217,12 +230,32 @@ python main.py                # starts on http://localhost:8000
 # 5. Frontend (separate terminal)
 cd frontend
 npm install
-npm run build                 # or `npm run dev` for hot reload on :4321
+npm run dev                   # hot reload on :4321, proxies the API to :8000
 ```
 
-The backend serves the built frontend from `frontend/dist/` at `/`. In development, run the Astro dev server separately and proxy API calls to `:8000`.
+For a production-style run, build the frontend once (`npm run build`) — the backend then serves the built UI from `frontend/dist/` at `/`.
 
-**Subsequent deploys.** Run `bin/deploy.sh` on the server. It pulls the latest code, installs frontend deps, **rebuilds `frontend/dist/`**, and restarts the backend — in that order.
+You can now log in with one of the accounts you seeded (e.g. `admin` with the `ADMIN_PASSWORD` you set). Anything the app writes — Owl conversations, learnings, leads, vault changes — lands under your `DATA_ROOT`, so `git status` stays clean while you experiment.
+
+### Make it your own
+
+1. **Add product/company knowledge.** Drop markdown into `${DATA_ROOT}/vault/company/` (and `agents/calls/knowledge/`, `agents/lead/knowledge/`), then run `python3 backend/scripts/normalise_company_truth.py` to normalise frontmatter and wikilinks. This is what grounds every agent.
+2. **Define your users.** Edit `_DEFAULT_PROFILES` in `backend/seed_users.py` and re-run `seed_users.py --rewrite-profiles`.
+3. **Tune the agents.** Prompts live in `backend/agents/*/prompts.py`; Owl's model routing in `backend/agents/owl/routing.py`.
+
+### Admin per-session sandbox (in-app)
+
+Admins can flip a session-scoped sandbox toggle (`POST /api/admin/sandbox/enable`) to route writes for the active session into `_sandbox/` subdirs alongside the canonical paths. Use this to try a flow in a real deployment without polluting production data. Disable to return to normal.
+
+### Connecting Google Calendar (optional)
+
+`google_tokens.json` is never committed. In the Lead agent → "Connect Google Calendar" → complete OAuth → the token file is created automatically under `${DATA_ROOT}/agents/lead/data/`.
+
+---
+
+## Deploying
+
+Run `bin/deploy.sh` on the server. It pulls the latest code, installs frontend deps, **rebuilds `frontend/dist/`**, and restarts the backend — in that order.
 
 ```bash
 bin/deploy.sh
@@ -231,55 +264,6 @@ CADENCE_SERVICE=my-service bin/deploy.sh
 ```
 
 > ⚠️ Do **not** deploy with `git pull && systemctl restart cadence` alone. The backend serves the UI from `frontend/dist/`, which is gitignored and built on the server — a plain pull updates the source but not `dist/`, so the **old UI keeps being served** until `npm run build` runs. `bin/deploy.sh` is that missing build step wrapped up so it can't be forgotten.
-
-`users_credentials.json` is gitignored, so the pull never touches credentials. New ingested data (calls, leads, Owl convos) is committed back by the server's data-sync cron and arrives the next time anyone pulls.
-
-**First Google Calendar connection.** `google_tokens.json` is not in the repo. From the Lead agent → "Connect Google Calendar" → completes OAuth → the token file is created automatically under `DATA_ROOT/agents/lead/data/`.
-
-## Local development (Ivan)
-
-Point `DATA_ROOT` at a path **outside** the repo so test writes never appear in `git status`. In `backend/.env`:
-
-```
-DATA_ROOT=/path/to/cadence-data
-ADMIN_PASSWORD=<your dev password>
-USER1_PASSWORD=...    # any value; only the accounts you want to log in as need passwords you remember
-USER2_PASSWORD=...
-```
-
-Then:
-
-```bash
-# One-shot: seed the local DATA_ROOT with the committed snapshot,
-# then write the local credentials file from .env.
-bin/sync-from-repo.sh
-cd backend && python seed_users.py
-python main.py
-```
-
-Now log in as `ivan` with the password you just set. Anything the app writes (Owl convos, learnings, new leads, vault changes) lands in `~/cadence-data`, **not** in the repo working tree — `git status` stays clean while you experiment.
-
-When the live server pushes new data back to git:
-
-```bash
-git pull
-bin/sync-from-repo.sh   # refresh ~/cadence-data with the new data
-# (your users_credentials.json is preserved)
-```
-
-Commit code only. Push. Your colleague pulls `main` on the live server and restarts; their credentials file is gitignored and untouched.
-
-### Admin per-session sandbox (in-app)
-
-Independent of the above, admins can flip a session-scoped sandbox toggle (`POST /api/admin/sandbox/enable`) to route writes for the active session into `_sandbox/` subdirs alongside the canonical paths. Use this to try a flow in a real deployment without polluting prod data. Disable to return to normal.
-
-### Knowledge base
-
-The vault and per-agent knowledge directories are committed as the **seed**. They live at runtime under `DATA_ROOT/`, not in the repo tree.
-
-- `vault/` — three-pillar Cadence Knowledge (Obsidian-compatible)
-- `agents/calls/knowledge/` — product docs, sales narratives, competitive positioning
-- `agents/lead/knowledge/` — ICP definitions, campaign strategies, outreach playbooks
 
 ---
 

@@ -1,19 +1,41 @@
 import json
-from pathlib import Path
 from typing import Optional
 
 import bcrypt
 from fastapi import HTTPException, Request
 
-USERS_FILE = Path(__file__).parent / "agents" / "users.json"
+from paths import users_credentials_file, users_file
+
+
+def _load_credentials() -> dict[str, str]:
+    """Return {username: password_hash} from the gitignored credentials file."""
+    path = users_credentials_file()
+    if not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data.get("credentials", {})
 
 
 def load_users() -> list[dict]:
-    if not USERS_FILE.exists():
+    """Load user profiles from the committed users.json and merge in
+    password hashes from the gitignored users_credentials.json.
+    """
+    path = users_file()
+    if not path.exists():
         return []
-    with USERS_FILE.open("r", encoding="utf-8") as f:
+    with path.open("r", encoding="utf-8") as f:
         data = json.load(f)
-    return data.get("users", [])
+    profiles = data.get("users", [])
+    credentials = _load_credentials()
+    merged = []
+    for profile in profiles:
+        merged_profile = dict(profile)
+        username = merged_profile.get("username")
+        if username and username in credentials:
+            merged_profile["password_hash"] = credentials[username]
+        merged.append(merged_profile)
+    return merged
 
 
 def find_user(username: str) -> Optional[dict]:
@@ -66,6 +88,13 @@ def require_admin(request: Request) -> dict:
     if user.get("access") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
+
+
+def is_sandbox(request: Request) -> bool:
+    user = current_user(request)
+    if not user or user.get("access") != "admin":
+        return False
+    return bool(request.session.get("sandbox", False))
 
 
 def require_agent_access(slug: str):

@@ -2,6 +2,12 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+# Load env vars BEFORE importing anything that resolves data paths — so
+# DATA_ROOT is in os.environ when paths.py resolves storage locations. The
+# agent router imports below transitively import paths.py.
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -9,18 +15,21 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
+from agents.admin.routes import router as admin_router
 from agents.calls.routes import router as calls_router
+from agents.high_intent.routes import router as high_intent_router
 from agents.lead.routes import router as lead_router
+from agents.meet.routes import router as meet_router
 from agents.owl.routes import router as owl_router
-from auth import current_user, public_user, verify_login
-
-load_dotenv()
+from auth import current_user, is_sandbox, public_user, require_admin, verify_login
 
 # Cadence auth config — set in backend/.env:
 #   SESSION_SECRET=<long random string>
-#   IVAN_PASSWORD=<plaintext, used by seed_users.py>
-#   TEST_PASSWORD=<plaintext, used by seed_users.py>
-# Users themselves live in backend/agents/users.json (gitignored).
+#   ADMIN_PASSWORD, USER1_PASSWORD, etc. — plaintext, used by seed_users.py to
+#     write the gitignored ${DATA_ROOT}/agents/users_credentials.json.
+# User profiles (name, role, access, agents) live in backend/agents/users.json
+# (regenerate locally via `seed_users.py --rewrite-profiles`); credentials live
+# in users_credentials.json. Neither is committed to this public mirror.
 SESSION_SECRET = os.getenv("SESSION_SECRET")
 if not SESSION_SECRET:
     raise RuntimeError("SESSION_SECRET is not set. Add it to backend/.env before starting.")
@@ -101,11 +110,37 @@ def auth_status(request: Request):
 
 
 # ---------------------------------------------------------------------------
+# Admin sandbox
+# ---------------------------------------------------------------------------
+
+@app.get("/api/admin/sandbox/status")
+def sandbox_status(request: Request):
+    return {"sandbox": is_sandbox(request)}
+
+
+@app.post("/api/admin/sandbox/enable")
+def sandbox_enable(request: Request, _user: dict = None):
+    require_admin(request)
+    request.session["sandbox"] = True
+    return {"sandbox": True}
+
+
+@app.post("/api/admin/sandbox/disable")
+def sandbox_disable(request: Request, _user: dict = None):
+    require_admin(request)
+    request.session["sandbox"] = False
+    return {"sandbox": False}
+
+
+# ---------------------------------------------------------------------------
 # Agent routers
 # ---------------------------------------------------------------------------
 
+app.include_router(admin_router)
 app.include_router(calls_router)
+app.include_router(high_intent_router)
 app.include_router(lead_router)
+app.include_router(meet_router)
 app.include_router(owl_router)
 
 

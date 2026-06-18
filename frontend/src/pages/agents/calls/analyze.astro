@@ -119,6 +119,48 @@ import { CALLS_AGENT_NAME, CALLS_AGENT_TAGLINE, CALLS_NAV } from '../../../agent
     let currentMode: 'text' | 'mp4' = 'text';
     let uploadedFile: File | null = null;
 
+    // ── Meet Capture: auto-fill from extension hash ───────────────────────
+    (function checkMeetHash() {
+      const hash = window.location.hash;
+      if (!hash.startsWith('#meet=')) return;
+      try {
+        const raw = decodeURIComponent(hash.slice(6));
+        const payload = JSON.parse(raw) as { transcript: string; title?: string; session_id?: string };
+        if (!payload.transcript) return;
+
+        (document.getElementById('transcript-input') as HTMLTextAreaElement).value = payload.transcript;
+        if (payload.title) {
+          (document.getElementById('call-title') as HTMLInputElement).value = payload.title;
+        }
+        // Store session_id for transcript save after analysis
+        if (payload.session_id) {
+          (document.getElementById('analyze-btn') as HTMLButtonElement).dataset.meetSessionId = payload.session_id;
+        }
+        // Clear the hash so it doesn't persist on reload
+        history.replaceState(null, '', window.location.pathname);
+
+        // Auto-submit after a short pause so the user can see what was loaded
+        let countdown = 3;
+        const progressEl = document.getElementById('progress')!;
+        const progressText = document.getElementById('progress-text')!;
+        progressEl.classList.remove('hidden');
+        progressText.textContent = `Google Meet transcript loaded (${payload.transcript.split('\n').length} lines). Analysing in ${countdown}s… click Analyse to start now.`;
+
+        const timer = setInterval(() => {
+          countdown--;
+          if (countdown <= 0) {
+            clearInterval(timer);
+            progressEl.classList.add('hidden');
+            (document.getElementById('analyze-btn') as HTMLButtonElement).click();
+          } else {
+            progressText.textContent = `Google Meet transcript loaded (${payload.transcript.split('\n').length} lines). Analysing in ${countdown}s… click Analyse to start now.`;
+          }
+        }, 1000);
+      } catch {
+        // Malformed hash — ignore silently
+      }
+    })();
+
     // ── Input mode tabs ───────────────────────────────────────────────────
     const tabTextBtn = document.getElementById('tab-text')!;
     const tabMp4Btn = document.getElementById('tab-mp4')!;
@@ -222,13 +264,13 @@ import { CALLS_AGENT_NAME, CALLS_AGENT_TAGLINE, CALLS_NAV } from '../../../agent
       try {
         const res = await fetch('/api/transcribe', { method: 'POST', body: formData });
         if (!res.ok) {
-          const err = await res.json();
-          if (err.detail && err.detail.includes('ffmpeg')) {
+          const msg = await errorMessage(res, 'Transcription failed');
+          if (msg.includes('ffmpeg')) {
             document.getElementById('ffmpeg-error')!.classList.remove('hidden');
             hideProgress();
             return;
           }
-          throw new Error(err.detail || 'Transcription failed');
+          throw new Error(msg);
         }
         const data = await res.json();
         transcript = data.transcript;
@@ -250,8 +292,7 @@ import { CALLS_AGENT_NAME, CALLS_AGENT_TAGLINE, CALLS_NAV } from '../../../agent
           body: JSON.stringify({ text: transcript, title }),
         });
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.detail || 'Analysis failed');
+          throw new Error(await errorMessage(res, 'Analysis failed'));
         }
         const analysis = await res.json();
         analysis._title = title;
@@ -271,6 +312,8 @@ import { CALLS_AGENT_NAME, CALLS_AGENT_TAGLINE, CALLS_NAV } from '../../../agent
       if (!text) { alert('Please provide a transcript to analyse.'); return; }
 
       const title = (document.getElementById('call-title') as HTMLInputElement).value.trim() || 'Call Analysis';
+      const meetSessionId = (document.getElementById('analyze-btn') as HTMLButtonElement).dataset.meetSessionId || '';
+
       setProgress('Owl is analysing the call…');
       document.getElementById('analysis-result')!.classList.add('hidden');
 
@@ -281,11 +324,21 @@ import { CALLS_AGENT_NAME, CALLS_AGENT_TAGLINE, CALLS_NAV } from '../../../agent
           body: JSON.stringify({ text, title }),
         });
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.detail || 'Analysis failed');
+          throw new Error(await errorMessage(res, 'Analysis failed'));
         }
         const analysis = await res.json();
         analysis._title = title;
+
+        // If this came from a Meet capture, save the raw transcript for download
+        if (meetSessionId) {
+          analysis._transcript_id = meetSessionId;
+          fetch('/api/meet/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transcript: text, session_id: meetSessionId, title }),
+          }).catch(() => {});
+        }
+
         (window as any).renderAnalysisResult(analysis);
         hideProgress();
       } catch (e: any) {
@@ -304,6 +357,16 @@ import { CALLS_AGENT_NAME, CALLS_AGENT_TAGLINE, CALLS_NAV } from '../../../agent
     function hideProgress() {
       document.getElementById('progress')!.classList.add('hidden');
       (document.getElementById('analyze-btn') as HTMLButtonElement).disabled = false;
+    }
+
+    async function errorMessage(res: Response, fallback: string): Promise<string> {
+      const body = await res.text();
+      try {
+        const parsed = JSON.parse(body);
+        return parsed.detail || parsed.message || fallback;
+      } catch {
+        return body?.trim() || `${fallback} (HTTP ${res.status})`;
+      }
     }
   </script>
 </AgentLayout>

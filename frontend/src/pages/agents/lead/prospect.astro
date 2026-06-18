@@ -1,0 +1,457 @@
+---
+import AgentLayout from '../../../layouts/AgentLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import { LEAD_AGENT_NAME, LEAD_AGENT_TAGLINE, LEAD_NAV } from '../../../agents/lead/config';
+---
+<AgentLayout title="X-Ray search" agentName={LEAD_AGENT_NAME} agentTagline={LEAD_AGENT_TAGLINE} navItems={LEAD_NAV}>
+  <div class="px-10 py-12 max-w-4xl">
+
+    <PageHeader
+      label="Workspace · Lead · Prospecting"
+      heading="X-Ray search."
+      lead="Find named people at a target company, grounded in Timebeat's customer personas. Save a list, then push it into a campaign when you're ready."
+    />
+
+    <!-- ====== SEARCH ====== -->
+    <section class="mb-10">
+      <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Search</h2>
+        <span id="px-status" class="font-mono text-[10px] uppercase tracking-label text-ink-muted"></span>
+      </div>
+
+      <!-- input mode tabs -->
+      <div class="flex gap-1 mb-4 border-b border-rule-subtle">
+        <button type="button" class="ptab-btn px-4 py-2 text-sm border-b-2 border-accent text-ink-primary" data-ptab="paste">Paste lead</button>
+        <button type="button" class="ptab-btn px-4 py-2 text-sm border-b-2 border-transparent text-ink-muted hover:text-ink-primary" data-ptab="form">Company details</button>
+      </div>
+
+      <div class="space-y-4 text-sm">
+        <!-- Paste-lead pane: score the visit + search the detected company -->
+        <div data-ppane="paste" class="space-y-2">
+          <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Lead — paste the Leadinfo block (company + page views)</label>
+          <textarea id="px-lead-text" rows="8"
+            placeholder="Paste the full Leadinfo entry — company, details, and the Page views section. We'll score the visit behaviour and search for people at the detected company."
+            class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm focus:outline-none focus:border-accent"></textarea>
+          <p class="text-[12px] text-ink-muted">Owl analyses the lead and scores the page-visit behaviour, then X-Ray finds matching people at the company.</p>
+        </div>
+
+        <!-- Company-details pane: search only -->
+        <div data-ppane="form" class="hidden grid grid-cols-2 gap-3">
+          <div class="col-span-2">
+            <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Company *</label>
+            <input id="px-company" placeholder="e.g. Jane Street" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+          </div>
+          <div>
+            <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Industry / vertical</label>
+            <input id="px-industry" placeholder="Capital markets, HFT, telecoms…" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+          </div>
+          <div>
+            <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Location</label>
+            <input id="px-location" placeholder="London, New York…" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+          </div>
+          <div>
+            <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Domain (optional)</label>
+            <input id="px-domain" placeholder="janestreet.com" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+          </div>
+          <div>
+            <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Product-fit hint (optional)</label>
+            <input id="px-product" placeholder="PTP grandmaster, White Rabbit…" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1" />
+          </div>
+        </div>
+
+        <div>
+          <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Focus on personas <span class="text-ink-muted/60">(optional — leave blank for the full persona set)</span></label>
+          <select id="px-focus" multiple size="5" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 mt-1 text-sm"></select>
+        </div>
+
+        <button id="px-run" class="px-5 py-2 bg-accent text-ink-inverse text-sm rounded hover:opacity-90">Score lead</button>
+        <p id="px-error" class="text-xs font-mono text-signal-danger hidden"></p>
+      </div>
+    </section>
+
+    <!-- ====== RESULTS ====== -->
+    <section id="px-results-section" class="mb-12 hidden">
+      <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Results <span id="px-results-for" class="text-ink-muted"></span></h2>
+      </div>
+
+      <div id="px-score-card"></div>
+
+      <div id="px-xray-cta" class="hidden mb-5">
+        <button id="px-xray-run" class="px-5 py-2 bg-accent text-ink-inverse text-sm rounded hover:opacity-90">Run X-Ray for <span id="px-xray-company"></span> →</button>
+        <span class="ml-2 text-[12px] text-ink-muted">Searches public sources for matching people (~30–50s).</span>
+      </div>
+
+      <p id="px-loading" class="text-sm text-ink-muted hidden">Searching public sources for matching people…</p>
+      <div id="px-skeleton" class="hidden mb-4"></div>
+      <p id="px-empty" class="text-sm text-ink-muted hidden">No matching profiles found.</p>
+
+      <div id="px-toolbar" class="hidden items-center gap-3 mb-4">
+        <button id="px-save" type="button" class="px-4 py-2 bg-accent text-ink-inverse text-sm rounded hover:opacity-90 disabled:opacity-50">Save as prospect list</button>
+        <button id="px-start" type="button" class="px-4 py-2 border border-rule-subtle text-sm rounded hover:border-accent hover:bg-surface-1 disabled:opacity-50">Start a campaign →</button>
+        <button id="px-lusha" type="button" class="px-4 py-2 border border-rule-subtle text-sm rounded hover:border-accent hover:bg-surface-1">Open in Lusha</button>
+        <span id="px-count" class="font-mono text-[11px] text-ink-muted">0 selected</span>
+        <span id="px-toast" class="font-mono text-[11px] text-accent hidden"></span>
+      </div>
+
+      <div id="px-buckets" class="space-y-5">
+        <div data-bucket="linkedin_direct">
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Ready for LinkedIn outreach</p>
+          <ul class="space-y-2" data-list="linkedin_direct"></ul>
+        </div>
+        <div data-bucket="email_enrichment">
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Needs email enrichment</p>
+          <ul class="space-y-2" data-list="email_enrichment"></ul>
+        </div>
+        <div data-bucket="campaign_context">
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Campaign context only</p>
+          <ul class="space-y-2" data-list="campaign_context"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== SAVED LISTS ====== -->
+    <section>
+      <div class="flex items-baseline justify-between pb-3 mb-2 border-b border-rule-strong">
+        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Saved prospect lists</h2>
+        <span id="px-saved-count" class="font-mono text-[11px] tabular text-ink-muted">—</span>
+      </div>
+      <ul id="px-saved-list">
+        <li class="py-6 font-mono text-xs text-ink-muted">// loading…</li>
+      </ul>
+    </section>
+
+  </div>
+
+  <script>
+    import { esc, renderScoreCard, skeletonCards } from '../../../lib/leadCards';
+
+    type XRayRow = {
+      full_name: string; job_title: string; company: string; linkedin_url: string;
+      confidence: 'high' | 'medium' | 'low';
+      recommended_path: 'linkedin_direct' | 'email_enrichment' | 'campaign_context';
+      match_reason: string; source_query?: string; source?: string;
+    };
+    type Grouped = { linkedin_direct: XRayRow[]; email_enrichment: XRayRow[]; campaign_context: XRayRow[] };
+
+    const state = { rows: [] as XRayRow[], selected: new Set<string>(), company: '', savedId: '', analysis: null as any };
+    let pmode: 'paste' | 'form' = 'paste';
+    let inFlight = false; // one scoring/X-Ray request at a time across both modes
+
+    function $(s: string) { return document.querySelector(s) as HTMLElement; }
+    function rowKey(r: XRayRow) { return r.linkedin_url || `${r.full_name}::${r.job_title}`; }
+
+    // ---- Input mode tabs ----
+    document.querySelectorAll('.ptab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.ptab-btn').forEach(b => {
+          b.classList.remove('border-accent', 'text-ink-primary');
+          b.classList.add('border-transparent', 'text-ink-muted');
+        });
+        btn.classList.add('border-accent', 'text-ink-primary');
+        btn.classList.remove('border-transparent', 'text-ink-muted');
+        pmode = (btn as HTMLElement).dataset.ptab as 'paste' | 'form';
+        document.querySelectorAll('[data-ppane]').forEach(p => p.classList.add('hidden'));
+        $(`[data-ppane="${pmode}"]`).classList.remove('hidden');
+        (document.getElementById('px-run') as HTMLButtonElement).textContent = pmode === 'paste' ? 'Score lead' : 'Run X-Ray';
+      });
+    });
+
+    // ---- Persona focus options ----
+    (async () => {
+      try {
+        const res = await fetch('/api/lead/personas');
+        const data = await res.json();
+        const sel = document.getElementById('px-focus') as HTMLSelectElement;
+        (data.focus_options || []).forEach((opt: string) => {
+          const o = document.createElement('option');
+          o.value = opt; o.textContent = opt;
+          sel.appendChild(o);
+        });
+      } catch {}
+    })();
+
+    // ---- Render buckets ----
+    function renderBuckets(grouped: Grouped) {
+      const buckets: (keyof Grouped)[] = ['linkedin_direct', 'email_enrichment', 'campaign_context'];
+      let total = 0;
+      state.rows = [];
+      buckets.forEach(b => {
+        const list = document.querySelector(`[data-list="${b}"]`)!;
+        const wrap = document.querySelector(`[data-bucket="${b}"]`) as HTMLElement;
+        const rows = grouped[b] || [];
+        if (!rows.length) { wrap.classList.add('hidden'); list.innerHTML = ''; return; }
+        wrap.classList.remove('hidden');
+        list.innerHTML = rows.map(r => {
+          const key = rowKey(r);
+          state.rows.push(r);
+          if (b === 'linkedin_direct') state.selected.add(key);
+          const checked = state.selected.has(key) ? 'checked' : '';
+          const link = r.linkedin_url
+            ? `<a href="${esc(r.linkedin_url)}" target="_blank" rel="noopener" class="text-accent hover:underline">${esc(r.linkedin_url)}</a>`
+            : '<span class="text-ink-muted">no link</span>';
+          return `
+            <li class="border border-rule-subtle bg-surface-1 px-4 py-3" data-key="${esc(key)}">
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" class="px-check mt-1" data-key="${esc(key)}" ${checked} />
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-baseline justify-between gap-3">
+                    <p class="text-sm font-semibold text-ink-primary truncate">${esc(r.full_name)}</p>
+                    <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted">${esc(r.confidence)}</span>
+                  </div>
+                  <p class="text-sm text-ink-secondary">${esc(r.job_title)}${r.company ? ' — ' + esc(r.company) : ''}</p>
+                  <p class="text-sm text-ink-primary mt-2">${esc(r.match_reason)}</p>
+                  <p class="text-[11px] text-ink-muted mt-2">${link}</p>
+                </div>
+              </label>
+            </li>`;
+        }).join('');
+        total += rows.length;
+      });
+      $('#px-results-section').classList.remove('hidden');
+      $('#px-buckets').classList.toggle('hidden', total === 0);
+      $('#px-empty').classList.toggle('hidden', total !== 0);
+      $('#px-toolbar').classList.toggle('hidden', total === 0);
+      $('#px-toolbar').classList.toggle('flex', total !== 0);
+      updateCount();
+    }
+
+    function updateCount() {
+      const n = state.selected.size;
+      $('#px-count').textContent = `${n} selected`;
+      (document.getElementById('px-save') as HTMLButtonElement).disabled = n === 0;
+      (document.getElementById('px-start') as HTMLButtonElement).disabled = n === 0;
+    }
+    function selectedRows() {
+      return state.rows.filter(r => state.selected.has(rowKey(r)));
+    }
+
+    $('#px-buckets').addEventListener('change', (e) => {
+      const t = e.target as HTMLInputElement;
+      if (!t.classList.contains('px-check')) return;
+      const key = t.dataset.key!;
+      if (t.checked) state.selected.add(key); else state.selected.delete(key);
+      updateCount();
+    });
+
+    function focusVals() {
+      return Array.from((document.getElementById('px-focus') as HTMLSelectElement).selectedOptions).map(o => o.value);
+    }
+
+    // ---- Shared X-Ray search (used by form mode + the paste-mode CTA) ----
+    // The clicked trigger is passed in and disabled for the duration, and a
+    // module-level guard blocks overlapping requests, so a double-click can't
+    // fire two concurrent /xray calls that clobber each other.
+    async function runXray(body: any, triggerBtn?: HTMLButtonElement) {
+      if (inFlight) return;
+      inFlight = true;
+      const err = document.getElementById('px-error')!;
+      err.classList.add('hidden');
+      state.savedId = ''; state.selected.clear();
+      const btn = triggerBtn || (document.getElementById('px-xray-run') as HTMLButtonElement);
+      const label = btn.innerHTML;
+      btn.disabled = true; btn.textContent = 'Searching…';
+      const skel = document.getElementById('px-skeleton')!;
+      $('#px-status').textContent = 'searching…';
+      $('#px-results-section').classList.remove('hidden');
+      $('#px-buckets').classList.add('hidden');
+      $('#px-toolbar').classList.add('hidden');
+      $('#px-empty').classList.add('hidden');
+      skel.innerHTML = skeletonCards(4); skel.classList.remove('hidden');
+      try {
+        const res = await fetch('/api/lead/xray', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'X-Ray failed');
+        const data = await res.json();
+        if (data.error) { err.textContent = '// ' + data.error; err.classList.remove('hidden'); $('#px-status').textContent = 'failed'; }
+        else $('#px-status').textContent = 'done';
+        renderBuckets(data.xray_results || { linkedin_direct: [], email_enrichment: [], campaign_context: [] });
+      } catch (e: any) {
+        err.textContent = '// ' + (e?.message || 'failed'); err.classList.remove('hidden');
+        $('#px-status').textContent = 'failed';
+      } finally {
+        skel.classList.add('hidden'); skel.innerHTML = '';
+        btn.disabled = false; btn.innerHTML = label;
+        inFlight = false;
+      }
+    }
+
+    // ---- Score (paste mode, fast first step) ----
+    async function doScore() {
+      if (inFlight) return;
+      const btn = document.getElementById('px-run') as HTMLButtonElement;
+      const err = document.getElementById('px-error')!;
+      err.classList.add('hidden');
+      const text = (document.getElementById('px-lead-text') as HTMLTextAreaElement).value.trim();
+      if (!text) { err.textContent = '// paste a lead first'; err.classList.remove('hidden'); return; }
+      inFlight = true;
+      state.savedId = ''; state.selected.clear(); state.analysis = null;
+      btn.disabled = true; btn.textContent = 'Scoring…';
+      $('#px-status').textContent = 'scoring…';
+      $('#px-results-section').classList.remove('hidden');
+      $('#px-score-card').innerHTML = '';
+      $('#px-xray-cta').classList.add('hidden');
+      $('#px-buckets').classList.add('hidden');
+      $('#px-toolbar').classList.add('hidden');
+      $('#px-empty').classList.add('hidden');
+      $('#px-loading').classList.remove('hidden');
+      try {
+        const res = await fetch('/api/lead/prospect/score', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Scoring failed');
+        const data = await res.json();
+        $('#px-loading').classList.add('hidden');
+        state.analysis = data.analysis;
+        state.company = (data.company || data.analysis?.company || '').trim();
+        document.getElementById('px-score-card')!.innerHTML = renderScoreCard(data.analysis);
+        $('#px-results-for').textContent = state.company ? `· ${state.company}` : '';
+        document.getElementById('px-xray-company')!.textContent = state.company || 'this company';
+        $('#px-xray-cta').classList.toggle('hidden', !state.company);
+        $('#px-status').textContent = 'scored';
+      } catch (e: any) {
+        $('#px-loading').classList.add('hidden');
+        err.textContent = '// ' + (e?.message || 'failed'); err.classList.remove('hidden');
+        $('#px-status').textContent = 'failed';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Score lead';
+        inFlight = false;
+      }
+    }
+
+    // ---- Run button: paste => score (then a separate X-Ray step); form => search now ----
+    document.getElementById('px-run')!.addEventListener('click', () => {
+      if (pmode === 'paste') { doScore(); return; }
+      const err = document.getElementById('px-error')!;
+      const company = (document.getElementById('px-company') as HTMLInputElement).value.trim();
+      if (!company) { err.textContent = '// enter a company first'; err.classList.remove('hidden'); return; }
+      state.company = company; state.analysis = null;
+      $('#px-score-card').innerHTML = ''; $('#px-xray-cta').classList.add('hidden');
+      $('#px-results-for').textContent = `· ${company}`;
+      runXray({
+        company,
+        industry: (document.getElementById('px-industry') as HTMLInputElement).value.trim() || null,
+        location: (document.getElementById('px-location') as HTMLInputElement).value.trim() || null,
+        domain: (document.getElementById('px-domain') as HTMLInputElement).value.trim() || null,
+        product_fit: (document.getElementById('px-product') as HTMLInputElement).value.trim() || null,
+        focus_personas: focusVals().length ? focusVals() : null,
+      }, document.getElementById('px-run') as HTMLButtonElement);
+    });
+
+    // ---- X-Ray CTA (paste mode, after scoring) ----
+    document.getElementById('px-xray-run')!.addEventListener('click', () => {
+      const a = state.analysis || {};
+      runXray({
+        company: state.company || a.company || '',
+        industry: a.signal_type || null,
+        product_fit: a.product_fit || null,
+        role: a.role || null,
+        signal_strength: a.signal_strength || null,
+        focus_personas: focusVals().length ? focusVals() : null,
+      }, document.getElementById('px-xray-run') as HTMLButtonElement);
+    });
+
+    function toast(msg: string) {
+      const t = document.getElementById('px-toast')!;
+      t.textContent = msg; t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2500);
+    }
+
+    // ---- Save as prospect list ----
+    async function saveList(): Promise<string | null> {
+      const rows = selectedRows();
+      if (!rows.length) return null;
+      const res = await fetch('/api/lead/prospects', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company: state.company, rows, signal: state.analysis || {} }),
+      });
+      if (!res.ok) throw new Error((await res.json()).detail || 'Save failed');
+      const data = await res.json();
+      state.savedId = data.id;
+      loadSaved();
+      return data.id;
+    }
+
+    document.getElementById('px-save')!.addEventListener('click', async () => {
+      const btn = document.getElementById('px-save') as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try { await saveList(); toast('saved'); }
+      catch (e: any) { toast('// ' + (e?.message || 'failed')); }
+      finally { btn.disabled = false; btn.textContent = 'Save as prospect list'; }
+    });
+
+    // ---- Start a campaign from selection ----
+    document.getElementById('px-start')!.addEventListener('click', async () => {
+      const btn = document.getElementById('px-start') as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = 'Starting…';
+      try {
+        const id = state.savedId || await saveList();
+        if (!id) throw new Error('nothing selected');
+        const res = await fetch('/api/lead/campaigns/from-prospects', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prospect_id: id, selected: selectedRows() }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Failed');
+        const data = await res.json();
+        window.location.href = `/agents/lead/new?id=${encodeURIComponent(data.campaign_id)}`;
+      } catch (e: any) {
+        toast('// ' + (e?.message || 'failed'));
+        btn.disabled = false; btn.textContent = 'Start a campaign →';
+      }
+    });
+
+    document.getElementById('px-lusha')!.addEventListener('click', () => {
+      const q = state.company ? encodeURIComponent(state.company) : '';
+      window.open(q ? `https://www.lusha.com/?q=${q}` : 'https://www.lusha.com/', '_blank', 'noopener');
+    });
+
+    // ---- Saved lists ----
+    async function loadSaved() {
+      const el = document.getElementById('px-saved-list')!;
+      try {
+        const res = await fetch('/api/lead/prospects');
+        const items = await res.json();
+        document.getElementById('px-saved-count')!.textContent = String(items.length).padStart(2, '0') + ' total';
+        if (!items.length) {
+          el.innerHTML = '<li class="py-6 font-mono text-xs text-ink-muted">// no saved lists yet</li>';
+          return;
+        }
+        el.innerHTML = items.map((p: any) => `
+          <li class="group grid grid-cols-[1fr_auto_auto] gap-6 items-center py-4 border-b border-rule-subtle">
+            <div class="min-w-0">
+              <p class="text-sm font-semibold tracking-tightest truncate">${esc(p.title || 'Untitled')}</p>
+              <p class="font-mono text-[11px] text-ink-muted mt-1">${esc(p.created_at || '')} · ${p.count || 0} prospects</p>
+            </div>
+            <button data-use="${esc(p.id)}" class="font-mono text-[11px] uppercase tracking-label text-accent hover:underline">Use in campaign →</button>
+            <button data-del="${esc(p.id)}" class="font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-signal-danger">delete</button>
+          </li>`).join('');
+      } catch {
+        el.innerHTML = '<li class="py-6 font-mono text-xs text-signal-danger">// could not load lists</li>';
+      }
+    }
+
+    document.getElementById('px-saved-list')!.addEventListener('click', async (e) => {
+      const t = e.target as HTMLElement;
+      const useId = t.getAttribute('data-use');
+      const delId = t.getAttribute('data-del');
+      if (useId) {
+        try {
+          const res = await fetch('/api/lead/campaigns/from-prospects', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prospect_id: useId }),
+          });
+          if (!res.ok) throw new Error((await res.json()).detail || 'Failed');
+          const data = await res.json();
+          window.location.href = `/agents/lead/new?id=${encodeURIComponent(data.campaign_id)}`;
+        } catch {}
+      } else if (delId) {
+        if (!confirm('Delete this prospect list?')) return;
+        await fetch('/api/lead/prospects/' + encodeURIComponent(delId), { method: 'DELETE' });
+        loadSaved();
+      }
+    });
+
+    loadSaved();
+  </script>
+</AgentLayout>

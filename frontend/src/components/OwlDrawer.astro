@@ -1,139 +1,9 @@
 ---
 // Global Owl floating widget. Included in DashboardLayout and AgentLayout.
-// Streams from /api/owl/stream with automatic model routing (Haiku / Sonnet).
-// is:global required — markdown elements are created via JS and miss Astro's scoped attribute.
+// A thin client of the shared chat module (src/lib/owlChat.ts) — same SSE
+// stream client, markdown renderer, and conversation API as the full page.
+import '../styles/owl.css';
 ---
-
-<style is:global>
-  .owl-content {
-    font-size: 0.8125rem;
-    color: rgb(var(--text-secondary));
-    line-height: 1.65;
-  }
-  .owl-content > *:first-child { margin-top: 0 !important; }
-  .owl-content > *:last-child  { margin-bottom: 0 !important; }
-
-  /* Headings */
-  .owl-content .owl-h1 {
-    font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.02em;
-    color: rgb(var(--text-primary));
-    border-bottom: 1px solid rgb(var(--border-subtle));
-    padding-bottom: 0.4rem; margin: 1.1rem 0 0.65rem;
-  }
-  .owl-content .owl-h2 {
-    font-size: 0.8125rem; font-weight: 600; letter-spacing: -0.01em;
-    color: rgb(var(--text-primary)); margin: 1rem 0 0.45rem;
-  }
-  .owl-content .owl-h3 {
-    font-family: 'JetBrains Mono Variable', monospace;
-    font-size: 0.6875rem; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.08em;
-    color: rgb(var(--text-muted)); margin: 0.9rem 0 0.4rem;
-  }
-
-  /* Paragraph */
-  .owl-content .owl-p { margin: 0 0 0.6rem; }
-
-  /* Lists */
-  .owl-content .owl-ul,
-  .owl-content .owl-ol {
-    list-style: none; padding: 0; margin: 0 0 0.7rem;
-  }
-  .owl-content .owl-li {
-    position: relative; padding-left: 1.15rem; margin-bottom: 0.3rem;
-  }
-  .owl-content .owl-ul .owl-li::before {
-    content: '';
-    position: absolute; left: 1px; top: 0.54em;
-    width: 4px; height: 4px; border-radius: 50%;
-    background: rgb(var(--accent));
-  }
-  .owl-content .owl-ol { counter-reset: owl-item; }
-  .owl-content .owl-ol .owl-li { counter-increment: owl-item; }
-  .owl-content .owl-ol .owl-li::before {
-    content: counter(owl-item) '.';
-    position: absolute; left: 0; top: 0;
-    font-family: 'JetBrains Mono Variable', monospace;
-    font-size: 0.6875rem; font-weight: 600;
-    color: rgb(var(--accent));
-  }
-
-  /* Blockquote */
-  .owl-content .owl-blockquote {
-    border-left: 2px solid rgb(var(--accent) / 0.45);
-    padding-left: 0.75rem; margin: 0 0 0.7rem;
-    font-style: italic; color: rgb(var(--text-muted));
-  }
-
-  /* Divider */
-  .owl-content .owl-hr {
-    border: none;
-    border-top: 1px solid rgb(var(--border-subtle));
-    margin: 0.75rem 0;
-  }
-
-  /* Code — inline */
-  .owl-content .owl-code {
-    font-family: 'JetBrains Mono Variable', monospace;
-    font-size: 0.72rem; font-style: normal;
-    color: rgb(var(--accent));
-    background: rgb(var(--surface-2));
-    padding: 0.1rem 0.3rem; border-radius: 3px;
-  }
-
-  /* Code — block */
-  .owl-content .owl-pre {
-    background: rgb(var(--surface-2));
-    border: 1px solid rgb(var(--border-subtle));
-    border-radius: 4px; padding: 0.7rem 0.8rem;
-    margin: 0 0 0.7rem; overflow-x: auto;
-  }
-  .owl-content .owl-pre-code {
-    font-family: 'JetBrains Mono Variable', monospace;
-    font-size: 0.6875rem; line-height: 1.6;
-    color: rgb(var(--text-primary));
-    background: none; padding: 0; white-space: pre;
-  }
-
-  /* Inline emphasis */
-  .owl-content .owl-strong { font-weight: 600; color: rgb(var(--text-primary)); }
-  .owl-content .owl-em     { font-style: italic; }
-
-  /* Table */
-  .owl-content .owl-table {
-    width: 100%; border-collapse: collapse;
-    margin: 0 0 0.85rem; font-size: 0.75rem;
-  }
-  .owl-content .owl-th {
-    text-align: left; font-weight: 600;
-    color: rgb(var(--text-primary));
-    padding: 0.45rem 0.6rem;
-    border-bottom: 2px solid rgb(var(--border-strong));
-    white-space: nowrap;
-  }
-  .owl-content .owl-td {
-    padding: 0.4rem 0.6rem; vertical-align: top;
-    color: rgb(var(--text-secondary));
-    border-bottom: 1px solid rgb(var(--border-subtle));
-    line-height: 1.5;
-  }
-  .owl-content .owl-tr:last-child .owl-td { border-bottom: none; }
-
-  /* Reveal animation — only on the rendered state */
-  @keyframes owl-reveal {
-    from { opacity: 0; transform: translateY(3px); }
-    to   { opacity: 1; transform: none; }
-  }
-  .owl-content { animation: owl-reveal 200ms ease-out both; }
-
-  /* Streaming raw text */
-  .owl-streaming {
-    font-family: 'JetBrains Mono Variable', monospace;
-    font-size: 0.6875rem; line-height: 1.7;
-    color: rgb(var(--text-secondary));
-    white-space: pre-wrap; word-break: break-word;
-  }
-</style>
 
 <!-- FAB -->
 <button
@@ -165,9 +35,15 @@
       </div>
     </div>
     <div class="flex items-center gap-1">
+      <button id="owl-new-btn" type="button" aria-label="New chat" title="New chat" class="w-7 h-7 flex items-center justify-center rounded text-ink-muted hover:text-ink-primary hover:bg-surface-2 transition-colors duration-150">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
       <button id="owl-history-btn" type="button" aria-label="Conversation history" title="Past conversations" class="w-7 h-7 flex items-center justify-center rounded text-ink-muted hover:text-ink-primary hover:bg-surface-2 transition-colors duration-150">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="6.25" width="8" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="10.5" width="10" height="1.5" rx="0.75" fill="currentColor"/></svg>
       </button>
+      <a id="owl-fullpage" href="/agents/owl" aria-label="Open full page" title="Open full page" class="w-7 h-7 flex items-center justify-center rounded text-ink-muted hover:text-ink-primary hover:bg-surface-2 transition-colors duration-150">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 2H2v10h10V9M8.5 1.5H12.5M12.5 1.5V5.5M12.5 1.5L6.5 7.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
       <button id="owl-close" type="button" aria-label="Close Owl" class="w-7 h-7 flex items-center justify-center rounded text-ink-muted hover:text-ink-primary hover:bg-surface-2 transition-colors duration-150">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
@@ -186,26 +62,28 @@
   </div>
 
   <!-- Messages -->
-  <div id="owl-messages" class="flex-1 overflow-y-auto px-5 py-5 space-y-5">
-    <div id="owl-empty" class="flex flex-col gap-5 h-full justify-between">
+  <div id="owl-messages" class="owl-thread owl-drawer-scale flex-1 overflow-y-auto px-5 py-5 space-y-6">
+    <div id="owl-empty" class="flex flex-col gap-6 pt-2">
       <div>
-        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Owl</p>
+        <p class="label text-ink-muted mb-2">Owl</p>
         <p class="text-sm text-ink-secondary leading-relaxed max-w-xs">
           Your Timebeat knowledge partner. Ask me anything about products, protocols, or your next sales conversation.
         </p>
       </div>
-      <div class="space-y-2" id="owl-suggestions">
-        <p class="font-mono text-[10px] uppercase tracking-label text-ink-muted mb-3">Quick questions</p>
-        <button data-suggestion="What is PTP and why does it matter?" class="owl-chip w-full text-left px-3 py-2.5 rounded border border-rule-subtle bg-surface-1 text-sm text-ink-secondary hover:border-accent hover:text-ink-primary transition-colors duration-150 ease-decelerate">What is PTP and why does it matter?</button>
-        <button data-suggestion="Explain Clock Quorum in simple terms" class="owl-chip w-full text-left px-3 py-2.5 rounded border border-rule-subtle bg-surface-1 text-sm text-ink-secondary hover:border-accent hover:text-ink-primary transition-colors duration-150 ease-decelerate">Explain Clock Quorum in simple terms</button>
-        <button data-suggestion="Help me handle a pricing objection" class="owl-chip w-full text-left px-3 py-2.5 rounded border border-rule-subtle bg-surface-1 text-sm text-ink-secondary hover:border-accent hover:text-ink-primary transition-colors duration-150 ease-decelerate">Help me handle a pricing objection</button>
+      <div id="owl-suggestions">
+        <p class="label text-ink-muted mb-1">Try asking</p>
+        <div class="flex flex-col">
+          <button data-suggestion="What is PTP and why does it matter?" class="owl-chip group flex items-center gap-2.5 w-full text-left py-2.5 border-b border-rule-subtle/60 text-sm text-ink-secondary hover:text-ink-primary transition-colors duration-150"><span class="font-mono text-accent/40 group-hover:text-accent transition-colors duration-150">→</span><span>What is PTP and why does it matter?</span></button>
+          <button data-suggestion="Explain Clock Quorum in simple terms" class="owl-chip group flex items-center gap-2.5 w-full text-left py-2.5 border-b border-rule-subtle/60 text-sm text-ink-secondary hover:text-ink-primary transition-colors duration-150"><span class="font-mono text-accent/40 group-hover:text-accent transition-colors duration-150">→</span><span>Explain Clock Quorum in simple terms</span></button>
+          <button data-suggestion="Help me handle a pricing objection" class="owl-chip group flex items-center gap-2.5 w-full text-left py-2.5 border-b border-rule-subtle/60 text-sm text-ink-secondary hover:text-ink-primary transition-colors duration-150"><span class="font-mono text-accent/40 group-hover:text-accent transition-colors duration-150">→</span><span>Help me handle a pricing objection</span></button>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Input -->
   <form id="owl-form" class="border-t border-rule-subtle p-4 shrink-0">
-    <div class="flex items-center gap-2 bg-surface-1 border border-rule-subtle rounded-full px-4 py-2 focus-within:border-accent transition-colors duration-150">
+    <div class="flex items-center gap-2 bg-surface-1 border border-rule-subtle rounded-xl pl-4 pr-2 py-1.5 shadow-lift focus-within:border-accent transition-colors duration-150">
       <input
         id="owl-input"
         type="text"
@@ -213,154 +91,48 @@
         autocomplete="off"
         class="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-ink-muted"
       />
-      <button type="submit" aria-label="Send" class="w-7 h-7 rounded-full bg-accent flex items-center justify-center shrink-0 hover:opacity-90 transition-opacity duration-150">
+      <button id="owl-send" type="submit" aria-label="Send" class="w-7 h-7 rounded-lg bg-accent flex items-center justify-center shrink-0 hover:opacity-90 transition-opacity duration-150">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 6h10M6 1l5 5-5 5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button id="owl-stop" type="button" aria-label="Stop" class="hidden w-7 h-7 rounded-lg bg-surface-ink flex items-center justify-center shrink-0 hover:opacity-90 transition-opacity duration-150">
+        <span class="w-2.5 h-2.5 rounded-[2px] bg-ink-inverse"></span>
       </button>
     </div>
   </form>
 </aside>
 
 <script>
-  // ─── Markdown renderer ──────────────────────────────────────────────────────
+  import {
+    renderMarkdown, streamChat, listConversations, getConversation,
+    getActiveConversationId, setActiveConversationId, relativeTime,
+    buildCorrectionCard, type ChatMessage,
+  } from '../lib/owlChat';
 
-  function escHtml(s: string): string {
-    return s
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
+  // Astro hoists this component's script onto every page that imports it —
+  // including pages that conditionally skip rendering the drawer (e.g. the
+  // full-page chat sets hideOwlDrawer). Bail out when the drawer DOM is absent
+  // so we don't throw on null element lookups.
+  if (document.getElementById('owl-drawer')) initOwlDrawer();
 
-  function renderInline(s: string): string {
-    let r = escHtml(s);
-    r = r.replace(/`([^`]+)`/g, '<code class="owl-code">$1</code>');
-    r = r.replace(/\*\*\*(.+?)\*\*\*/g, '<strong class="owl-strong"><em class="owl-em">$1</em></strong>');
-    r = r.replace(/\*\*(.+?)\*\*/g, '<strong class="owl-strong">$1</strong>');
-    r = r.replace(/\*(.+?)\*/g, '<em class="owl-em">$1</em>');
-    return r;
-  }
-
-  function isTableRow(line: string): boolean {
-    return /^\|.+\|/.test(line.trim());
-  }
-
-  function isSeparatorRow(line: string): boolean {
-    return /^\|[\s\-:|]+\|/.test(line.trim());
-  }
-
-  function parseTableCells(line: string): string[] {
-    return line.trim().split('|').slice(1, -1).map(c => c.trim());
-  }
-
-  function renderMarkdown(text: string): string {
-    const lines = text.split('\n');
-    const out: string[] = [];
-    let inUl = false, inOl = false, inCode = false, inTable = false;
-    let codeAcc: string[] = [];
-    let tableRows: string[][] = [];
-
-    function closeList() {
-      if (inUl) { out.push('</ul>'); inUl = false; }
-      if (inOl) { out.push('</ol>'); inOl = false; }
-    }
-
-    function closeTable() {
-      if (!inTable || tableRows.length === 0) { inTable = false; return; }
-      inTable = false;
-
-      // Find separator row index
-      let sepIdx = -1;
-      for (let i = 0; i < tableRows.length; i++) {
-        if (tableRows[i].every(c => /^[-:]+$/.test(c.replace(/\s/g, '')))) {
-          sepIdx = i; break;
-        }
-      }
-
-      const headerRows = sepIdx > 0 ? tableRows.slice(0, sepIdx) : [tableRows[0]];
-      const bodyRows   = sepIdx >= 0 ? tableRows.slice(sepIdx + 1) : tableRows.slice(1);
-
-      let html = '<table class="owl-table"><thead>';
-      headerRows.forEach(row => {
-        html += '<tr>' + row.map(c => `<th class="owl-th">${renderInline(c)}</th>`).join('') + '</tr>';
-      });
-      html += '</thead><tbody>';
-      bodyRows.forEach(row => {
-        html += '<tr class="owl-tr">' + row.map(c => `<td class="owl-td">${renderInline(c)}</td>`).join('') + '</tr>';
-      });
-      html += '</tbody></table>';
-      out.push(html);
-      tableRows = [];
-    }
-
-    for (const raw of lines) {
-      // Code fence
-      if (raw.startsWith('```')) {
-        if (inCode) {
-          out.push(`<pre class="owl-pre"><code class="owl-pre-code">${escHtml(codeAcc.join('\n'))}</code></pre>`);
-          codeAcc = []; inCode = false;
-        } else {
-          closeList(); closeTable(); inCode = true;
-        }
-        continue;
-      }
-      if (inCode) { codeAcc.push(raw); continue; }
-
-      const line = raw.trimEnd();
-
-      // Table rows
-      if (isTableRow(line)) {
-        closeList();
-        inTable = true;
-        if (!isSeparatorRow(line)) tableRows.push(parseTableCells(line));
-        continue;
-      }
-      if (inTable) closeTable();
-
-      // Divider
-      if (/^---+$/.test(line) || /^\*\*\*+$/.test(line)) {
-        closeList(); out.push('<hr class="owl-hr">'); continue;
-      }
-
-      // Blank line
-      if (line === '') { closeList(); continue; }
-
-      // Block elements
-      if (line.startsWith('### '))      { closeList(); out.push(`<h3 class="owl-h3">${renderInline(line.slice(4))}</h3>`); }
-      else if (line.startsWith('## ')) { closeList(); out.push(`<h2 class="owl-h2">${renderInline(line.slice(3))}</h2>`); }
-      else if (line.startsWith('# '))  { closeList(); out.push(`<h1 class="owl-h1">${renderInline(line.slice(2))}</h1>`); }
-      else if (line.startsWith('> '))  { closeList(); out.push(`<blockquote class="owl-blockquote">${renderInline(line.slice(2))}</blockquote>`); }
-      else if (/^[-*+]\s/.test(line)) {
-        if (!inUl) { out.push('<ul class="owl-ul">'); inUl = true; }
-        out.push(`<li class="owl-li">${renderInline(line.replace(/^[-*+]\s+/, ''))}</li>`);
-      }
-      else if (/^\d+\.\s/.test(line)) {
-        if (!inOl) { out.push('<ol class="owl-ol">'); inOl = true; }
-        out.push(`<li class="owl-li">${renderInline(line.replace(/^\d+\.\s+/, ''))}</li>`);
-      }
-      else { closeList(); out.push(`<p class="owl-p">${renderInline(line)}</p>`); }
-    }
-
-    closeList(); closeTable();
-    if (inCode && codeAcc.length) {
-      out.push(`<pre class="owl-pre"><code class="owl-pre-code">${escHtml(codeAcc.join('\n'))}</code></pre>`);
-    }
-    return out.join('');
-  }
-
-  // ─── UI ────────────────────────────────────────────────────────────────────
-
+  function initOwlDrawer() {
   const fab        = document.getElementById('owl-fab')!;
   const fabInner   = document.getElementById('owl-fab-inner')!;
   const drawer     = document.getElementById('owl-drawer')!;
   const closeBtn   = document.getElementById('owl-close')!;
+  const newBtn     = document.getElementById('owl-new-btn')!;
   const messages   = document.getElementById('owl-messages')!;
-  const emptyState = document.getElementById('owl-empty')!;
   const form       = document.getElementById('owl-form') as HTMLFormElement;
   const input      = document.getElementById('owl-input') as HTMLInputElement;
+  const sendBtn    = document.getElementById('owl-send')!;
+  const stopBtn    = document.getElementById('owl-stop')!;
+  const fullpageLink = document.getElementById('owl-fullpage') as HTMLAnchorElement;
   const modelBadge = document.getElementById('owl-model-badge')!;
 
-  const history: { role: 'user' | 'assistant'; content: string }[] = [];
+  const history: ChatMessage[] = [];
+  let conversationId: string | null = null;
   let conversationStarted = false;
+  let isStreaming = false;
+  let abortController: AbortController | null = null;
 
   const fabImg = fabInner.querySelector('img');
   if (fabImg) fabImg.addEventListener('error', () => { fabInner.innerHTML = '<span style="font-size:1.5rem;line-height:1">🦉</span>'; });
@@ -377,8 +149,15 @@
 
   fab.addEventListener('click', openDrawer);
   closeBtn.addEventListener('click', closeDrawer);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.activeElement !== input) closeDrawer();
+  });
   document.addEventListener('owl:open', () => openDrawer());
+
+  // Carry the active conversation through to the full page.
+  fullpageLink.addEventListener('click', () => {
+    if (conversationId) fullpageLink.href = `/agents/owl?c=${conversationId}`;
+  });
 
   document.querySelectorAll<HTMLButtonElement>('.owl-chip').forEach(chip => {
     chip.addEventListener('click', () => {
@@ -388,76 +167,119 @@
   });
 
   function startConversation() {
-    if (!conversationStarted) { conversationStarted = true; emptyState.remove(); }
+    if (!conversationStarted) {
+      conversationStarted = true;
+      document.getElementById('owl-empty')?.remove();
+    }
+  }
+  function markTurns() {
+    messages.classList.toggle('has-turns', messages.querySelector('.owl-turn') !== null);
   }
 
+  function newChat() {
+    if (isStreaming) { abortController?.abort(); setStreaming(false); }
+    history.length = 0;
+    conversationId = null;
+    setActiveConversationId(null);
+    messages.innerHTML = '';
+    messages.classList.remove('has-turns');
+    conversationStarted = false;
+    modelBadge.textContent = 'Timebeat AI';
+    // Rebuild the empty state.
+    const empty = document.createElement('div');
+    empty.id = 'owl-empty';
+    empty.className = 'flex flex-col gap-6 pt-2';
+    empty.innerHTML = `
+      <div>
+        <p class="label text-ink-muted mb-2">Owl</p>
+        <p class="text-sm text-ink-secondary leading-relaxed max-w-xs">Your Timebeat knowledge partner. Ask me anything about products, protocols, or your next sales conversation.</p>
+      </div>`;
+    messages.appendChild(empty);
+    showChatPanel();
+    input.focus();
+  }
+
+  // The user's question — quiet mono lead + the question as a section head.
   function appendUserMessage(text: string) {
     startConversation();
-    const wrap = document.createElement('div');
-    wrap.className = 'flex justify-end';
-    const bubble = document.createElement('div');
-    bubble.className = 'max-w-[82%] px-3.5 py-2.5 rounded-2xl rounded-tr-sm bg-accent-soft text-ink-primary text-sm leading-relaxed';
-    bubble.textContent = text;
-    wrap.appendChild(bubble);
-    messages.appendChild(wrap);
+    const turn = document.createElement('div');
+    turn.className = 'owl-turn owl-turn--you';
+    const label = document.createElement('p');
+    label.className = 'owl-lead-label';
+    label.textContent = `// you · ${nowLabel()}`;
+    const q = document.createElement('p');
+    q.className = 'owl-lead';
+    q.textContent = text;
+    turn.append(label, q);
+    messages.appendChild(turn);
+    markTurns();
     messages.scrollTop = messages.scrollHeight;
   }
 
-  function createOwlMessage() {
+  // One Owl answer: a byline rule, a breathing dot, then streamed text that
+  // settles into typeset prose. Mirrors the full-page transcript.
+  function createOwlMessage(model: string | null = null) {
     startConversation();
-    const wrap = document.createElement('div');
-    wrap.className = 'flex justify-start gap-2.5 items-start';
+    const turn = document.createElement('div');
+    turn.className = 'owl-turn owl-turn--owl';
 
-    const avatar = document.createElement('div');
-    avatar.className = 'w-6 h-6 rounded-full bg-surface-2 border border-rule-subtle flex items-center justify-center shrink-0 mt-0.5 overflow-hidden';
-    avatar.innerHTML = '<img src="/images/owl.png" alt="" class="w-4 h-4 object-contain" onerror="this.parentElement.innerHTML=\'🦉\'" />';
+    const byline = document.createElement('div');
+    byline.className = 'owl-byline';
+    const dot = document.createElement('span');
+    dot.className = 'owl-byline__dot ' + dotClass(model);
+    const tag = document.createElement('span');
+    tag.className = 'owl-byline__tag';
+    tag.textContent = 'Owl';
+    const rule = document.createElement('span');
+    rule.className = 'owl-byline__rule';
+    byline.append(dot, tag, rule);
 
-    const col = document.createElement('div');
-    col.className = 'flex-1 min-w-0 pt-0.5';
+    const body = document.createElement('div');
+    const think = document.createElement('span');
+    think.className = 'owl-think animate-signal-pulse inline-block';
+    body.appendChild(think);
 
-    const streamEl = document.createElement('div');
-    streamEl.className = 'owl-streaming';
-
-    col.appendChild(streamEl);
-    wrap.appendChild(avatar);
-    wrap.appendChild(col);
-    messages.appendChild(wrap);
+    turn.append(byline, body);
+    messages.appendChild(turn);
+    markTurns();
     messages.scrollTop = messages.scrollHeight;
 
-    function finalise(full: string) {
-      const rendered = renderMarkdown(full);
-      if (!rendered.trim()) return;
-      const content = document.createElement('div');
-      content.className = 'owl-content';
-      content.innerHTML = rendered;
-      col.replaceChild(content, streamEl);
-      messages.scrollTop = messages.scrollHeight;
+    let streamEl: HTMLElement | null = null;
+    function ensureStream() {
+      if (!streamEl) { body.innerHTML = ''; streamEl = document.createElement('div'); streamEl.className = 'owl-streaming'; body.appendChild(streamEl); }
     }
-
-    return { streamEl, finalise };
+    return {
+      turn,
+      setModel(m: string) { dot.className = 'owl-byline__dot ' + dotClass(m); },
+      get text() { return streamEl?.textContent || ''; },
+      setText(full: string) { ensureStream(); streamEl!.textContent = full; },
+      finalise(full: string) {
+        const rendered = renderMarkdown(full);
+        if (!rendered.trim()) { turn.remove(); markTurns(); return; }
+        const content = document.createElement('div');
+        content.className = 'owl-content';
+        content.innerHTML = rendered;
+        body.innerHTML = '';
+        body.appendChild(content);
+        messages.scrollTop = messages.scrollHeight;
+      },
+    };
   }
 
-  function appendTypingIndicator() {
-    startConversation();
-    const wrap = document.createElement('div');
-    wrap.className = 'flex justify-start gap-2.5 items-start';
+  function dotClass(model: string | null): string {
+    if (!model) return 'owl-byline__dot--haiku';
+    return model.includes('haiku') ? 'owl-byline__dot--haiku' : 'owl-byline__dot--sonnet';
+  }
+  function nowLabel(): string {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
 
-    const avatar = document.createElement('div');
-    avatar.className = 'w-6 h-6 rounded-full bg-surface-2 border border-rule-subtle flex items-center justify-center shrink-0 mt-1 overflow-hidden';
-    avatar.innerHTML = '<img src="/images/owl.png" alt="" class="w-4 h-4 object-contain" onerror="this.parentElement.innerHTML=\'🦉\'" />';
-
-    const bubble = document.createElement('div');
-    bubble.className = 'mt-1 px-3 py-2.5 rounded-2xl rounded-tl-sm bg-surface-1 flex gap-1 items-center';
-    bubble.innerHTML = `
-      <span class="w-1.5 h-1.5 rounded-full bg-ink-muted animate-bounce" style="animation-delay:0ms"></span>
-      <span class="w-1.5 h-1.5 rounded-full bg-ink-muted animate-bounce" style="animation-delay:150ms"></span>
-      <span class="w-1.5 h-1.5 rounded-full bg-ink-muted animate-bounce" style="animation-delay:300ms"></span>
-    `;
-    wrap.appendChild(avatar);
-    wrap.appendChild(bubble);
-    messages.appendChild(wrap);
-    messages.scrollTop = messages.scrollHeight;
-    return wrap;
+  function setStreaming(active: boolean) {
+    isStreaming = active;
+    input.disabled = active;
+    sendBtn.classList.toggle('hidden', active);
+    stopBtn.classList.toggle('hidden', !active);
   }
 
   // ─── Submit ─────────────────────────────────────────────────────────────────
@@ -465,65 +287,54 @@
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = input.value.trim();
-    if (!text) return;
+    if (!text || isStreaming) return;
     input.value = '';
 
     appendUserMessage(text);
     history.push({ role: 'user', content: text });
 
-    const typingWrap = appendTypingIndicator();
-    let owlMsg: ReturnType<typeof createOwlMessage> | null = null;
-    let full = '';
+    setStreaming(true);
+    abortController = new AbortController();
+    const owlMsg = createOwlMessage();
+    let gotText = false;
 
-    try {
-      const res = await fetch('/api/owl/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history }),
-      });
-      if (!res.ok || !res.body) throw new Error('Owl is unavailable');
+    await streamChat({
+      messages: history,
+      conversationId,
+      signal: abortController.signal,
+      onConvId: (id) => { conversationId = id; setActiveConversationId(id); },
+      onModel: (model) => {
+        owlMsg.setModel(model);
+        modelBadge.textContent = `Timebeat AI · ${model.includes('haiku') ? 'haiku' : 'sonnet'}`;
+      },
+      onText: (_delta, full) => {
+        gotText = true;
+        owlMsg.setText(full);
+        messages.scrollTop = messages.scrollHeight;
+      },
+      onCorrection: (c) => { messages.appendChild(buildCorrectionCard(c)); messages.scrollTop = messages.scrollHeight; },
+      onError: (msg) => {
+        // Preserve any text already streamed, then show the error on its own
+        // line — don't overwrite the partial answer the user was reading.
+        if (owlMsg.text) owlMsg.finalise(owlMsg.text); else { owlMsg.turn.remove(); markTurns(); }
+        const err = document.createElement('p');
+        err.className = 'font-mono text-[11px] text-signal-danger px-1';
+        err.textContent = `// ${msg}`;
+        messages.appendChild(err);
+        messages.scrollTop = messages.scrollHeight;
+      },
+      onDone: (full) => {
+        if (full) { owlMsg.finalise(full); history.push({ role: 'assistant', content: full }); }
+        else if (!gotText) { owlMsg.turn.remove(); markTurns(); }
+      },
+    });
 
-      const reader  = res.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        for (const line of chunk.split('\n')) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') break;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.error) {
-              typingWrap.remove();
-              const err = createOwlMessage();
-              err.streamEl.textContent = parsed.error;
-              return;
-            }
-            if (parsed.model) {
-              modelBadge.textContent = `Timebeat AI · ${parsed.model.includes('haiku') ? 'haiku' : 'sonnet'}`;
-            }
-            if (parsed.text) {
-              if (!owlMsg) { typingWrap.remove(); owlMsg = createOwlMessage(); }
-              full += parsed.text;
-              owlMsg.streamEl.textContent = full;
-              messages.scrollTop = messages.scrollHeight;
-            }
-          } catch {}
-        }
-      }
-
-      if (owlMsg && full) owlMsg.finalise(full);
-      history.push({ role: 'assistant', content: full });
-
-    } catch (err: any) {
-      typingWrap.remove();
-      const errMsg = createOwlMessage();
-      errMsg.streamEl.textContent = err?.message || 'Request failed';
-    }
+    setStreaming(false);
+    abortController = null;
   });
+
+  stopBtn.addEventListener('click', () => { abortController?.abort(); });
+  newBtn.addEventListener('click', newChat);
 
   // ─── History panel ──────────────────────────────────────────────────────────
 
@@ -555,28 +366,10 @@
   historyBtn.addEventListener('click', () => historyMode ? showChatPanel() : showHistoryPanel());
   historyBack.addEventListener('click', showChatPanel);
 
-  function relTime(ts: string): string {
-    try {
-      const [datePart, timePart = '00:00'] = ts.split(', ');
-      const [day, mon, yr] = datePart.split(' ');
-      const months: Record<string, number> = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
-      const d = new Date(+yr, months[mon] ?? 0, +day, +timePart.split(':')[0], +timePart.split(':')[1]);
-      const diff = Date.now() - d.getTime();
-      const m = Math.floor(diff / 60000);
-      if (m < 2)  return 'just now';
-      if (m < 60) return `${m}m ago`;
-      const h = Math.floor(m / 60);
-      if (h < 24) return `${h}h ago`;
-      return `${Math.floor(h / 24)}d ago`;
-    } catch { return ts; }
-  }
-
   async function loadHistoryList() {
     historyList.innerHTML = '<p class="font-mono text-[11px] text-ink-muted py-4">// loading…</p>';
     try {
-      const res = await fetch('/api/owl/sessions');
-      if (!res.ok) throw new Error('failed');
-      const sessions: any[] = await res.json();
+      const sessions = await listConversations();
       if (sessions.length === 0) {
         historyList.innerHTML = '<p class="font-mono text-[11px] text-ink-muted py-4">// No past conversations yet.</p>';
         return;
@@ -595,10 +388,9 @@
         row.innerHTML = `
           <span class="text-sm text-ink-primary truncate leading-snug">${s.title || 'Chat'}</span>
           <span class="flex items-center gap-2 flex-wrap">
-            <span class="font-mono text-[10px] text-ink-muted">${modelDot}${s.model_used || 'owl'} · ${relTime(s.timestamp || '')}</span>
+            <span class="font-mono text-[10px] text-ink-muted">${modelDot}${s.model_used || 'owl'} · ${relativeTime(s.ts || s.timestamp || '')}</span>
             <span class="flex gap-1">${topics}</span>
-          </span>
-        `;
+          </span>`;
         row.addEventListener('click', () => loadSession(s.id));
         historyList.appendChild(row);
       });
@@ -609,12 +401,10 @@
 
   async function loadSession(id: string) {
     showChatPanel();
-    // Clear current chat
     messages.innerHTML = '';
     history.length = 0;
     conversationStarted = false;
 
-    // Loading state
     startConversation();
     const loadingEl = document.createElement('p');
     loadingEl.className = 'font-mono text-[10px] text-ink-muted text-center py-2';
@@ -622,33 +412,27 @@
     messages.appendChild(loadingEl);
 
     try {
-      const res = await fetch(`/api/owl/sessions/${id}`);
-      if (!res.ok) throw new Error('not found');
-      const session: any = await res.json();
-      const msgs: { role: string; content: string }[] = session.messages || [];
+      const session = await getConversation(id);
+      const msgs: ChatMessage[] = session.messages || [];
 
       messages.innerHTML = '';
       conversationStarted = false;
+      conversationId = id;            // continuing updates THIS conversation
+      setActiveConversationId(id);
 
-      // Banner
       startConversation();
       const banner = document.createElement('div');
       banner.className = 'font-mono text-[10px] text-ink-muted text-center py-1 mb-1';
       banner.textContent = `// loaded · ${session.timestamp || ''}`;
       messages.appendChild(banner);
 
-      // Render each message
       msgs.forEach(m => {
-        if (m.role === 'user') {
-          appendUserMessage(m.content);
-        } else if (m.role === 'assistant') {
-          const owl = createOwlMessage();
-          owl.finalise(m.content);
-        }
-        history.push({ role: m.role as 'user' | 'assistant', content: m.content });
+        if (m.role === 'user') appendUserMessage(m.content);
+        else if (m.role === 'assistant') createOwlMessage(session.model_used).finalise(m.content);
+        history.push({ role: m.role, content: m.content });
       });
+      markTurns();
 
-      // Continuation prompt
       const cont = document.createElement('div');
       cont.className = 'font-mono text-[10px] text-ink-muted text-center pt-2 pb-1';
       cont.textContent = '// continue below ↓';
@@ -674,4 +458,20 @@
     openDrawer();
     loadSession(id);
   });
+
+  // Restore the conversation the user was last in (shared with the full page),
+  // so reopening the drawer continues where they left off instead of blank.
+  // Verify it still exists first so a deleted/stale id silently falls back to
+  // the empty state rather than flashing an error.
+  (async () => {
+    const restoreId = getActiveConversationId();
+    if (!restoreId) return;
+    try {
+      await getConversation(restoreId);
+      loadSession(restoreId);
+    } catch {
+      setActiveConversationId(null);
+    }
+  })();
+  }
 </script>

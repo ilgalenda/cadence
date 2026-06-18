@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import OwlDrawer from '../components/OwlDrawer.astro';
+import Footer from '../components/Footer.astro';
 
 interface NavItem {
   href: string;
@@ -8,14 +9,16 @@ interface NavItem {
   icon: string;
   id: string;
   match?: string[];
+  section?: string;
 }
 interface Props {
   title?: string;
   agentName: string;
   agentTagline?: string;
   navItems: NavItem[];
+  hideOwlDrawer?: boolean;
 }
-const { title, agentName, agentTagline = '', navItems } = Astro.props;
+const { title, agentName, agentTagline = '', navItems, hideOwlDrawer = false } = Astro.props;
 const currentPath = Astro.url.pathname;
 ---
 <!DOCTYPE html>
@@ -34,20 +37,28 @@ const currentPath = Astro.url.pathname;
     </a>
 
     <div class="px-5 py-5 border-b border-rule-subtle">
-      <img
-        src="/images/timebeat-logo.png"
-        alt="Timebeat"
-        class="h-5 w-auto object-contain mb-4"
-        onerror="this.style.display='none'"
-      />
+      <a href="/dashboard" aria-label="Back to dashboard" class="inline-block">
+        <img
+          src="/images/timebeat-logo.png"
+          alt="Timebeat"
+          class="h-5 w-auto object-contain mb-4 hover:opacity-70 transition-opacity"
+          onerror="this.style.display='none'"
+        />
+      </a>
       <p class="text-base font-semibold tracking-tightest leading-tight">{agentName}</p>
       {agentTagline && <p class="text-xs text-ink-muted mt-1 leading-snug">{agentTagline}</p>}
     </div>
 
     <nav class="flex-1 py-3 overflow-y-auto">
-      {navItems.map(item => {
+      {(() => { let lastSection: string | undefined; return navItems.map(item => {
         const isActive = currentPath === item.id || (item.match || []).some(m => currentPath === m || currentPath.startsWith(m + '/'));
+        const showHeader = item.section && item.section !== lastSection;
+        lastSection = item.section;
         return (
+          <>
+          {showHeader && (
+            <p class="px-5 pt-4 pb-1 font-mono text-[10px] uppercase tracking-label text-ink-muted">{item.section}</p>
+          )}
           <a
             href={item.href}
             class={`relative flex items-center gap-3 px-5 py-2 text-sm transition-colors duration-150 ease-decelerate ${
@@ -60,8 +71,9 @@ const currentPath = Astro.url.pathname;
             <span class="font-mono text-[11px] text-ink-muted w-4 text-center">{item.icon}</span>
             <span>{item.label}</span>
           </a>
+          </>
         );
-      })}
+      }); })()}
     </nav>
 
     <div class="px-5 py-4 border-t border-rule-subtle space-y-3">
@@ -72,23 +84,32 @@ const currentPath = Astro.url.pathname;
           <p id="user-role" class="text-[11px] text-ink-muted"></p>
         </div>
       </div>
+      <button id="sandbox-toggle" class="hidden w-full text-left text-xs font-mono text-ink-muted hover:text-ink-secondary transition-colors duration-150 ease-decelerate">
+        sandbox →
+      </button>
       <button id="logout-btn" class="w-full text-left text-xs text-ink-secondary hover:text-accent transition-colors duration-150 ease-decelerate">
         Log out →
       </button>
     </div>
   </aside>
 
-  <main class="flex-1 overflow-y-auto">
-    <slot />
-  </main>
+  <div class="flex-1 flex flex-col min-w-0">
+    <main class="flex-1 overflow-y-auto">
+      <slot />
+    </main>
+    <Footer />
+  </div>
 
-  <OwlDrawer />
+  {!hideOwlDrawer && <OwlDrawer />}
 
   <script>
     (async () => {
       try {
-        const res = await fetch('/api/auth/status');
-        const data = await res.json();
+        const [authRes, sbRes] = await Promise.all([
+          fetch('/api/auth/status'),
+          fetch('/api/admin/sandbox/status'),
+        ]);
+        const data = await authRes.json();
         if (!data.authed) {
           window.location.href = '/';
           return;
@@ -97,6 +118,9 @@ const currentPath = Astro.url.pathname;
           window.location.href = '/dashboard';
           return;
         }
+        const sbData = sbRes.ok ? await sbRes.json() : { sandbox: false };
+        const isSandbox = Boolean(sbData.sandbox);
+
         const name = data.name || data.username || '';
         const role = data.role || '';
         const initial = (name.trim()[0] || '·').toUpperCase();
@@ -116,6 +140,30 @@ const currentPath = Astro.url.pathname;
         if (roleEl) roleEl.textContent = role;
         (window as any).__cadenceUser = data;
         document.body.dataset.access = data.access || 'user';
+
+        if (data.access === 'admin') {
+          const sbToggle = document.getElementById('sandbox-toggle');
+          if (sbToggle) {
+            sbToggle.classList.remove('hidden');
+            const updateToggle = (active: boolean) => {
+              sbToggle.textContent = active ? '// sandbox ×' : 'sandbox →';
+              sbToggle.className = [
+                'w-full text-left text-xs font-mono transition-colors duration-150 ease-decelerate',
+                active
+                  ? 'text-amber-400 hover:text-amber-300'
+                  : 'text-ink-muted hover:text-ink-secondary',
+              ].join(' ');
+            };
+            updateToggle(isSandbox);
+            sbToggle.addEventListener('click', async () => {
+              const current = (window as any).__cadenceSandbox;
+              const endpoint = current ? '/api/admin/sandbox/disable' : '/api/admin/sandbox/enable';
+              await fetch(endpoint, { method: 'POST' });
+              window.location.reload();
+            });
+          }
+          (window as any).__cadenceSandbox = isSandbox;
+        }
       } catch {
         window.location.href = '/';
       }

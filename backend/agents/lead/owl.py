@@ -11,7 +11,9 @@ import time
 import anthropic
 
 from agents.lead import prompts
-from agents.lead.knowledge import owl_system_prompt
+from agents.lead.knowledge import owl_system_blocks
+from agents.shared.jsonparse import parse_json
+from agents.shared.vault import log_cache_usage
 
 _RETRY_DELAYS = [10, 30, 60]
 
@@ -35,9 +37,10 @@ class OwlRefiner:
                 response = self._client.messages.create(
                     model=self.MODEL,
                     max_tokens=max_tokens,
-                    system=owl_system_prompt(self.username),
+                    system=owl_system_blocks(self.username),
                     messages=[{"role": "user", "content": user_prompt}],
                 )
+                log_cache_usage("lead.owl_refiner", response.usage)
                 return response.content[0].text.strip()
             except anthropic.RateLimitError as e:
                 last_err = e
@@ -45,14 +48,6 @@ class OwlRefiner:
                     raise
         raise last_err
 
-    @staticmethod
-    def _parse_json(raw: str):
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-            raw = raw.strip("` \n")
-        return json.loads(raw)
 
     def refine(self, task: str, claude_output: dict, context: dict) -> dict:
         """Refine pass-1 output. On failure, return the input unchanged."""
@@ -93,7 +88,7 @@ class OwlRefiner:
 
             max_tokens = 4096 if task in ("sequence", "abm_sequence") else 2048
             raw = self._call(user_prompt, max_tokens=max_tokens)
-            return self._parse_json(raw)
+            return parse_json(raw)
         except Exception as e:
             print(f"[lead.owl] refinement failed for task={task}: {e}")
             return claude_output

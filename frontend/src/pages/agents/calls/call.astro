@@ -40,6 +40,7 @@ import { CALLS_AGENT_NAME, CALLS_AGENT_TAGLINE, CALLS_NAV } from '../../../agent
         .then(session => {
           const result = session.result || {};
           result._title = session.title || 'Call Analysis';
+          result._call_id = session.id;
           (window as any).renderAnalysisResult(result);
           loadState.remove();
           const heading = document.getElementById('ar-heading');

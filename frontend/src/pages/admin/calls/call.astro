@@ -1,0 +1,54 @@
+---
+import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+import AnalysisResult from '../../../components/AnalysisResult.astro';
+---
+<DashboardLayout title="Admin · Call">
+  <div class="px-10 py-12 max-w-4xl">
+
+    <div class="mb-8">
+      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Admin · Calls</p>
+      <h1 id="call-heading" class="text-3xl font-semibold tracking-tightest leading-tight mb-3">Call Analysis.</h1>
+      <a href="/admin" class="font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">← admin dashboard</a>
+    </div>
+
+    <div id="load-state" class="py-8 font-mono text-xs text-ink-muted">// loading analysis…</div>
+
+    <AnalysisResult showClear={false} />
+
+  </div>
+
+  <script>
+    const params    = new URLSearchParams(window.location.search);
+    const id        = params.get('id');
+    const loadState = document.getElementById('load-state')!;
+    const heading   = document.getElementById('call-heading')!;
+
+    if (!id) {
+      loadState.textContent  = '// no call id provided';
+      loadState.className    = 'py-8 font-mono text-xs text-signal-danger';
+    } else {
+      fetch(`/api/admin/calls/${encodeURIComponent(id)}`)
+        .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
+        .then(session => {
+          const result = session.result || {};
+          result._title = session.title || 'Call Analysis';
+          (window as any).renderAnalysisResult(result);
+          loadState.remove();
+          const label = (session.title || 'Call Analysis') + (session.timestamp ? ' · ' + session.timestamp : '');
+          heading.textContent = label;
+          if (session.username) {
+            const chip = document.createElement('span');
+            chip.className   = 'ml-3 font-mono text-[11px] uppercase tracking-label text-ink-muted';
+            chip.textContent = session.username;
+            heading.appendChild(chip);
+          }
+          const arHeading = document.getElementById('ar-heading');
+          if (arHeading) arHeading.textContent = label;
+        })
+        .catch(() => {
+          loadState.textContent = '// analysis not found';
+          loadState.className   = 'py-8 font-mono text-xs text-signal-danger';
+        });
+    }
+  </script>
+</DashboardLayout>

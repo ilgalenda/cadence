@@ -1,0 +1,361 @@
+---
+import AgentLayout from '../../../layouts/AgentLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import { HI_AGENT_NAME, HI_AGENT_TAGLINE, HI_NAV, SIGNAL_TYPE_LABELS } from '../../../agents/high-intent/config';
+---
+<AgentLayout title="Signal agents" agentName={HI_AGENT_NAME} agentTagline={HI_AGENT_TAGLINE} navItems={HI_NAV}>
+  <div class="px-10 py-12 max-w-4xl">
+
+    <PageHeader
+      label="Workspace · High-Intent · Setup"
+      heading="Signal agents."
+      lead="Configure your ICP for each signal type. Detection cannot run until the ICP is complete."
+    />
+
+    <!-- Agent type selector -->
+    <div class="mb-8">
+      <div class="flex items-baseline justify-between pb-3 mb-3 border-b border-rule-strong">
+        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Signal types</h2>
+      </div>
+      <div id="type-list" class="grid grid-cols-2 gap-3"></div>
+    </div>
+
+    <!-- ICP form area -->
+    <div id="icp-panel" class="hidden">
+      <div class="flex items-baseline justify-between pb-3 mb-6 border-b border-rule-strong">
+        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary" id="icp-heading">ICP Configuration</h2>
+        <span id="icp-status-badge" class="font-mono text-[10px] px-2 py-0.5 rounded bg-surface-2 text-ink-muted">not set</span>
+      </div>
+
+      <form id="icp-form" class="space-y-6">
+        <div id="icp-fields"></div>
+
+        <div class="flex items-center gap-4 pt-4 border-t border-rule-subtle">
+          <button type="submit" class="px-5 py-2 bg-accent text-ink-inverse text-sm rounded hover:opacity-90">
+            Save ICP
+          </button>
+          <button type="button" id="detect-btn" class="px-5 py-2 bg-surface-2 border border-rule-subtle text-sm rounded hover:bg-surface-3 transition-colors disabled:opacity-40" disabled>
+            Run detection →
+          </button>
+          <p id="form-status" class="font-mono text-xs text-ink-muted"></p>
+        </div>
+      </form>
+
+      <div id="detect-result" class="mt-6 hidden"></div>
+    </div>
+
+  </div>
+
+  <script>
+    const SIGNAL_TYPE_LABELS: Record<string, string> = {
+      competitor_engagement: 'Competitor Engagement',
+      influencer_engagement: 'Influencer Engagement',
+      job_change: 'Recently Changed Roles',
+      funding: 'Recently Funded',
+      top_icp: 'Top 5% ICP Activity',
+      company_engagement: 'Engaged with Timebeat',
+    };
+    const SIGNAL_TYPES = Object.keys(SIGNAL_TYPE_LABELS);
+
+    let activeType: string | null = null;
+    let allConfigs: Record<string, any> = {};
+    let allFields: Record<string, any[]> = {};
+
+    async function init() {
+      // Pre-load ICP fields schema
+      const metaRes = await fetch('/api/high-intent/signal-types');
+      const meta = await metaRes.json();
+      allFields = meta.icp_fields;
+
+      // Load existing configs
+      const cfgRes = await fetch('/api/high-intent/icp');
+      allConfigs = await cfgRes.json();
+
+      renderTypeList();
+
+      // Auto-select type from URL param
+      const params = new URLSearchParams(window.location.search);
+      const preselect = params.get('type');
+      if (preselect && SIGNAL_TYPES.includes(preselect)) {
+        selectType(preselect);
+      }
+    }
+
+    function renderTypeList() {
+      const el = document.getElementById('type-list')!;
+      el.innerHTML = SIGNAL_TYPES.map(t => {
+        const configured = allConfigs[t] && Object.keys(allConfigs[t]).length > 0;
+        const isActive = t === activeType;
+        return `<button
+          type="button"
+          data-type="${t}"
+          class="type-btn text-left px-4 py-3 border rounded transition-colors ${isActive ? 'border-accent bg-accent-soft' : 'border-rule-subtle bg-surface-1 hover:bg-surface-2'}"
+        >
+          <p class="text-sm font-medium text-ink-primary">${SIGNAL_TYPE_LABELS[t]}</p>
+          <p class="font-mono text-[10px] mt-1 ${configured ? 'text-signal-success' : 'text-ink-muted'}">${configured ? '✓ configured' : 'not configured'}</p>
+        </button>`;
+      }).join('');
+
+      document.querySelectorAll('.type-btn').forEach(btn => {
+        btn.addEventListener('click', () => selectType((btn as HTMLElement).dataset.type!));
+      });
+    }
+
+    function selectType(type: string) {
+      activeType = type;
+      renderTypeList();
+
+      const panel = document.getElementById('icp-panel')!;
+      panel.classList.remove('hidden');
+
+      document.getElementById('icp-heading')!.textContent = `ICP · ${SIGNAL_TYPE_LABELS[type]}`;
+
+      const config = allConfigs[type] || {};
+      const fields = allFields[type] || [];
+      renderFields(fields, config);
+      updateStatusBadge(type, config, fields);
+
+      const detectBtn = document.getElementById('detect-btn') as HTMLButtonElement;
+      detectBtn.disabled = !isComplete(fields, config);
+    }
+
+    function renderFields(fields: any[], config: Record<string, any>) {
+      const container = document.getElementById('icp-fields')!;
+      container.innerHTML = fields.map(f => {
+        const val = config[f.key];
+
+        if (f.type === 'list') {
+          const listVal = Array.isArray(val) ? val : [];
+          return `<div class="space-y-2">
+            <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">${f.label}${f.label.toLowerCase().includes('optional') ? '' : ' <span class="text-signal-danger">*</span>'}</label>
+            <div id="list-${f.key}" class="space-y-1">
+              ${listVal.map((v: string, i: number) => listItem(f.key, i, v)).join('')}
+              <div id="list-${f.key}-empty" class="${listVal.length ? 'hidden' : ''} font-mono text-[11px] text-ink-muted py-1">// empty — add an entry below</div>
+            </div>
+            <div class="flex gap-2">
+              <input id="list-input-${f.key}" type="text" placeholder="${f.placeholder || ''}" class="flex-1 bg-surface-1 border border-rule-subtle rounded px-3 py-1.5 text-sm focus:outline-none focus:border-accent" />
+              <button type="button" data-list="${f.key}" class="add-list-btn px-3 py-1.5 bg-surface-2 border border-rule-subtle rounded text-xs hover:bg-surface-3 transition-colors">+ Add</button>
+            </div>
+          </div>`;
+        }
+
+        if (f.type === 'select') {
+          const opts = (f.options || []).map((o: string) => `<option value="${o}" ${val == o ? 'selected' : ''}>${o} days</option>`).join('');
+          return `<div class="space-y-2">
+            <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">${f.label}</label>
+            <select name="${f.key}" class="bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm w-full focus:outline-none focus:border-accent">
+              ${opts}
+            </select>
+          </div>`;
+        }
+
+        // text
+        return `<div class="space-y-2">
+          <label class="font-mono text-[11px] uppercase tracking-label text-ink-muted">${f.label}</label>
+          <input name="${f.key}" type="text" value="${val || ''}" placeholder="${f.placeholder || ''}" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm focus:outline-none focus:border-accent" />
+        </div>`;
+      }).join('');
+
+      // Wire up list add buttons
+      document.querySelectorAll('.add-list-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = (btn as HTMLElement).dataset.list!;
+          const input = document.getElementById(`list-input-${key}`) as HTMLInputElement;
+          const val = input.value.trim();
+          if (!val) return;
+          addListItem(key, val);
+          input.value = '';
+          onFieldChange();
+        });
+      });
+
+      // Wire enter key on list inputs
+      fields.filter(f => f.type === 'list').forEach(f => {
+        const input = document.getElementById(`list-input-${f.key}`) as HTMLInputElement;
+        input?.addEventListener('keydown', (e: KeyboardEvent) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = input.value.trim();
+            if (!val) return;
+            addListItem(f.key, val);
+            input.value = '';
+            onFieldChange();
+          }
+        });
+      });
+
+      container.querySelectorAll('input[type=text], select').forEach(el => {
+        el.addEventListener('change', onFieldChange);
+      });
+    }
+
+    function listItem(key: string, index: number, value: string): string {
+      return `<div class="flex items-center gap-2 list-item" data-key="${key}">
+        <span class="flex-1 px-3 py-1.5 bg-surface-1 border border-rule-subtle rounded text-sm">${value}</span>
+        <button type="button" data-key="${key}" data-val="${value.replace(/"/g, '&quot;')}" class="remove-list-btn font-mono text-[11px] text-ink-muted hover:text-signal-danger transition-colors">✕</button>
+      </div>`;
+    }
+
+    function addListItem(key: string, value: string) {
+      const container = document.getElementById(`list-${key}`)!;
+      const empty = document.getElementById(`list-${key}-empty`);
+      if (empty) empty.classList.add('hidden');
+      const idx = container.querySelectorAll('.list-item').length;
+      const div = document.createElement('div');
+      div.innerHTML = listItem(key, idx, value);
+      container.appendChild(div.firstElementChild!);
+      wireRemoveButtons(container);
+    }
+
+    function wireRemoveButtons(container: Element) {
+      container.querySelectorAll('.remove-list-btn').forEach(btn => {
+        btn.replaceWith(btn.cloneNode(true));
+      });
+      container.querySelectorAll('.remove-list-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          (btn as HTMLElement).closest('.list-item')!.remove();
+          const key = (btn as HTMLElement).dataset.key!;
+          const cnt = container.querySelectorAll('.list-item').length;
+          const empty = document.getElementById(`list-${key}-empty`);
+          if (empty && cnt === 0) empty.classList.remove('hidden');
+          onFieldChange();
+        });
+      });
+    }
+
+    // Wire on first render
+    document.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('.remove-list-btn');
+      if (btn) {
+        const key = (btn as HTMLElement).dataset.key!;
+        (btn as HTMLElement).closest('.list-item')!.remove();
+        const cnt = document.querySelectorAll(`[data-key="${key}"].list-item`).length;
+        const empty = document.getElementById(`list-${key}-empty`);
+        if (empty && cnt === 0) empty.classList.remove('hidden');
+        onFieldChange();
+      }
+    });
+
+    function collectConfig(): Record<string, any> {
+      if (!activeType) return {};
+      const fields = allFields[activeType] || [];
+      const config: Record<string, any> = {};
+      fields.forEach(f => {
+        if (f.type === 'list') {
+          config[f.key] = Array.from(document.querySelectorAll(`[data-key="${f.key}"].list-item span`))
+            .map(el => el.textContent?.trim() || '')
+            .filter(Boolean);
+        } else if (f.type === 'select') {
+          const sel = document.querySelector(`[name="${f.key}"]`) as HTMLSelectElement;
+          config[f.key] = sel?.value || f.default || '';
+        } else {
+          const inp = document.querySelector(`[name="${f.key}"]`) as HTMLInputElement;
+          config[f.key] = inp?.value?.trim() || '';
+        }
+      });
+      return config;
+    }
+
+    function isComplete(fields: any[], config: Record<string, any>): boolean {
+      for (const f of fields) {
+        if (f.label.toLowerCase().includes('optional')) continue;
+        if (f.type === 'list') {
+          const val = config[f.key];
+          if (!val || !Array.isArray(val) || val.length === 0) return false;
+        }
+      }
+      return true;
+    }
+
+    function updateStatusBadge(type: string, config: Record<string, any>, fields: any[]) {
+      const badge = document.getElementById('icp-status-badge')!;
+      const complete = isComplete(fields, config);
+      badge.textContent = complete ? '✓ configured' : 'incomplete';
+      badge.className = `font-mono text-[10px] px-2 py-0.5 rounded ${complete ? 'bg-signal-success/10 text-signal-success' : 'bg-surface-2 text-ink-muted'}`;
+    }
+
+    function onFieldChange() {
+      if (!activeType) return;
+      const config = collectConfig();
+      const fields = allFields[activeType] || [];
+      updateStatusBadge(activeType, config, fields);
+      const detectBtn = document.getElementById('detect-btn') as HTMLButtonElement;
+      detectBtn.disabled = !isComplete(fields, config);
+    }
+
+    document.getElementById('icp-form')!.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!activeType) return;
+      const config = collectConfig();
+      const statusEl = document.getElementById('form-status')!;
+      statusEl.textContent = 'Saving…';
+      try {
+        const res = await fetch('/api/high-intent/icp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signal_type: activeType, config }),
+        });
+        const d = await res.json();
+        allConfigs[activeType] = config;
+        renderTypeList();
+        statusEl.textContent = '✓ Saved';
+        const detectBtn = document.getElementById('detect-btn') as HTMLButtonElement;
+        detectBtn.disabled = !d.complete;
+        setTimeout(() => { statusEl.textContent = ''; }, 2000);
+      } catch {
+        statusEl.textContent = '✕ Save failed';
+      }
+    });
+
+    document.getElementById('detect-btn')!.addEventListener('click', async () => {
+      if (!activeType) return;
+      const btn = document.getElementById('detect-btn') as HTMLButtonElement;
+      const statusEl = document.getElementById('form-status')!;
+      const resultEl = document.getElementById('detect-result')!;
+
+      btn.disabled = true;
+      statusEl.textContent = 'Detecting signals — this may take 30–60 seconds…';
+      resultEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/high-intent/detect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signal_type: activeType }),
+        });
+        const d = await res.json();
+        statusEl.textContent = '';
+        btn.disabled = false;
+
+        if (!res.ok) {
+          resultEl.innerHTML = `<div class="px-4 py-3 bg-signal-danger/10 border border-signal-danger/20 rounded font-mono text-xs text-signal-danger">Detection failed: ${d.detail || 'unknown error'}</div>`;
+          resultEl.classList.remove('hidden');
+          return;
+        }
+
+        resultEl.innerHTML = `
+          <div class="pb-3 mb-3 border-b border-rule-strong flex items-baseline justify-between">
+            <p class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Detection complete</p>
+            <a href="/agents/high-intent/queue" class="font-mono text-[11px] text-accent hover:underline">View in queue →</a>
+          </div>
+          <p class="font-mono text-[11px] text-ink-muted mb-3">${d.detected} signal${d.detected !== 1 ? 's' : ''} added to queue${d.parse_error ? ` (partial — ${d.parse_error})` : ''}</p>
+          <ul class="space-y-2">
+            ${(d.signals || []).map((s: any) => `
+              <li class="px-4 py-3 bg-surface-1 border border-rule-subtle rounded">
+                <p class="text-sm font-medium text-ink-primary">${s.profile?.full_name || '—'} · ${s.profile?.job_title || ''}</p>
+                <p class="font-mono text-[11px] text-ink-muted mt-1">${s.profile?.company || ''}</p>
+                <p class="text-xs text-ink-secondary mt-1 leading-snug">${s.profile?.signal_context || ''}</p>
+              </li>
+            `).join('')}
+          </ul>
+        `;
+        resultEl.classList.remove('hidden');
+      } catch {
+        statusEl.textContent = '✕ Detection request failed';
+        btn.disabled = false;
+      }
+    });
+
+    init();
+  </script>
+</AgentLayout>

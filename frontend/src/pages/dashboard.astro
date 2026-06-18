@@ -16,6 +16,13 @@ const agents = [
     description: 'Campaign creation and outreach — research, sequencing, draft generation across Timebeat channels.',
     status: 'active',
   },
+  {
+    index: '03',
+    href: '/agents/high-intent',
+    name: 'High-Intent — Test',
+    description: 'LinkedIn intent signal detection and outreach composition. Admin-only sandbox environment.',
+    status: 'test',
+  },
 ];
 ---
 <DashboardLayout title="Dashboard">
@@ -58,6 +65,11 @@ const agents = [
                   <>
                     <span class="w-1.5 h-1.5 rounded-full bg-signal-success animate-signal-pulse"></span>
                     <span class="font-mono text-[11px] uppercase tracking-label text-ink-secondary">Status · Active</span>
+                  </>
+                ) : agent.status === 'test' ? (
+                  <>
+                    <span class="w-1.5 h-1.5 rounded-full bg-signal-warning animate-signal-pulse"></span>
+                    <span class="font-mono text-[11px] uppercase tracking-label text-ink-secondary">Status · Test / Sandbox</span>
                   </>
                 ) : (
                   <>

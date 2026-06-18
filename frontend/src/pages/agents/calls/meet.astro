@@ -1,0 +1,82 @@
+---
+import AgentLayout from '../../../layouts/AgentLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import { CALLS_AGENT_NAME, CALLS_AGENT_TAGLINE, CALLS_NAV } from '../../../agents/calls/config';
+---
+<AgentLayout
+  title="Meet Capture"
+  agentName={CALLS_AGENT_NAME}
+  agentTagline={CALLS_AGENT_TAGLINE}
+  navItems={CALLS_NAV}
+>
+  <div class="px-10 py-12 max-w-3xl">
+
+    <PageHeader
+      label="Calls · Meet Capture"
+      heading="Google Meet capture."
+      lead="A Chrome extension captures live captions during a Google Meet call. When the call ends, the transcript is sent to the Call Analyser automatically — same output, no manual copy-paste."
+    />
+
+    <div class="space-y-8 mt-10">
+
+      <!-- How it works -->
+      <section>
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-4">How it works</p>
+        <ol class="space-y-4">
+          <li class="grid grid-cols-[auto_1fr] gap-4 text-sm text-ink-secondary leading-relaxed">
+            <span class="font-mono text-ink-muted w-5">01</span>
+            <span>Install the extension from <code class="font-mono text-xs bg-surface-1 px-1.5 py-0.5 rounded-sm">meet-extension/</code> in developer mode.</span>
+          </li>
+          <li class="grid grid-cols-[auto_1fr] gap-4 text-sm text-ink-secondary leading-relaxed">
+            <span class="font-mono text-ink-muted w-5">02</span>
+            <span>Join a Google Meet and enable captions using the <strong class="text-ink-primary">CC</strong> button in the bottom bar.</span>
+          </li>
+          <li class="grid grid-cols-[auto_1fr] gap-4 text-sm text-ink-secondary leading-relaxed">
+            <span class="font-mono text-ink-muted w-5">03</span>
+            <span>Click the IvanOS extension icon and press <strong class="text-ink-primary">Start recording</strong>.</span>
+          </li>
+          <li class="grid grid-cols-[auto_1fr] gap-4 text-sm text-ink-secondary leading-relaxed">
+            <span class="font-mono text-ink-muted w-5">04</span>
+            <span>When the call ends, press <strong class="text-ink-primary">End call &amp; analyse →</strong>. The transcript opens here and is analysed automatically.</span>
+          </li>
+          <li class="grid grid-cols-[auto_1fr] gap-4 text-sm text-ink-secondary leading-relaxed">
+            <span class="font-mono text-ink-muted w-5">05</span>
+            <span>After analysis, use <strong class="text-ink-primary">Download transcript →</strong> in the result header to save the raw timestamped transcript.</span>
+          </li>
+        </ol>
+      </section>
+
+      <!-- Install instructions -->
+      <section>
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-4">Install the extension</p>
+        <div class="relative bg-surface-1 border border-rule-subtle pl-5 pr-5 py-5 space-y-3">
+          <span class="absolute left-0 top-0 bottom-0 w-[2px] bg-accent"></span>
+          <p class="text-sm text-ink-secondary leading-relaxed">
+            1. Open <code class="font-mono text-xs bg-surface-0 px-1.5 py-0.5 rounded-sm">chrome://extensions</code> in Chrome.
+          </p>
+          <p class="text-sm text-ink-secondary leading-relaxed">
+            2. Enable <strong class="text-ink-primary">Developer mode</strong> (toggle in the top-right corner).
+          </p>
+          <p class="text-sm text-ink-secondary leading-relaxed">
+            3. Click <strong class="text-ink-primary">Load unpacked</strong> and select the <code class="font-mono text-xs bg-surface-0 px-1.5 py-0.5 rounded-sm">meet-extension/</code> folder from this project.
+          </p>
+          <p class="text-sm text-ink-secondary leading-relaxed">
+            4. The extension appears in Chrome's toolbar. Pin it for quick access during calls.
+          </p>
+        </div>
+      </section>
+
+      <!-- Troubleshooting -->
+      <section>
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-4">If captions are not captured</p>
+        <p class="text-sm text-ink-secondary leading-relaxed max-w-2xl">
+          Google Meet updates its DOM structure periodically. If the extension stops capturing captions after a Meet update,
+          open DevTools on an active meeting with captions enabled, inspect the element whose text updates as people speak,
+          and update <code class="font-mono text-xs bg-surface-1 px-1.5 py-0.5 rounded-sm">CAPTION_SELECTORS</code> in
+          <code class="font-mono text-xs bg-surface-1 px-1.5 py-0.5 rounded-sm">meet-extension/content.js</code>.
+        </p>
+      </section>
+
+    </div>
+  </div>
+</AgentLayout>

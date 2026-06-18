@@ -14,14 +14,34 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-VAULT_DIR = Path(__file__).parent.parent.parent / "vault"
-KNOWLEDGE_DIR = VAULT_DIR / "knowledge"
-ENTITIES_DIR = KNOWLEDGE_DIR / "entities"
-GLOSSARY_DIR = KNOWLEDGE_DIR / "glossary"
-CALLS_DIR = VAULT_DIR / "calls"
-LEAD_DIR = VAULT_DIR / "lead"
+from paths import vault_dir
 
-for _d in [VAULT_DIR, KNOWLEDGE_DIR, ENTITIES_DIR, GLOSSARY_DIR, CALLS_DIR, LEAD_DIR]:
+VAULT_DIR = vault_dir()
+
+# Pillar 1 — Company Truth (locked, canonical)
+COMPANY_DIR = VAULT_DIR / "company"
+KNOWLEDGE_DIR = COMPANY_DIR / "knowledge"
+ENTITIES_DIR = COMPANY_DIR / "entities"
+GLOSSARY_DIR = COMPANY_DIR / "glossary"
+
+# Pillar 2 — Dynamic Truth (grown from calls + leads at runtime)
+DYNAMIC_DIR = VAULT_DIR / "dynamic"
+CALLS_DIR = DYNAMIC_DIR / "calls"
+LEAD_DIR = DYNAMIC_DIR / "lead"
+DYNAMIC_GLOSSARY_DIR = DYNAMIC_DIR / "glossary"
+
+# Pillar 3 — Added Knowledge (user corrections, admin-gated)
+ADDED_DIR = VAULT_DIR / "added"
+ADDED_PENDING_DIR = ADDED_DIR / "pending"
+ADDED_APPROVED_DIR = ADDED_DIR / "approved"
+ADDED_REJECTED_DIR = ADDED_DIR / "rejected"
+
+for _d in [
+    VAULT_DIR,
+    COMPANY_DIR, KNOWLEDGE_DIR, ENTITIES_DIR, GLOSSARY_DIR,
+    DYNAMIC_DIR, CALLS_DIR, LEAD_DIR, DYNAMIC_GLOSSARY_DIR,
+    ADDED_DIR, ADDED_PENDING_DIR, ADDED_APPROVED_DIR, ADDED_REJECTED_DIR,
+]:
     _d.mkdir(parents=True, exist_ok=True)
 
 
@@ -168,6 +188,18 @@ def _inject_links_and_enrich_meta(
     for entity in _SORTED_ENTITIES:
         category, tag = _LINK_ENTITIES[entity]
 
+        # Idempotency: if this entity already appears as a [[wikilink]] anywhere
+        # in the body (any casing), skip — re-running must not add new links.
+        if re.search(r"\[\[" + re.escape(entity) + r"\]\]", body, flags=re.IGNORECASE):
+            # Still record the tag/product so frontmatter stays in sync
+            if category == "product":
+                if entity not in products:
+                    products.append(entity)
+            else:
+                if tag not in tags:
+                    tags.append(tag)
+            continue
+
         # Regex: word-boundary match, not already inside [[ ]]
         # (?<!\[) avoids matching inside existing [[links]]
         pattern = r"(?<!\[)\b(" + re.escape(entity) + r")\b(?!\])"
@@ -197,6 +229,7 @@ def _inject_links_and_enrich_meta(
 def write_learning(
     *,
     title: str,
+    description: str,
     content: str,
     category: str,
     agent: str,
@@ -206,11 +239,18 @@ def write_learning(
     tags: list[str] | None = None,
     products: list[str] | None = None,
 ) -> Path:
-    """Write one learning entry to the vault.
+    """Write one learning entry to the Dynamic pillar.
 
     Auto-injects [[wikilinks]] for known entities and enriches frontmatter.
-    Returns the written file path.
+    Requires both `title` and `description` — every runtime write must carry
+    a one-sentence summary used by Owl, Obsidian property views, and the
+    admin UI. Returns the written file path.
     """
+    if not title or not title.strip():
+        raise ValueError("write_learning: title is required")
+    if not description or not description.strip():
+        raise ValueError("write_learning: description is required (one-sentence summary)")
+
     enriched_body, detected_products, detected_tags = _inject_links_and_enrich_meta(
         content,
         existing_products=products or [],
@@ -225,6 +265,8 @@ def write_learning(
     meta = {
         "id": entry_id,
         "title": title,
+        "description": description.strip(),
+        "tier": "dynamic",
         "type": "learning",
         "category": category,
         "agent": agent,
@@ -237,6 +279,7 @@ def write_learning(
     }
     path = target_dir / filename
     path.write_text(_write_fm(meta) + "\n\n" + enriched_body, encoding="utf-8")
+    invalidate_vault_cache()
     return path
 
 
@@ -264,30 +307,41 @@ def write_entity(
         "tags": tags or [],
     }
     path.write_text(_write_fm(meta) + "\n\n" + description.strip(), encoding="utf-8")
+    invalidate_vault_cache()
     return path
 
 
 def write_glossary_term(
     *,
     term: str,
-    definition: str,
-    context: str = "",
+    description: str,
+    body: str = "",
     source_id: str,
     contributed_by: str,
     aliases: list[str] | None = None,
     tags: list[str] | None = None,
 ) -> Path | None:
-    """Write a dynamic glossary term if it does not already exist.
+    """Write a dynamic glossary term into the Dynamic pillar if not already known.
 
+    Skips if the term exists in either the Company-tier seed glossary
+    (`company/glossary/`) or the Dynamic glossary (`dynamic/glossary/`).
+    `description` is the short one/two-sentence summary surfaced everywhere.
+    `body` is the full expanded entry (definition + Timebeat context + sales
+    note + related products). If `body` is empty, `description` is used.
     Returns path or None if the term is already known.
     """
+    if not description or not description.strip():
+        raise ValueError("write_glossary_term: description is required")
+
     slug = _slug(term)
-    path = GLOSSARY_DIR / f"{slug}.md"
-    if path.exists():
+    if (GLOSSARY_DIR / f"{slug}.md").exists() or (DYNAMIC_GLOSSARY_DIR / f"{slug}.md").exists():
         return None
+    path = DYNAMIC_GLOSSARY_DIR / f"{slug}.md"
     meta = {
         "id": uuid.uuid4().hex,
         "title": term,
+        "description": description.strip(),
+        "tier": "dynamic",
         "type": "glossary",
         "aliases": aliases or [],
         "tags": tags or [],
@@ -295,9 +349,144 @@ def write_glossary_term(
         "contributed_by": contributed_by,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    body = definition + ("\n\n" + context if context else "")
-    path.write_text(_write_fm(meta) + "\n\n" + body, encoding="utf-8")
+    final_body = body.strip() if body and body.strip() else description.strip()
+    path.write_text(_write_fm(meta) + "\n\n" + final_body, encoding="utf-8")
+    invalidate_vault_cache()
     return path
+
+
+# ---------------------------------------------------------------------------
+# Added Knowledge — Pillar 3 (user corrections, admin-gated)
+# ---------------------------------------------------------------------------
+
+def write_added_knowledge(
+    *,
+    title: str,
+    description: str,
+    content: str,
+    topic: str,
+    what_owl_said: str,
+    user_correction: str,
+    submitted_by: str,
+    session_id: str,
+    suggested_source: str = "",
+) -> Path:
+    """Write a user-submitted correction into the Added pillar pending queue.
+
+    The file lands in `added/pending/` and is NOT loaded by Owl until an admin
+    moves it to `added/approved/` via `approve_added()`. Both `title` and
+    `description` are required.
+    """
+    if not title or not title.strip():
+        raise ValueError("write_added_knowledge: title is required")
+    if not description or not description.strip():
+        raise ValueError("write_added_knowledge: description is required")
+    if not user_correction or not user_correction.strip():
+        raise ValueError("write_added_knowledge: user_correction is required")
+
+    enriched_body, detected_products, detected_tags = _inject_links_and_enrich_meta(
+        content,
+        existing_products=[],
+        existing_tags=[],
+    )
+
+    entry_id = uuid.uuid4().hex
+    slug = _slug(title)
+    filename = f"{entry_id[:8]}--{slug}.md"
+    path = ADDED_PENDING_DIR / filename
+
+    meta = {
+        "id": entry_id,
+        "title": title,
+        "description": description.strip(),
+        "tier": "added",
+        "status": "pending",
+        "type": "correction",
+        "topic": topic,
+        "submitted_by": submitted_by,
+        "session_id": session_id,
+        "what_owl_said": what_owl_said,
+        "user_correction": user_correction,
+        "suggested_source": suggested_source,
+        "tags": detected_tags,
+        "products": detected_products,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    path.write_text(_write_fm(meta) + "\n\n" + enriched_body, encoding="utf-8")
+    return path
+
+
+def _find_added(entry_id: str, *dirs: Path) -> Path | None:
+    for d in dirs:
+        for p in d.glob(f"{entry_id[:8]}--*.md"):
+            return p
+    return None
+
+
+def approve_added(entry_id: str, *, reviewed_by: str, review_notes: str = "") -> Path:
+    """Move a pending Added entry to `approved/`, stamping reviewer metadata.
+
+    From the next Owl turn onward, the approved file is loaded into context.
+    """
+    src = _find_added(entry_id, ADDED_PENDING_DIR)
+    if src is None:
+        raise FileNotFoundError(f"No pending Added entry for id {entry_id}")
+    text = src.read_text(encoding="utf-8")
+    meta, body = _parse_fm(text)
+    meta["status"] = "approved"
+    meta["reviewed_by"] = reviewed_by
+    meta["reviewed_at"] = datetime.now(timezone.utc).isoformat()
+    if review_notes:
+        meta["review_notes"] = review_notes
+    dst = ADDED_APPROVED_DIR / src.name
+    dst.write_text(_write_fm(meta) + "\n\n" + body, encoding="utf-8")
+    src.unlink()
+    invalidate_vault_cache()
+    return dst
+
+
+def reject_added(entry_id: str, *, reviewed_by: str, review_notes: str = "") -> Path:
+    """Move a pending Added entry to `rejected/`. Never loaded by Owl."""
+    src = _find_added(entry_id, ADDED_PENDING_DIR)
+    if src is None:
+        raise FileNotFoundError(f"No pending Added entry for id {entry_id}")
+    text = src.read_text(encoding="utf-8")
+    meta, body = _parse_fm(text)
+    meta["status"] = "rejected"
+    meta["reviewed_by"] = reviewed_by
+    meta["reviewed_at"] = datetime.now(timezone.utc).isoformat()
+    if review_notes:
+        meta["review_notes"] = review_notes
+    dst = ADDED_REJECTED_DIR / src.name
+    dst.write_text(_write_fm(meta) + "\n\n" + body, encoding="utf-8")
+    src.unlink()
+    return dst
+
+
+def list_added(status: str) -> list[dict]:
+    """Return a list of Added-pillar files in the given status directory.
+
+    status: 'pending' | 'approved' | 'rejected'
+    Returns dicts with frontmatter fields + `body_preview`.
+    """
+    mapping = {
+        "pending": ADDED_PENDING_DIR,
+        "approved": ADDED_APPROVED_DIR,
+        "rejected": ADDED_REJECTED_DIR,
+    }
+    if status not in mapping:
+        raise ValueError(f"Invalid status {status!r}")
+    out: list[dict] = []
+    for p in sorted(mapping[status].glob("*.md"), reverse=True):
+        try:
+            text = p.read_text(encoding="utf-8")
+            meta, body = _parse_fm(text)
+            meta["_filename"] = p.name
+            meta["body_preview"] = body.strip()[:300]
+            out.append(meta)
+        except Exception:
+            pass
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -407,67 +596,107 @@ def _fmt_learning_for_context(meta: dict, body: str) -> str:
     return header + "\n\n" + body.strip()
 
 
-def load_vault_for_context(
-    *,
-    tags: list[str] | None = None,
-    products: list[str] | None = None,
-    max_learnings: int = 30,
-) -> str:
-    """Load vault content for injection into a system prompt.
+# ---------------------------------------------------------------------------
+# Composable section builders
+# ---------------------------------------------------------------------------
+# Each builder produces one assembled section (or None when empty), and takes an
+# optional filter so the full vault (`load_vault_for_context`) and the scoped
+# analyser vault (`load_vault_for_analysis`) share assembly logic. With every
+# filter left as None the builders reproduce the original full-vault output
+# byte-for-byte.
 
-    Returns:
-      1. Curated KB files (always loaded)
-      2. Entity files — product/term/protocol definitions (always loaded)
-      3. Dynamic glossary terms (from runtime new_terms extraction)
-      4. Top-scored empirical learnings (ranked by entity overlap + recency)
-      5. Any entity files referenced by [[wikilinks]] in selected learnings
-         that weren't already loaded — ensuring linked context is co-present
+def _build_company_truth_section(
+    file_filter: "Callable[[Path, dict], bool] | None" = None,
+) -> str | None:
+    """# Company Truth — every .md under company/, excluding entities/ and glossary/.
+
+    `file_filter(path, meta)` decides inclusion; when None, every file is kept
+    (and frontmatter is not even parsed, preserving the original behaviour).
     """
-    parts: list[str] = []
-    loaded_entity_slugs: set[str] = set()
-
-    # 1. Curated knowledge files
-    for path in sorted(KNOWLEDGE_DIR.glob("*.md")):
+    excluded_subtrees = {ENTITIES_DIR.resolve(), GLOSSARY_DIR.resolve()}
+    company_files: list[str] = []
+    for path in sorted(COMPANY_DIR.rglob("*.md")):
         try:
-            parts.append(path.read_text(encoding="utf-8"))
+            if any(parent.resolve() in excluded_subtrees for parent in path.parents):
+                continue
+            text = path.read_text(encoding="utf-8")
+            if file_filter is not None:
+                meta, _ = _parse_fm(text)
+                if not file_filter(path, meta):
+                    continue
+            company_files.append(text)
         except Exception:
             pass
+    if company_files:
+        return "# Company Truth (canonical)\n\n" + "\n\n---\n\n".join(company_files)
+    return None
 
-    # 2. Entity files (products, protocols, terms, customers)
+
+def _build_entities_section(
+    slug_filter: "set[str] | None" = None,
+) -> tuple[str | None, set[str]]:
+    """# Entity Reference — products, protocols, terms, customers.
+
+    Returns (section, loaded_slugs). `slug_filter`, when given, restricts the
+    section to those entity stems (used by the scoped analyser path).
+    """
     entity_texts: dict[str, str] = {}
+    loaded_entity_slugs: set[str] = set()
     for path in sorted(ENTITIES_DIR.glob("*.md")):
         try:
+            if slug_filter is not None and path.stem not in slug_filter:
+                continue
             text = path.read_text(encoding="utf-8")
             entity_texts[path.stem] = text
             loaded_entity_slugs.add(path.stem)
         except Exception:
             pass
+    section = None
     if entity_texts:
-        parts.append(
-            "# Entity Reference\n\n"
-            + "\n\n---\n\n".join(entity_texts.values())
-        )
+        section = "# Entity Reference\n\n" + "\n\n---\n\n".join(entity_texts.values())
+    return section, loaded_entity_slugs
 
-    # 3. Dynamic glossary terms
+
+def _build_glossary_section(
+    name_filter: "Callable[[str, list], bool] | None" = None,
+) -> str | None:
+    """# Glossary — company seed first, dynamic terms second.
+
+    `name_filter(term, aliases)` decides inclusion; when None, every term is kept.
+    """
     glossary_lines: list[str] = []
-    for path in sorted(GLOSSARY_DIR.glob("*.md")):
-        try:
-            text = path.read_text(encoding="utf-8")
-            meta, body = _parse_fm(text)
-            term = meta.get("title", path.stem)
-            aliases = meta.get("aliases", [])
-            alias_str = (
-                f" (also: {', '.join(aliases)})"
-                if aliases and isinstance(aliases, list) and aliases
-                else ""
-            )
-            glossary_lines.append(f"**{term}**{alias_str}: {body.strip()}")
-        except Exception:
-            pass
+    for glossary_dir in (GLOSSARY_DIR, DYNAMIC_GLOSSARY_DIR):
+        for path in sorted(glossary_dir.glob("*.md")):
+            try:
+                text = path.read_text(encoding="utf-8")
+                meta, body = _parse_fm(text)
+                term = meta.get("title", path.stem)
+                aliases = meta.get("aliases", [])
+                if name_filter is not None and not name_filter(term, aliases):
+                    continue
+                alias_str = (
+                    f" (also: {', '.join(aliases)})"
+                    if aliases and isinstance(aliases, list) and aliases
+                    else ""
+                )
+                glossary_lines.append(f"**{term}**{alias_str}: {body.strip()}")
+            except Exception:
+                pass
     if glossary_lines:
-        parts.append("# Vault Glossary\n\n" + "\n\n".join(glossary_lines))
+        return "# Glossary\n\n" + "\n\n".join(glossary_lines)
+    return None
 
-    # 4. Empirical learnings — scored and limited
+
+def _build_learnings_section(
+    tags: list[str] | None,
+    products: list[str] | None,
+    max_learnings: int,
+) -> tuple[str | None, list["_Candidate"]]:
+    """# Dynamic Truth — Team Learnings (scored subset).
+
+    Returns (section, selected_candidates). Scoring/selection is unchanged from
+    the original; `selected` is returned so the wikilink follow-up can run.
+    """
     candidates: list[_Candidate] = []
     for subdir in [CALLS_DIR, LEAD_DIR]:
         for path in subdir.glob("*.md"):
@@ -495,6 +724,7 @@ def load_vault_for_context(
     candidates.sort(key=lambda c: (c.score, c.created_at), reverse=True)
     selected = candidates[:max_learnings]
 
+    section = None
     if selected:
         learning_blocks = [
             _fmt_learning_for_context(
@@ -510,31 +740,468 @@ def load_vault_for_context(
             )
             for c in selected
         ]
-        parts.append(
-            f"# Team Learnings from Cadence ({len(selected)} entries)\n\n"
+        section = (
+            f"# Dynamic Truth — Team Learnings ({len(selected)} entries)\n\n"
             + "\n\n---\n\n".join(learning_blocks)
         )
+    return section, selected
 
-        # 5. Follow [[wikilinks]] — pull in any referenced entity not yet loaded
-        linked_refs: set[str] = set()
-        for c in selected:
-            for link in _extract_wikilinks(c.body):
-                linked_refs.add(_slug(link))
 
-        missing_entities: list[str] = []
-        for ref_slug in linked_refs:
-            if ref_slug not in loaded_entity_slugs:
-                entity_path = ENTITIES_DIR / f"{ref_slug}.md"
-                if entity_path.exists():
-                    try:
-                        missing_entities.append(entity_path.read_text(encoding="utf-8"))
-                        loaded_entity_slugs.add(ref_slug)
-                    except Exception:
-                        pass
-        if missing_entities:
-            parts.append(
-                "# Referenced Entities (via links in learnings)\n\n"
-                + "\n\n---\n\n".join(missing_entities)
-            )
+def _build_added_section(max_added: int) -> str | None:
+    """# Approved Added Knowledge — admin-blessed user corrections."""
+    approved_blocks: list[str] = []
+    approved_paths = sorted(ADDED_APPROVED_DIR.glob("*.md"), reverse=True)[:max_added]
+    for path in approved_paths:
+        try:
+            text = path.read_text(encoding="utf-8")
+            meta, body = _parse_fm(text)
+            approved_blocks.append(_fmt_learning_for_context(meta, body))
+        except Exception:
+            pass
+    if approved_blocks:
+        return (
+            f"# Approved Added Knowledge ({len(approved_blocks)} entries)\n\n"
+            "*Admin-approved corrections submitted by users. Treat as authoritative.*\n\n"
+            + "\n\n---\n\n".join(approved_blocks)
+        )
+    return None
+
+
+def _build_referenced_entities_section(
+    selected: list["_Candidate"],
+    loaded_entity_slugs: set[str],
+) -> str | None:
+    """# Referenced Entities — entity files reached only via [[wikilinks]] in learnings.
+
+    Mutates `loaded_entity_slugs` to record any newly loaded entity.
+    """
+    linked_refs: set[str] = set()
+    for c in selected:
+        for link in _extract_wikilinks(c.body):
+            linked_refs.add(_slug(link))
+
+    missing_entities: list[str] = []
+    for ref_slug in linked_refs:
+        if ref_slug not in loaded_entity_slugs:
+            entity_path = ENTITIES_DIR / f"{ref_slug}.md"
+            if entity_path.exists():
+                try:
+                    missing_entities.append(entity_path.read_text(encoding="utf-8"))
+                    loaded_entity_slugs.add(ref_slug)
+                except Exception:
+                    pass
+    if missing_entities:
+        return (
+            "# Referenced Entities (via links in learnings)\n\n"
+            + "\n\n---\n\n".join(missing_entities)
+        )
+    return None
+
+
+def load_vault_for_context(
+    *,
+    tags: list[str] | None = None,
+    products: list[str] | None = None,
+    max_learnings: int = 30,
+    max_added: int = 20,
+) -> str:
+    """Assemble Owl's full context across the three Cadence Knowledge pillars.
+
+    Precedence (top of the assembled prompt → bottom):
+      1. # Company Truth (canonical)        — vault/company/**/*.md
+      2. # Entity Reference                  — vault/company/entities/
+      3. # Glossary                          — company/glossary/ then dynamic/glossary/
+      4. # Dynamic Truth — Team Learnings    — scored subset of dynamic/calls + dynamic/lead
+      5. # Approved Added Knowledge          — vault/added/approved/ (admin-blessed)
+      6. # Referenced Entities (via links)   — any entity files only reached via [[wikilinks]]
+
+    Pending and rejected Added entries are NEVER loaded. `tags`/`products` only
+    influence the learnings score (section 4); the other sections load in full.
+    """
+    parts: list[str] = []
+
+    if (s := _build_company_truth_section()) is not None:
+        parts.append(s)
+
+    entities_section, loaded_entity_slugs = _build_entities_section()
+    if entities_section is not None:
+        parts.append(entities_section)
+
+    if (s := _build_glossary_section()) is not None:
+        parts.append(s)
+
+    learnings_section, selected = _build_learnings_section(tags, products, max_learnings)
+    if learnings_section is not None:
+        parts.append(learnings_section)
+
+    if (s := _build_added_section(max_added)) is not None:
+        parts.append(s)
+
+    if selected:
+        if (s := _build_referenced_entities_section(selected, loaded_entity_slugs)) is not None:
+            parts.append(s)
 
     return "\n\n---\n\n".join(parts) if parts else "No vault knowledge loaded."
+
+
+# ---------------------------------------------------------------------------
+# Transcript-scoped vault (analyser path)
+# ---------------------------------------------------------------------------
+# The call analyser only needs the slice of the vault a given call references.
+# These helpers select entities, glossary terms, learnings, and company-truth
+# docs by matching the transcript, cutting the assembled prefix from ~130k to
+# ~30-40k tokens. Output is deterministic but transcript-dependent, so this
+# path does NOT use the Anthropic prompt cache (see get_analysis_system_blocks).
+
+# A short token is treated as an acronym (matched case-sensitively) when it is
+# all-caps/digits with optional . / - separators — e.g. PTP, GNSS, 10GbE.
+_ACRONYM_RE = re.compile(r"^[A-Z0-9][A-Z0-9./-]*$")
+
+# Tags that appear on the majority of Company Truth docs (measured: ptp 41/47,
+# gnss 40, holdover 33, …) or are structural rather than topical. They carry no
+# signal for *which* docs to include, so they must not drive Company-Truth
+# scoping — otherwise one mention of "PTP" pulls in nearly the whole tree. They
+# still feed learnings scoring (which is capped), just not doc selection.
+_COMPANY_TAG_STOPLIST = {
+    "ptp", "gnss", "holdover", "ocxo", "rubidium", "pnt",
+    "products", "website", "datasheet", "hardware", "software", "solution",
+    "industry", "research", "reference", "platform", "downloads", "videos",
+    "resources", "pricing-model",
+}
+
+
+def _norm_tag(t: str) -> str:
+    """Normalise a frontmatter tag/product token. `_parse_fm` leaves quotes on
+    list items (`["research", rubidium]` -> `'"research"'`, `'rubidium'`), so
+    strip them and lowercase for reliable set intersection."""
+    return t.strip().strip('"').strip("'").lower()
+
+
+def _under(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+        return True
+    except Exception:
+        return False
+
+
+def _strip_parenthetical(title: str) -> list[str]:
+    """Full title plus the inside/outside of a trailing parenthetical.
+
+    "1PPS (One Pulse Per Second)" -> ["1PPS (One Pulse Per Second)", "1PPS", "One Pulse Per Second"]
+    Entity `aliases` are empty on disk, so this is the main entity match surface.
+    """
+    title = (title or "").strip()
+    forms = [title] if title else []
+    m = re.match(r"^(.*?)\s*\(([^)]*)\)\s*$", title)
+    if m:
+        outside, inside = m.group(1).strip(), m.group(2).strip()
+        if outside:
+            forms.append(outside)
+        if inside:
+            forms.append(inside)
+    return forms
+
+
+def _build_match_terms(title: str, aliases) -> list[str]:
+    """Distinct surface forms to match a vault entry against a transcript."""
+    terms: list[str] = list(_strip_parenthetical(title))
+    if isinstance(aliases, list):
+        for a in aliases:
+            a = (a or "").strip().strip('"').strip("'")
+            if a:
+                terms.append(a)
+    seen: set[str] = set()
+    out: list[str] = []
+    for t in terms:
+        k = t.lower()
+        if k and k not in seen:
+            seen.add(k)
+            out.append(t)
+    return out
+
+
+def _compile_term_pattern(term: str):
+    """Word-boundary matcher for one term, or None if too short to match safely.
+
+    Short all-caps acronyms (<4 chars: PTP, STL, BBU) match case-sensitively so
+    they don't fire inside ordinary words ("stl" in "install"); everything else
+    matches case-insensitively.
+    """
+    if len(term) < 2:
+        return None
+    flags = 0 if (len(term) < 4 and _ACRONYM_RE.match(term)) else re.IGNORECASE
+    return re.compile(r"(?<![A-Za-z0-9])" + re.escape(term) + r"(?![A-Za-z0-9])", flags)
+
+
+def _terms_match(transcript: str, terms: list[str]) -> bool:
+    """True if any term hits the (original-case) transcript."""
+    for term in terms:
+        pat = _compile_term_pattern(term)
+        if pat is not None and pat.search(transcript):
+            return True
+    return False
+
+
+def _build_glossary_index() -> str | None:
+    """A compact index of EVERY glossary term (names + aliases, no bodies).
+
+    Cheap (~2-3k tokens for the whole glossary) but keeps the analyser aware of
+    the full term vocabulary even when only a few full definitions are loaded —
+    so it names concepts canonically and doesn't re-propose terms that already
+    exist. Pairs with the full bodies of the matched terms.
+    """
+    lines: list[str] = []
+    for glossary_dir in (GLOSSARY_DIR, DYNAMIC_GLOSSARY_DIR):
+        for path in sorted(glossary_dir.glob("*.md")):
+            try:
+                meta, _ = _parse_fm(path.read_text(encoding="utf-8"))
+                term = meta.get("title", path.stem)
+                aliases = meta.get("aliases", [])
+                alias_str = (
+                    f" (also: {', '.join(aliases)})"
+                    if aliases and isinstance(aliases, list) and aliases
+                    else ""
+                )
+                lines.append(f"- {term}{alias_str}")
+            except Exception:
+                pass
+    if lines:
+        return "# Known Glossary Terms (index — names only)\n\n" + "\n".join(lines)
+    return None
+
+
+def load_vault_for_analysis(transcript: str, *, max_learnings: int = 20) -> str:
+    """Assemble a transcript-scoped vault for the call analyser.
+
+    Includes only the entities and glossary terms the transcript mentions, the
+    learnings scored against their tags/products, plus an always-on Company
+    Truth core (`company/knowledge/`) and any product/research docs whose
+    tags/products intersect what the call references. Deterministic; no product
+    catalogue (product fit is the opt-in endpoint's job).
+    """
+    text = transcript or ""
+    parts: list[str] = []
+    derived_tags: set[str] = set()
+    derived_products: set[str] = set()
+
+    # 1. Entities mentioned in the call — harvest their tags/products for scoring.
+    matched_entity_slugs: set[str] = set()
+    for path in sorted(ENTITIES_DIR.glob("*.md")):
+        try:
+            meta, _ = _parse_fm(path.read_text(encoding="utf-8"))
+            title = meta.get("title", path.stem)
+            if _terms_match(text, _build_match_terms(title, meta.get("aliases", []))):
+                matched_entity_slugs.add(path.stem)
+                for t in (meta.get("tags") or []):
+                    if isinstance(t, str):
+                        derived_tags.add(_norm_tag(t))
+                if meta.get("entity_type") == "product":
+                    derived_products.add(_norm_tag(title))
+        except Exception:
+            pass
+
+    # 2. Glossary terms mentioned in the call — harvest their tags too.
+    matched_glossary_titles: set[str] = set()
+    for glossary_dir in (GLOSSARY_DIR, DYNAMIC_GLOSSARY_DIR):
+        for path in sorted(glossary_dir.glob("*.md")):
+            try:
+                meta, _ = _parse_fm(path.read_text(encoding="utf-8"))
+                title = meta.get("title", path.stem)
+                if _terms_match(text, _build_match_terms(title, meta.get("aliases", []))):
+                    matched_glossary_titles.add(title.strip().lower())
+                    for t in (meta.get("tags") or []):
+                        if isinstance(t, str):
+                            derived_tags.add(_norm_tag(t))
+            except Exception:
+                pass
+
+    # 3. Company Truth — always-on knowledge/ core + tag/product-matched docs.
+    #    Generic tags (PTP, GNSS, …) are excluded from doc selection so a single
+    #    common mention doesn't pull in the whole products/research tree.
+    discriminating_tags = derived_tags - _COMPANY_TAG_STOPLIST
+
+    def _company_filter(path: Path, meta: dict) -> bool:
+        if _under(path, KNOWLEDGE_DIR):
+            return True
+        file_tags = {_norm_tag(t) for t in (meta.get("tags") or []) if isinstance(t, str)}
+        if discriminating_tags & file_tags:
+            return True
+        file_products = {_norm_tag(p) for p in (meta.get("products") or []) if isinstance(p, str)}
+        return bool(derived_products & file_products)
+
+    if (s := _build_company_truth_section(file_filter=_company_filter)) is not None:
+        parts.append(s)
+
+    # 4. Entity Reference — ALL entities (only ~3.3k tokens, 24 files). Keeping
+    #    the full product/protocol vocabulary prevents mis-naming and unsupported
+    #    product claims; the A/B showed scoping this out cost groundedness.
+    entities_section, loaded_entity_slugs = _build_entities_section()
+    if entities_section is not None:
+        parts.append(entities_section)
+
+    # 5a. Known-terms index — every glossary term by name, so concepts are named
+    #     canonically and new_terms aren't re-proposed.
+    if (s := _build_glossary_index()) is not None:
+        parts.append(s)
+
+    # 5b. Glossary — full definitions for only the matched terms.
+    if matched_glossary_titles:
+        s = _build_glossary_section(
+            name_filter=lambda term, _aliases: term.strip().lower() in matched_glossary_titles
+        )
+        if s is not None:
+            parts.append(s)
+
+    # 6. Learnings — scored against the tags/products the call surfaced.
+    learnings_section, selected = _build_learnings_section(
+        sorted(derived_tags), sorted(derived_products), max_learnings
+    )
+    if learnings_section is not None:
+        parts.append(learnings_section)
+
+    # 7. Referenced entities via [[wikilinks]] in selected learnings.
+    if selected:
+        s = _build_referenced_entities_section(selected, loaded_entity_slugs)
+        if s is not None:
+            parts.append(s)
+
+    return "\n\n---\n\n".join(parts) if parts else "No vault knowledge loaded."
+
+
+def load_vault_for_product_rec(
+    *,
+    product_name: str | None = None,
+    concepts: list[str] | None = None,
+) -> str:
+    """Focused product context for the opt-in product-recommendation endpoint.
+
+    Always loads the product entities (the catalogue is small) so the model sees
+    the full product space; restricts Company Truth to the named product's docs
+    when `product_name` is given, else to product/concept-tagged docs.
+    """
+    product_slugs: set[str] = set()
+    for path in sorted(ENTITIES_DIR.glob("*.md")):
+        try:
+            meta, _ = _parse_fm(path.read_text(encoding="utf-8"))
+            if meta.get("entity_type") == "product":
+                product_slugs.add(path.stem)
+        except Exception:
+            pass
+
+    target_product = _norm_tag(product_name) if product_name else None
+    concept_tags = {_norm_tag(c) for c in (concepts or []) if isinstance(c, str)}
+
+    def _company_filter(path: Path, meta: dict) -> bool:
+        file_products = {_norm_tag(p) for p in (meta.get("products") or []) if isinstance(p, str)}
+        file_tags = {_norm_tag(t) for t in (meta.get("tags") or []) if isinstance(t, str)}
+        if target_product:
+            return target_product in file_products or target_product == _norm_tag(meta.get("title", ""))
+        # No product named: the product entities already enumerate the catalogue,
+        # so include only the fit-relevant overviews (industries/solutions) plus
+        # docs matching the call's concepts — not every datasheet.
+        category = _norm_tag(meta.get("category", ""))
+        folder = _norm_tag(meta.get("source_folder", ""))
+        if category in {"industry", "solution"} or folder in {"industries", "solutions"}:
+            return True
+        return bool((concept_tags - _COMPANY_TAG_STOPLIST) & file_tags)
+
+    parts: list[str] = []
+    if (s := _build_company_truth_section(file_filter=_company_filter)) is not None:
+        parts.append(s)
+    entities_section, _slugs = _build_entities_section(slug_filter=product_slugs)
+    if entities_section is not None:
+        parts.append(entities_section)
+
+    return "\n\n---\n\n".join(parts) if parts else "No product knowledge loaded."
+
+
+# ---------------------------------------------------------------------------
+# Prompt-cache support
+# ---------------------------------------------------------------------------
+# The Anthropic prompt cache requires byte-identical prefixes across requests
+# within a 5-minute TTL. `load_vault_for_context` does I/O on every call and
+# can include time-sensitive ordering, so we memoise the assembled string per
+# username for the cache window.
+
+import time as _time
+
+_VAULT_SESSION_TTL_SECONDS = 5 * 60
+_vault_session_cache: dict[str, tuple[float, str]] = {}
+
+
+def load_vault_for_session(username: str) -> str:
+    """Return a byte-stable vault assembly for `username` within the cache window.
+
+    Used by chat/refine flows that want their system prompt prefix to hit the
+    Anthropic prompt cache across consecutive requests. Outside the TTL the
+    assembly is rebuilt from disk.
+    """
+    now = _time.time()
+    cached = _vault_session_cache.get(username)
+    if cached and (now - cached[0]) < _VAULT_SESSION_TTL_SECONDS:
+        return cached[1]
+    text = load_vault_for_context()
+    _vault_session_cache[username] = (now, text)
+    return text
+
+
+def invalidate_vault_cache() -> None:
+    """Drop all cached vault assemblies. Call after any write to dynamic/added pillars.
+
+    The Dynamic pillar is team-wide, so a new learning from one user must
+    surface in every other user's next Owl turn. Clearing the whole dict is
+    cheap — each user just pays one fresh assembly on their next request.
+    """
+    _vault_session_cache.clear()
+
+
+# Claude Sonnet 4.6 pricing, USD per million tokens.
+# input applies to uncached input; cache writes cost 1.25x and reads 0.1x.
+_SONNET_46_RATES_PER_MTOK = {
+    "input": 3.00,
+    "output": 15.00,
+    "cache_write": 3.75,
+    "cache_read": 0.30,
+}
+
+
+def log_cache_usage(label: str, usage) -> None:
+    """Print per-call token counts and an estimated cost for one response.
+
+    `usage` is the `response.usage` object from the Anthropic SDK. Safe to call
+    on streaming results once the stream has finished and `get_final_message()`
+    has been awaited; otherwise pass the resolved usage explicitly.
+
+    Breaks the input down into the three billing tiers (uncached input, cache
+    write, cache read) plus output, reports the total tokens that flowed through
+    the call, and estimates cost at Sonnet 4.6 rates. Cost assumes the caller is
+    on claude-sonnet-4-6; treat it as indicative for other models.
+    """
+    if usage is None:
+        return
+    try:
+        created = getattr(usage, "cache_creation_input_tokens", 0) or 0
+        read = getattr(usage, "cache_read_input_tokens", 0) or 0
+        inp = getattr(usage, "input_tokens", 0) or 0
+        out = getattr(usage, "output_tokens", 0) or 0
+
+        # Total prompt size = uncached input + cache write + cache read.
+        total_input = inp + created + read
+        total_tokens = total_input + out
+
+        rates = _SONNET_46_RATES_PER_MTOK
+        cost = (
+            inp * rates["input"]
+            + created * rates["cache_write"]
+            + read * rates["cache_read"]
+            + out * rates["output"]
+        ) / 1_000_000
+
+        print(
+            f"[cache] {label} read={read} create={created} input={inp} "
+            f"output={out} total_in={total_input} total={total_tokens} "
+            f"cost=${cost:.4f}"
+        )
+    except Exception:
+        pass

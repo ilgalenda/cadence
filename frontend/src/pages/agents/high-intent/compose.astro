@@ -1,0 +1,323 @@
+---
+import AgentLayout from '../../../layouts/AgentLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import { HI_AGENT_NAME, HI_AGENT_TAGLINE, HI_NAV, SIGNAL_TYPE_LABELS } from '../../../agents/high-intent/config';
+---
+<AgentLayout title="Compose" agentName={HI_AGENT_NAME} agentTagline={HI_AGENT_TAGLINE} navItems={HI_NAV}>
+  <div class="px-10 py-12 max-w-4xl">
+
+    <PageHeader
+      label="Workspace · High-Intent · Compose"
+      heading="Compose."
+      lead="Review the signal, generate the outreach sequence, edit and approve."
+    />
+
+    <div id="not-found" class="hidden font-mono text-xs text-ink-muted py-8">
+      // No signal selected — <a href="/agents/high-intent/queue" class="text-accent hover:underline">go to the queue</a>
+    </div>
+
+    <div id="compose-root" class="hidden">
+
+      <!-- Profile card -->
+      <div class="mb-8 px-5 py-5 bg-surface-1 border border-rule-subtle rounded">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-3 mb-1">
+              <span class="font-mono text-[10px] uppercase tracking-label" id="c-strength"></span>
+              <span class="font-mono text-[10px] text-ink-muted" id="c-signal-type"></span>
+            </div>
+            <p class="text-lg font-semibold text-ink-primary" id="c-name"></p>
+            <p class="text-sm text-ink-secondary" id="c-title-co"></p>
+            <a id="c-linkedin" href="#" target="_blank" rel="noopener" class="font-mono text-[11px] text-accent hover:underline hidden">LinkedIn →</a>
+          </div>
+          <div class="text-right shrink-0">
+            <p class="font-mono text-[10px] text-ink-muted mb-1">Timebeat fit</p>
+            <p class="text-sm font-medium text-ink-primary" id="c-product"></p>
+          </div>
+        </div>
+        <div class="mt-4 pt-4 border-t border-rule-subtle">
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-1">Intent signal</p>
+          <p class="text-sm text-ink-secondary leading-relaxed" id="c-signal-context"></p>
+        </div>
+        <div id="c-fit-reason-block" class="mt-3 hidden">
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-1">Why Timebeat</p>
+          <p class="text-xs text-ink-muted italic leading-relaxed" id="c-fit-reason"></p>
+        </div>
+      </div>
+
+      <!-- Compose action -->
+      <div id="compose-action" class="mb-8">
+        <button id="compose-btn" class="px-5 py-2 bg-accent text-ink-inverse text-sm rounded hover:opacity-90">
+          Generate sequence →
+        </button>
+        <p id="compose-status" class="mt-2 font-mono text-xs text-ink-muted"></p>
+      </div>
+
+      <!-- Message sequence -->
+      <div id="sequence-panel" class="hidden">
+        <div class="flex items-baseline justify-between pb-3 mb-4 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">3-touch sequence</h2>
+          <div class="flex items-center gap-4">
+            <button id="regenerate-btn" class="font-mono text-[11px] text-ink-muted hover:text-accent transition-colors">Regenerate ↺</button>
+            <button id="approve-btn" class="px-4 py-1.5 bg-surface-2 border border-rule-subtle text-xs rounded hover:bg-surface-3 transition-colors">Approve all</button>
+            <button id="mark-sent-btn" class="px-4 py-1.5 bg-accent text-ink-inverse text-xs rounded hover:opacity-90">Mark as sent</button>
+          </div>
+        </div>
+
+        <div id="touches-list" class="space-y-6"></div>
+
+        <!-- Follow-up generator -->
+        <div class="mt-10 pt-6 border-t border-rule-strong">
+          <h3 class="font-mono text-[11px] uppercase tracking-label text-ink-primary mb-4">Generate follow-up</h3>
+          <p class="text-xs text-ink-secondary mb-3">Paste their reply below — Owl will generate a contextual follow-up.</p>
+          <textarea id="reply-text" rows="3" placeholder="Their reply text…" class="w-full bg-surface-1 border border-rule-subtle rounded px-3 py-2 text-sm focus:outline-none focus:border-accent mb-3"></textarea>
+          <button id="followup-btn" class="px-4 py-2 bg-surface-2 border border-rule-subtle text-xs rounded hover:bg-surface-3 transition-colors">Generate follow-up →</button>
+          <div id="followup-result" class="mt-4 hidden"></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    const SIGNAL_TYPE_LABELS: Record<string, string> = {
+      competitor_engagement: 'Competitor Engagement',
+      influencer_engagement: 'Influencer Engagement',
+      job_change: 'Recently Changed Roles',
+      funding: 'Recently Funded',
+      top_icp: 'Top 5% ICP Activity',
+      company_engagement: 'Engaged with Timebeat',
+    };
+
+    const strengthColour: Record<string, string> = {
+      hot: 'text-signal-danger',
+      warm: 'text-signal-warning',
+      cold: 'text-ink-muted',
+    };
+
+    let currentSignal: any = null;
+    let currentMessage: any = null;
+
+    function qs(id: string): HTMLElement {
+      return document.getElementById(id)!;
+    }
+
+    async function init() {
+      const params = new URLSearchParams(window.location.search);
+      const signalId = params.get('id');
+      if (!signalId) {
+        qs('not-found').classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/high-intent/signals/${signalId}`);
+        if (!res.ok) { qs('not-found').classList.remove('hidden'); return; }
+        currentSignal = await res.json();
+      } catch {
+        qs('not-found').classList.remove('hidden');
+        return;
+      }
+
+      renderProfile(currentSignal);
+      qs('compose-root').classList.remove('hidden');
+
+      // If already composed, load existing message
+      if (currentSignal.status === 'composed' || currentSignal.status === 'approved' || currentSignal.status === 'sent') {
+        try {
+          const mRes = await fetch(`/api/high-intent/messages/${signalId}`);
+          if (mRes.ok) {
+            currentMessage = await mRes.json();
+            renderSequence(currentMessage.touches);
+          }
+        } catch {}
+      }
+    }
+
+    function renderProfile(signal: any) {
+      const p = signal.profile || {};
+      const strength = signal.signal_strength || 'cold';
+
+      qs('c-strength').textContent = strength.toUpperCase();
+      qs('c-strength').className = `font-mono text-[10px] uppercase tracking-label ${strengthColour[strength] || 'text-ink-muted'}`;
+      qs('c-signal-type').textContent = SIGNAL_TYPE_LABELS[signal.signal_type] || signal.signal_type;
+      qs('c-name').textContent = p.full_name || '—';
+      qs('c-title-co').textContent = [p.job_title, p.company].filter(Boolean).join(' · ');
+      if (p.linkedin_url) {
+        const lnk = qs('c-linkedin') as HTMLAnchorElement;
+        lnk.href = p.linkedin_url;
+        lnk.classList.remove('hidden');
+      }
+      qs('c-product').textContent = signal.timebeat_product_fit || '—';
+      qs('c-signal-context').textContent = p.signal_context || '';
+      if (p.timebeat_fit_reason) {
+        qs('c-fit-reason').textContent = p.timebeat_fit_reason;
+        qs('c-fit-reason-block').classList.remove('hidden');
+      }
+    }
+
+    function renderSequence(touches: any[]) {
+      qs('sequence-panel').classList.remove('hidden');
+      qs('compose-action').classList.add('hidden');
+
+      const list = qs('touches-list');
+      list.innerHTML = touches.map((t: any) => `
+        <div class="touch-card border border-rule-subtle rounded overflow-hidden" data-n="${t.n}">
+          <div class="flex items-center justify-between px-4 py-3 bg-surface-1 border-b border-rule-subtle">
+            <div class="flex items-center gap-3">
+              <span class="font-mono text-[10px] text-ink-muted">Touch ${t.n}</span>
+              <span class="text-sm font-medium text-ink-primary">${t.label}</span>
+            </div>
+            <button type="button" data-n="${t.n}" class="copy-btn font-mono text-[11px] text-accent hover:underline">Copy</button>
+          </div>
+          <div class="px-4 py-4">
+            <textarea data-n="${t.n}" class="touch-body w-full bg-surface-0 text-sm text-ink-primary leading-relaxed resize-none focus:outline-none focus:ring-0 border-none" rows="${Math.max(4, (t.body || '').split('\n').length + 2)}">${t.body || ''}</textarea>
+          </div>
+        </div>
+      `).join('');
+
+      list.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const n = (btn as HTMLElement).dataset.n!;
+          const ta = list.querySelector(`textarea[data-n="${n}"]`) as HTMLTextAreaElement;
+          navigator.clipboard.writeText(ta.value.trim()).then(() => {
+            btn.textContent = 'Copied ✓';
+            setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+          });
+        });
+      });
+    }
+
+    qs('compose-btn').addEventListener('click', async () => {
+      if (!currentSignal) return;
+      const btn = qs('compose-btn') as HTMLButtonElement;
+      const status = qs('compose-status');
+      btn.disabled = true;
+      status.textContent = 'Composing — this may take 20–40 seconds…';
+
+      try {
+        const res = await fetch('/api/high-intent/compose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signal_id: currentSignal.id }),
+        });
+        const d = await res.json();
+        if (!res.ok) {
+          status.textContent = `✕ ${d.detail || 'Composition failed'}`;
+          btn.disabled = false;
+          return;
+        }
+        currentMessage = d.message;
+        currentSignal = d.signal;
+        status.textContent = '';
+        renderSequence(currentMessage.touches);
+      } catch {
+        status.textContent = '✕ Request failed';
+        btn.disabled = false;
+      }
+    });
+
+    qs('regenerate-btn').addEventListener('click', async () => {
+      if (!currentSignal) return;
+      const status = qs('compose-status');
+      status.textContent = 'Regenerating…';
+      qs('sequence-panel').classList.add('hidden');
+      qs('compose-action').classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/high-intent/compose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signal_id: currentSignal.id }),
+        });
+        const d = await res.json();
+        if (!res.ok) { status.textContent = `✕ ${d.detail}`; return; }
+        currentMessage = d.message;
+        status.textContent = '';
+        renderSequence(currentMessage.touches);
+      } catch {
+        status.textContent = '✕ Request failed';
+      }
+    });
+
+    qs('approve-btn').addEventListener('click', async () => {
+      if (!currentMessage) return;
+      // Save edited touch bodies back to message
+      const touches = Array.from(document.querySelectorAll('.touch-body')).map((ta: any) => {
+        const card = ta.closest('.touch-card');
+        const n = parseInt(card.dataset.n);
+        return { n, label: currentMessage.touches.find((t: any) => t.n === n)?.label || '', body: ta.value.trim() };
+      });
+      const res = await fetch(`/api/high-intent/messages/${currentMessage.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved', touches }),
+      });
+      if (res.ok) {
+        qs('approve-btn').textContent = '✓ Approved';
+        setTimeout(() => { (qs('approve-btn') as HTMLButtonElement).textContent = 'Approve all'; }, 2000);
+      }
+    });
+
+    qs('mark-sent-btn').addEventListener('click', async () => {
+      if (!currentMessage) return;
+      const res = await fetch(`/api/high-intent/messages/${currentMessage.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'sent' }),
+      });
+      if (res.ok) {
+        qs('mark-sent-btn').textContent = '✓ Sent';
+        (qs('mark-sent-btn') as HTMLButtonElement).disabled = true;
+      }
+    });
+
+    qs('followup-btn').addEventListener('click', async () => {
+      if (!currentSignal) return;
+      const replyText = (qs('reply-text') as HTMLTextAreaElement).value.trim();
+      if (!replyText) return;
+      const btn = qs('followup-btn') as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = 'Generating…';
+
+      try {
+        const res = await fetch('/api/high-intent/followup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signal_id: currentSignal.id, reply_text: replyText }),
+        });
+        const d = await res.json();
+        const resultEl = qs('followup-result');
+        if (res.ok) {
+          resultEl.innerHTML = `
+            <div class="border border-rule-subtle rounded overflow-hidden">
+              <div class="flex items-center justify-between px-4 py-3 bg-surface-1 border-b border-rule-subtle">
+                <span class="font-mono text-[11px] text-ink-muted">Follow-up</span>
+                <button type="button" id="copy-followup" class="font-mono text-[11px] text-accent hover:underline">Copy</button>
+              </div>
+              <div class="px-4 py-4">
+                <p id="followup-text" class="text-sm text-ink-primary leading-relaxed whitespace-pre-wrap">${d.followup}</p>
+              </div>
+            </div>
+          `;
+          resultEl.classList.remove('hidden');
+          document.getElementById('copy-followup')!.addEventListener('click', () => {
+            navigator.clipboard.writeText(d.followup);
+            document.getElementById('copy-followup')!.textContent = 'Copied ✓';
+          });
+        } else {
+          resultEl.innerHTML = `<p class="font-mono text-xs text-signal-danger">${d.detail || 'Generation failed'}</p>`;
+          resultEl.classList.remove('hidden');
+        }
+      } catch {
+        qs('followup-result').innerHTML = '<p class="font-mono text-xs text-signal-danger">Request failed</p>';
+        qs('followup-result').classList.remove('hidden');
+      }
+      btn.disabled = false;
+      btn.textContent = 'Generate follow-up →';
+    });
+
+    init();
+  </script>
+</AgentLayout>

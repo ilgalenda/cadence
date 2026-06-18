@@ -45,12 +45,22 @@ import { LEAD_AGENT_NAME, LEAD_AGENT_TAGLINE, LEAD_NAV } from '../../../../agent
                     : c.signal_analysis ? 'ANALYSED'
                     : 'DRAFT';
         const synced = c.calendar_events ? ` · ${c.calendar_events.length} events synced` : '';
+        const sa = c.signal_analysis || {};
+        const hasScore = sa.lead_score !== undefined && sa.lead_score !== null;
+        const grade = sa.lead_grade || 'C';
+        const gradeColor = grade === 'A' ? 'text-accent border-accent' : grade === 'B' ? 'text-ink-primary border-rule-strong' : 'text-ink-muted border-rule-subtle';
+        const scoreBadge = hasScore
+          ? `<span class="font-mono text-[10px] uppercase tracking-label border px-2 py-0.5 ${gradeColor}" title="Behavioural lead score">${esc(String(sa.lead_score))} · ${esc(grade)}</span>`
+          : '';
         return `<li>
           <div class="group relative grid grid-cols-[auto_1fr_auto_auto] gap-8 items-start py-6 border-b border-rule-subtle hover:bg-surface-1 transition-colors -mx-4 px-4">
             <a href="/agents/lead/new?id=${encodeURIComponent(c.id)}" class="absolute inset-0" aria-label="Open ${esc(c.title || 'Untitled')}"></a>
             <span class="font-mono text-[11px] tabular text-ink-muted pt-1">${esc(c.updated_at || c.created_at || '')}</span>
             <div class="min-w-0">
-              <h3 class="text-base font-semibold tracking-tightest leading-tight group-hover:text-accent transition-colors">${esc(c.title || 'Untitled')}</h3>
+              <div class="flex items-center gap-2">
+                <h3 class="text-base font-semibold tracking-tightest leading-tight group-hover:text-accent transition-colors truncate">${esc(c.title || 'Untitled')}</h3>
+                ${scoreBadge}
+              </div>
               <p class="text-xs text-ink-secondary mt-1">${esc(stage)}${esc(synced)}</p>
             </div>
             <button type="button" data-delete-id="${esc(c.id)}" class="relative z-10 font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-signal-danger pt-1 transition-colors">delete</button>

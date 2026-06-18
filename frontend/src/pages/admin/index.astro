@@ -1,0 +1,457 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import Tabs from '../../components/Tabs.astro';
+---
+<DashboardLayout title="Admin">
+  <div class="px-10 py-12 max-w-6xl mx-auto">
+
+    <!-- Heading -->
+    <div class="mb-10">
+      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Admin · System</p>
+      <h1 class="text-3xl font-semibold tracking-tightest leading-tight mb-3">Admin Dashboard.</h1>
+      <p class="text-base text-ink-secondary max-w-xl leading-relaxed">
+        System-wide view across all users, calls, and campaigns.
+      </p>
+    </div>
+
+    <!-- Tabs -->
+    <Tabs
+      group="admin"
+      tabs={[
+        { id: 'overview',   label: 'Overview'   },
+        { id: 'approvals',  label: 'Approvals'  },
+        { id: 'calls',      label: 'Calls'      },
+        { id: 'campaigns',  label: 'Campaigns'  },
+        { id: 'users',      label: 'Users'      },
+      ]}
+    />
+
+    <!-- Overview panel -->
+    <div id="panel-overview" class="tab-panel mt-8">
+      <!-- Stat strip -->
+      <div class="grid grid-cols-4 border-y border-rule-strong mb-10">
+        <div class="px-5 py-5 border-r border-rule-subtle">
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Total users</p>
+          <p class="font-mono text-2xl tabular text-ink-primary" id="stat-users">—</p>
+        </div>
+        <div class="px-5 py-5 border-r border-rule-subtle">
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Total calls</p>
+          <p class="font-mono text-2xl tabular text-ink-primary" id="stat-calls">—</p>
+        </div>
+        <div class="px-5 py-5 border-r border-rule-subtle">
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Total campaigns</p>
+          <p class="font-mono text-2xl tabular text-ink-primary" id="stat-campaigns">—</p>
+        </div>
+        <div class="px-5 py-5">
+          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Active today</p>
+          <p class="font-mono text-2xl tabular text-ink-primary" id="stat-active">—</p>
+        </div>
+      </div>
+
+      <!-- Recent activity -->
+      <div class="flex items-baseline justify-between pb-3 border-b border-rule-strong mb-1">
+        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Recent activity</h2>
+        <span id="activity-count" class="font-mono text-[11px] tabular text-ink-muted"></span>
+      </div>
+      <ul id="activity-list">
+        <li class="py-8 font-mono text-xs text-ink-muted">// loading…</li>
+      </ul>
+    </div>
+
+    <!-- Approvals panel (Added Knowledge — Pillar 3) -->
+    <div id="panel-approvals" class="tab-panel mt-8 hidden">
+      <div class="mb-6">
+        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary mb-2">Pending Added-Knowledge submissions</h2>
+        <p class="text-sm text-ink-secondary">User-submitted corrections to Owl. Approved entries are loaded into Owl's context on the next turn. Rejected entries are archived and never loaded.</p>
+      </div>
+      <div class="flex items-baseline justify-between pb-3 border-b border-rule-strong mb-1">
+        <h3 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Pending</h3>
+        <span id="approvals-count" class="font-mono text-[11px] tabular text-ink-muted"></span>
+      </div>
+      <ul id="approvals-list">
+        <li class="py-8 font-mono text-xs text-ink-muted">// loading…</li>
+      </ul>
+    </div>
+
+    <!-- Calls panel -->
+    <div id="panel-calls" class="tab-panel mt-8 hidden">
+      <div class="mb-4 pb-3 border-b border-rule-strong">
+        <input
+          id="calls-search"
+          type="text"
+          placeholder="search calls…"
+          class="w-full bg-transparent border-0 focus:outline-none focus:ring-0 py-1 text-sm font-mono text-ink-primary placeholder-ink-muted"
+        />
+      </div>
+      <div class="flex items-baseline justify-between pb-3 border-b border-rule-strong mb-1">
+        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">All calls</h2>
+        <span id="calls-count" class="font-mono text-[11px] tabular text-ink-muted"></span>
+      </div>
+      <ul id="calls-list">
+        <li class="py-8 font-mono text-xs text-ink-muted">// loading…</li>
+      </ul>
+    </div>
+
+    <!-- Campaigns panel -->
+    <div id="panel-campaigns" class="tab-panel mt-8 hidden">
+      <div class="flex items-baseline justify-between pb-3 border-b border-rule-strong mb-1">
+        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">All campaigns</h2>
+        <span id="campaigns-count" class="font-mono text-[11px] tabular text-ink-muted"></span>
+      </div>
+      <ul id="campaigns-list">
+        <li class="py-8 font-mono text-xs text-ink-muted">// loading…</li>
+      </ul>
+    </div>
+
+    <!-- Users panel -->
+    <div id="panel-users" class="tab-panel mt-8 hidden">
+      <div class="flex items-baseline justify-between pb-3 border-b border-rule-strong mb-1">
+        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">All users</h2>
+        <span id="users-count" class="font-mono text-[11px] tabular text-ink-muted"></span>
+      </div>
+      <!-- Column headers -->
+      <div class="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-6 py-2 border-b border-rule-subtle mb-1">
+        <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted">User</span>
+        <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted w-14">Access</span>
+        <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted w-32">Agents</span>
+        <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted w-10 text-right">Calls</span>
+        <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted w-20 text-right">Campaigns</span>
+        <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted w-36 text-right">Last active</span>
+      </div>
+      <ul id="users-list">
+        <li class="py-8 font-mono text-xs text-ink-muted">// loading…</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <script>
+    // -----------------------------------------------------------------------
+    // Access guard
+    // -----------------------------------------------------------------------
+    (async () => {
+      const user = (window as any).__cadenceUser;
+      if (user) {
+        if (user.access !== 'admin') { window.location.href = '/dashboard'; return; }
+      } else {
+        // DashboardLayout script is async — fallback fetch
+        try {
+          const res = await fetch('/api/auth/status');
+          const data = await res.json();
+          if (!data.authed || data.access !== 'admin') { window.location.href = '/dashboard'; return; }
+        } catch {
+          window.location.href = '/dashboard';
+          return;
+        }
+      }
+    })();
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+    function esc(str: string): string {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // -----------------------------------------------------------------------
+    // Tab switching
+    // -----------------------------------------------------------------------
+    let overviewLoaded  = false;
+    let approvalsLoaded = false;
+    let callsLoaded     = false;
+    let campaignsLoaded = false;
+    let usersLoaded     = false;
+
+    document.addEventListener('tab-change', (e: Event) => {
+      const id = (e as CustomEvent).detail?.id as string;
+      document.querySelectorAll('.tab-panel').forEach(p => {
+        (p as HTMLElement).classList.toggle('hidden', p.id !== `panel-${id}`);
+      });
+      if (id === 'overview'  && !overviewLoaded)   loadOverview();
+      if (id === 'approvals' && !approvalsLoaded)  loadApprovals();
+      if (id === 'calls'     && !callsLoaded)      loadCalls();
+      if (id === 'campaigns' && !campaignsLoaded)  loadCampaigns();
+      if (id === 'users'     && !usersLoaded)      loadUsers();
+    });
+
+    // Load overview on page init
+    loadOverview();
+
+    // -----------------------------------------------------------------------
+    // Overview
+    // -----------------------------------------------------------------------
+    async function loadOverview() {
+      overviewLoaded = true;
+      const activityList  = document.getElementById('activity-list')!;
+      const activityCount = document.getElementById('activity-count')!;
+      try {
+        const res  = await fetch('/api/admin/overview');
+        if (!res.ok) throw new Error(String(res.status));
+        const data = await res.json();
+
+        const setEl = (id: string, val: string | number) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = String(val);
+        };
+        setEl('stat-users',     data.total_users     ?? 0);
+        setEl('stat-calls',     data.total_calls     ?? 0);
+        setEl('stat-campaigns', data.total_campaigns ?? 0);
+        setEl('stat-active',    data.active_today    ?? 0);
+
+        // Update the Approvals tab label with a pending-count badge
+        const pendingCount = Number(data.pending_added_count ?? 0);
+        const approvalsBtn = document.querySelector<HTMLButtonElement>('[data-tab="approvals"] span:first-child');
+        if (approvalsBtn) {
+          approvalsBtn.innerHTML = pendingCount > 0
+            ? `Approvals <span class="ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-signal-danger text-white">${pendingCount}</span>`
+            : 'Approvals';
+        }
+
+        const activity: any[] = data.recent_activity ?? [];
+        activityCount.textContent = `${activity.length} events`;
+
+        if (!activity.length) {
+          activityList.innerHTML = '<li class="py-8 font-mono text-xs text-ink-muted">// no activity yet</li>';
+          return;
+        }
+
+        const typeLabel = (type: string) => {
+          if (type === 'call_analysis') return 'Call';
+          if (type === 'campaign')      return 'Campaign';
+          return type;
+        };
+
+        activityList.innerHTML = activity.map(item => `
+          <li>
+            <div class="grid grid-cols-[140px_80px_1fr_80px] gap-4 items-start py-4 border-b border-rule-subtle">
+              <span class="font-mono text-[11px] tabular text-ink-muted pt-0.5 truncate">${esc(item.timestamp)}</span>
+              <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted pt-0.5">${esc(item.username)}</span>
+              <div class="min-w-0">
+                <p class="text-sm text-ink-primary truncate">${esc(item.title)}</p>
+                ${item.meta ? `<p class="font-mono text-[11px] text-ink-muted mt-0.5">${esc(item.meta)}</p>` : ''}
+              </div>
+              <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted pt-0.5 text-right">${esc(typeLabel(item.type))}</span>
+            </div>
+          </li>`).join('');
+      } catch {
+        activityList.innerHTML = '<li class="py-8 font-mono text-xs text-signal-danger">// could not load — is the backend running?</li>';
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Approvals (Added Knowledge — Pillar 3)
+    // -----------------------------------------------------------------------
+    async function loadApprovals() {
+      approvalsLoaded = true;
+      const list  = document.getElementById('approvals-list')!;
+      const count = document.getElementById('approvals-count')!;
+      try {
+        const res = await fetch('/api/admin/added/pending');
+        if (!res.ok) throw new Error(String(res.status));
+        const items: any[] = await res.json();
+        count.textContent = `${items.length} pending`;
+
+        if (!items.length) {
+          list.innerHTML = '<li class="py-8 font-mono text-xs text-ink-muted">// no pending submissions</li>';
+          return;
+        }
+
+        list.innerHTML = items.map(it => {
+          const entryId = String(it.id || '').slice(0, 8);
+          const date = String(it.created_at || '').slice(0, 19).replace('T', ' ');
+          return `
+            <li data-entry="${esc(entryId)}">
+              <div class="py-5 border-b border-rule-subtle">
+                <div class="flex items-baseline justify-between mb-2">
+                  <p class="text-sm font-semibold text-ink-primary">${esc(it.title || 'Untitled')}</p>
+                  <span class="font-mono text-[11px] tabular text-ink-muted">${esc(date)}</span>
+                </div>
+                ${it.description ? `<p class="text-sm text-ink-secondary mb-3">${esc(it.description)}</p>` : ''}
+                <dl class="grid grid-cols-[120px_1fr] gap-y-1 gap-x-4 text-sm mb-3">
+                  <dt class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Submitted by</dt>
+                  <dd class="text-ink-secondary">${esc(it.submitted_by || '')}</dd>
+                  <dt class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Topic</dt>
+                  <dd class="text-ink-secondary">${esc(it.topic || '')}</dd>
+                  ${it.what_owl_said ? `<dt class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Owl said</dt><dd class="text-ink-secondary">${esc(it.what_owl_said)}</dd>` : ''}
+                  ${it.user_correction ? `<dt class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Correction</dt><dd class="text-ink-secondary">${esc(it.user_correction)}</dd>` : ''}
+                  ${it.suggested_source ? `<dt class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Source</dt><dd class="text-ink-secondary">${esc(it.suggested_source)}</dd>` : ''}
+                </dl>
+                <div class="flex items-center gap-3">
+                  <input type="text" placeholder="optional review notes…" class="approval-notes flex-1 bg-transparent border border-rule-subtle rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-accent" />
+                  <button type="button" class="approval-approve px-3 py-1.5 text-xs font-mono bg-accent text-white rounded hover:opacity-90">Approve</button>
+                  <button type="button" class="approval-reject px-3 py-1.5 text-xs font-mono border border-rule-strong rounded hover:bg-surface-1">Reject</button>
+                </div>
+              </div>
+            </li>`;
+        }).join('');
+
+        // Wire approve/reject buttons
+        list.querySelectorAll<HTMLLIElement>('li[data-entry]').forEach(li => {
+          const entryId = li.dataset.entry!;
+          const notesEl = li.querySelector<HTMLInputElement>('.approval-notes')!;
+          const onAction = async (action: 'approve' | 'reject') => {
+            try {
+              const r = await fetch(`/api/admin/added/${encodeURIComponent(entryId)}/${action}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes: notesEl.value.trim() }),
+              });
+              if (!r.ok) throw new Error(String(r.status));
+              li.remove();
+              const remaining = list.querySelectorAll('li[data-entry]').length;
+              count.textContent = `${remaining} pending`;
+              if (!remaining) {
+                list.innerHTML = '<li class="py-8 font-mono text-xs text-ink-muted">// no pending submissions</li>';
+              }
+              // Refresh overview badge
+              overviewLoaded = false;
+              loadOverview();
+            } catch (e) {
+              alert(`Failed to ${action}: ${e}`);
+            }
+          };
+          li.querySelector<HTMLButtonElement>('.approval-approve')!.addEventListener('click', () => onAction('approve'));
+          li.querySelector<HTMLButtonElement>('.approval-reject')!.addEventListener('click', () => onAction('reject'));
+        });
+      } catch {
+        list.innerHTML = '<li class="py-8 font-mono text-xs text-signal-danger">// could not load</li>';
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Calls
+    // -----------------------------------------------------------------------
+    let allCalls: any[] = [];
+
+    async function loadCalls() {
+      callsLoaded = true;
+      const callsList  = document.getElementById('calls-list')!;
+      const callsCount = document.getElementById('calls-count')!;
+      try {
+        const res = await fetch('/api/admin/calls');
+        if (!res.ok) throw new Error(String(res.status));
+        allCalls = await res.json();
+        renderCalls(allCalls);
+        callsCount.textContent = `${allCalls.length} total`;
+
+        document.getElementById('calls-search')?.addEventListener('input', (e) => {
+          const q = (e.target as HTMLInputElement).value.trim().toLowerCase();
+          const filtered = q
+            ? allCalls.filter(c =>
+                (c.title || '').toLowerCase().includes(q) ||
+                (c.username || '').toLowerCase().includes(q) ||
+                (c.summary || '').toLowerCase().includes(q)
+              )
+            : allCalls;
+          callsCount.textContent = `${filtered.length} of ${allCalls.length}`;
+          renderCalls(filtered);
+        });
+      } catch {
+        callsList.innerHTML = '<li class="py-8 font-mono text-xs text-signal-danger">// could not load</li>';
+      }
+    }
+
+    function renderCalls(calls: any[]) {
+      const callsList = document.getElementById('calls-list')!;
+      if (!calls.length) {
+        callsList.innerHTML = '<li class="py-8 font-mono text-xs text-ink-muted">// no calls yet</li>';
+        return;
+      }
+      callsList.innerHTML = calls.map(c => `
+        <li>
+          <div class="group relative grid grid-cols-[140px_64px_1fr_16px] gap-4 items-start py-5 border-b border-rule-subtle hover:bg-surface-1 transition-colors -mx-4 px-4">
+            <a href="/admin/calls/call?id=${encodeURIComponent(c.id)}" class="absolute inset-0" aria-label="${esc(c.title)}"></a>
+            <span class="font-mono text-[11px] tabular text-ink-muted pt-1 truncate">${esc(c.timestamp)}</span>
+            <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted pt-1">${esc(c.username)}</span>
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-ink-primary group-hover:text-accent transition-colors truncate">${esc(c.title)}</p>
+              ${c.summary ? `<p class="text-sm text-ink-secondary mt-1 line-clamp-2">${esc(c.summary)}</p>` : ''}
+              ${c.product_fit?.length
+                ? `<p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mt-2">${esc(c.product_fit.slice(0, 2).join(' · '))}</p>`
+                : ''}
+            </div>
+            <span class="font-mono text-sm text-ink-muted group-hover:text-accent pt-1 transition-colors">→</span>
+          </div>
+        </li>`).join('');
+    }
+
+    // -----------------------------------------------------------------------
+    // Campaigns
+    // -----------------------------------------------------------------------
+    async function loadCampaigns() {
+      campaignsLoaded = true;
+      const campaignsList  = document.getElementById('campaigns-list')!;
+      const campaignsCount = document.getElementById('campaigns-count')!;
+      try {
+        const res  = await fetch('/api/admin/campaigns');
+        if (!res.ok) throw new Error(String(res.status));
+        const data: any[] = await res.json();
+        campaignsCount.textContent = `${data.length} total`;
+
+        if (!data.length) {
+          campaignsList.innerHTML = '<li class="py-8 font-mono text-xs text-ink-muted">// no campaigns yet</li>';
+          return;
+        }
+
+        campaignsList.innerHTML = data.map(c => `
+          <li>
+            <div class="grid grid-cols-[140px_64px_1fr_64px_48px] gap-4 items-start py-5 border-b border-rule-subtle hover:bg-surface-1 transition-colors -mx-4 px-4">
+              <span class="font-mono text-[11px] tabular text-ink-muted pt-1 truncate">${esc(c.updated_at || c.created_at)}</span>
+              <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted pt-1">${esc(c.username)}</span>
+              <div class="min-w-0">
+                <h3 class="text-sm font-semibold text-ink-primary truncate">${esc(c.title || 'Untitled')}</h3>
+                ${(c.company || c.signal_strength)
+                  ? `<p class="font-mono text-[11px] text-ink-muted mt-1">${esc([c.company, c.signal_strength].filter(Boolean).join(' · '))}</p>`
+                  : ''}
+              </div>
+              <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted pt-1">${esc(c.status || 'draft')}</span>
+              <span class="font-mono text-[11px] tabular text-ink-muted pt-1 text-right">Step ${c.current_step ?? 0}</span>
+            </div>
+          </li>`).join('');
+      } catch {
+        campaignsList.innerHTML = '<li class="py-8 font-mono text-xs text-signal-danger">// could not load</li>';
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Users
+    // -----------------------------------------------------------------------
+    async function loadUsers() {
+      usersLoaded = true;
+      const usersList  = document.getElementById('users-list')!;
+      const usersCount = document.getElementById('users-count')!;
+      try {
+        const res  = await fetch('/api/admin/users');
+        if (!res.ok) throw new Error(String(res.status));
+        const data: any[] = await res.json();
+        usersCount.textContent = `${data.length} total`;
+
+        if (!data.length) {
+          usersList.innerHTML = '<li class="py-8 font-mono text-xs text-ink-muted">// no users found</li>';
+          return;
+        }
+
+        usersList.innerHTML = data.map(u => `
+          <li>
+            <div class="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-6 items-center py-4 border-b border-rule-subtle hover:bg-surface-1 transition-colors -mx-4 px-4">
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-ink-primary">${esc(u.name || u.username)}</p>
+                <p class="font-mono text-[11px] text-ink-muted">${esc(u.role || '')}</p>
+              </div>
+              <span class="font-mono text-[11px] uppercase tracking-label w-14 ${u.access === 'admin' ? 'text-accent' : 'text-ink-muted'}">${esc(u.access)}</span>
+              <span class="font-mono text-[11px] text-ink-muted w-32 truncate">${esc((u.agents || []).join(', '))}</span>
+              <span class="font-mono text-[11px] tabular text-ink-primary w-10 text-right">${u.call_count ?? 0}</span>
+              <span class="font-mono text-[11px] tabular text-ink-primary w-20 text-right">${u.campaign_count ?? 0}</span>
+              <span class="font-mono text-[11px] tabular text-ink-muted w-36 text-right">${esc(u.last_active || '—')}</span>
+            </div>
+          </li>`).join('');
+      } catch {
+        usersList.innerHTML = '<li class="py-8 font-mono text-xs text-signal-danger">// could not load</li>';
+      }
+    }
+  </script>
+</DashboardLayout>

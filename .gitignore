@@ -2,8 +2,11 @@
 # SECRETS & CREDENTIALS — never commit these
 # ============================================================
 backend/.env
-backend/agents/users.json
 backend/agents/lead/data/google_tokens.json
+# Per-environment bcrypt password hashes. Written by `python backend/seed_users.py`
+# into ${DATA_ROOT}/agents/users_credentials.json. Never committed.
+backend/agents/users_credentials.json
+agents/users_credentials.json
 .env
 .env.*
 !.env.example
@@ -68,20 +71,34 @@ node_modules/
 .pnp.*
 
 # ============================================================
-# VAULT — contains proprietary call/campaign knowledge data
+# VAULT & AGENT DATA — operational CONTENT, never in this public mirror
+# (the architecture/structure travels; the content does not).
+# Directory skeletons and generic docs are kept via the negations below.
 # ============================================================
-backend/vault/
-
-# ============================================================
-# AGENT RUNTIME DATA — sessions, learnings, campaign & lead data
-# ============================================================
-backend/agents/*/data/sessions.json
+# Knowledge vault — entities, glossary, research, calls, personas, etc.
+backend/vault/company/
+backend/vault/dynamic/
+backend/vault/added/
+backend/vault/*.md
+backend/vault/.obsidian/
+# Per-agent runtime state and per-user learnings
+backend/agents/*/data/*.json
 backend/agents/*/data/learnings/
-backend/agents/calls/knowledge/_user/
-backend/agents/calls/knowledge/timebeat-*.md
-backend/agents/lead/data/campaigns.json
-backend/agents/lead/data/leads.json
-backend/agents/lead/knowledge/
+backend/agents/*/data/transcripts/
+backend/agents/*/data/_sandbox/
+backend/agents/*/knowledge/_user/
+backend/agents/*/knowledge/timebeat-*.md
+# User profiles (real roster) — regenerate locally via seed_users.py --rewrite-profiles
+backend/agents/users.json
+agents/users.json
+# Keep directory skeletons and generic docs so the structure is reproducible
+!**/.gitkeep
+!**/README.md
+# Stray backups inside data dirs only — main *.bak rule below covers most
+backend/agents/*/data/*.bak
+# SQLite write-ahead-log sidecars are transient
+*.db-wal
+*.db-shm
 
 # ============================================================
 # MEDIA & UPLOADS (large/generated files)

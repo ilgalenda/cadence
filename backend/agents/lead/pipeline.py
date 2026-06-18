@@ -7,27 +7,21 @@ import time
 
 import anthropic
 
-from agents.lead import prompts
+from agents.lead import knowledge, name_sources, prompts, scoring
 from agents.lead.owl import OwlRefiner
-
-XRAY_MODEL = "claude-sonnet-4-6"
-XRAY_MAX_RESULTS = 10
+from agents.shared.jsonparse import parse_json as _parse_json
 
 _RETRY_DELAYS = [10, 30, 60]  # seconds between retries on 429
 
-# One heavy pipeline operation at a time across all users.
-# Keeps concurrent token spend within the org TPM limit.
+# One heavy pipeline operation at a time across all users, to keep concurrent
+# token spend within the org TPM limit.
+# KNOWN LIMITATION: this is a single global slot, so a long generate_xray
+# (multiple sequential web_search rounds, ~30-60s) blocks every other user's
+# unrelated signal/sequence calls (head-of-line blocking). Replacing it
+# correctly needs a token-bucket limiter keyed on actual token spend, not a
+# per-operation semaphore (more slots would blow the TPM ceiling) — tracked as
+# separate work.
 _PIPELINE_SEMAPHORE = threading.Semaphore(1)
-
-
-def _parse_json(raw: str):
-    raw = raw.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip("` \n")
-    return json.loads(raw)
 
 
 def _claude_call(user_prompt: str, max_tokens: int, image_b64: str | None = None, image_media_type: str | None = None):
@@ -78,10 +72,26 @@ def generate_signal(username: str, text: str | None, structured: dict | None, im
 
         lead_blob = json.dumps({"text": text, "structured": structured}, indent=2)
         refined = OwlRefiner(username).refine("signal", claude_out, {"lead_blob": lead_blob})
+        owl_applied = refined != claude_out
+        # Refinement may, in rare cases, return non-dict JSON; the score keys
+        # below require a mutable dict, so fall back to the pass-1 output.
+        if not isinstance(refined, dict):
+            refined = claude_out if isinstance(claude_out, dict) else {}
+            owl_applied = False
+
+        # Deterministic behavioural score from Leadinfo page-visit data. Computed
+        # here (not by the model) so it is reproducible and tunable. Attached to
+        # the signal analysis under stable keys for the UI to surface.
+        score = scoring.score_lead(text, structured, refined)
+        refined["lead_score"] = score["score"]
+        refined["lead_grade"] = score["grade"]
+        refined["score_breakdown"] = score["breakdown"]
+        refined["score_signals"] = score["signals"]
+
         return {
             "final": refined,
             "claude_raw": claude_out,
-            "owl_applied": refined != claude_out,
+            "owl_applied": owl_applied,
         }
 
 
@@ -177,121 +187,76 @@ def generate_abm_identification(username: str, analysis: dict, config: dict) -> 
         }
 
 
-def _extract_text_blocks(response) -> str:
-    """Concatenate all text blocks from a tool-using assistant response."""
-    parts = []
-    for block in getattr(response, "content", []) or []:
-        if getattr(block, "type", None) == "text":
-            text = getattr(block, "text", "") or ""
-            if text.strip():
-                parts.append(text)
-    return "\n".join(parts).strip()
+def generate_xray(
+    username: str,
+    signal_final: dict | None,
+    structured: dict | None,
+    focus_personas: list[str] | None = None,
+) -> dict:
+    """Run X-Ray prospect discovery across every enabled name source.
 
-
-def _parse_json_array(raw: str):
-    """Best-effort JSON-array extraction. Falls back to slicing the first [...] span."""
-    try:
-        return _parse_json(raw)
-    except Exception:
-        pass
-    if "[" in raw and "]" in raw:
-        start = raw.index("[")
-        end = raw.rindex("]") + 1
-        try:
-            return json.loads(raw[start:end])
-        except Exception:
-            pass
-    raise ValueError("could not parse JSON array from model output")
-
-
-def _normalise_xray_row(row: dict) -> dict | None:
-    if not isinstance(row, dict):
-        return None
-    full_name = (row.get("full_name") or "").strip()
-    linkedin_url = (row.get("linkedin_url") or "").strip()
-    match_reason = (row.get("match_reason") or "").strip()
-    if not full_name or not match_reason:
-        return None
-    path = (row.get("recommended_path") or "").strip().lower()
-    if path not in {"linkedin_direct", "email_enrichment", "campaign_context"}:
-        path = "campaign_context"
-    confidence = (row.get("confidence") or "").strip().lower()
-    if confidence not in {"high", "medium", "low"}:
-        confidence = "low"
-    return {
-        "full_name": full_name,
-        "job_title": (row.get("job_title") or "").strip(),
-        "company": (row.get("company") or "").strip(),
-        "linkedin_url": linkedin_url,
-        "confidence": confidence,
-        "recommended_path": path,
-        "match_reason": match_reason,
-        "source_query": (row.get("source_query") or "").strip(),
-    }
-
-
-def generate_xray(username: str, signal_final: dict | None, structured: dict | None) -> dict:
-    """Run the X-Ray sub-agent: web_search-backed prospect discovery.
+    Each provider (web_search today; gtm.ai/ZoomInfo later) runs independently;
+    their results are merged and deduped by LinkedIn URL. The search is grounded
+    in the team's customer-persona file, optionally narrowed to ``focus_personas``.
 
     Returns: {results: [...], grouped: {linkedin_direct, email_enrichment, campaign_context}, raw, error}
     """
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        return {"results": [], "grouped": _empty_buckets(), "raw": "", "error": "missing_api_key"}
-
     payload = prompts.xray_user_payload(signal_final, structured)
     if not payload.get("company_name"):
         return {"results": [], "grouped": _empty_buckets(), "raw": "", "error": "missing_company"}
 
-    system_prompt = prompts.XRAY_SYSTEM_PROMPT
+    personas = knowledge.load_customer_personas()
+    system_prompt = prompts.xray_system_prompt(personas, focus_personas)
+    user_message = prompts.xray_user_message(payload)
+
+    sources = name_sources.enabled_sources()
+    if not sources:
+        return {"results": [], "grouped": _empty_buckets(), "raw": "", "error": "no_enabled_sources"}
+
+    merged: list[dict] = []
+    seen_urls: set[str] = set()
+    raws: list[str] = []
+    errors: list[str] = []
 
     with _PIPELINE_SEMAPHORE:
-        try:
-            client = anthropic.Anthropic(api_key=api_key)
-            response = client.messages.create(
-                model=XRAY_MODEL,
-                max_tokens=4096,
-                system=system_prompt,
-                tools=[{
-                    "type": "web_search_20250305",
-                    "name": "web_search",
-                    "max_uses": 8,
-                }],
-                tool_choice={"type": "any"},
-                messages=[{"role": "user", "content": prompts.xray_user_message(payload)}],
-            )
-        except Exception as e:
-            return {"results": [], "grouped": _empty_buckets(), "raw": "", "error": f"api_error: {e}"}
+        for src in sources:
+            out = src.discover(system_prompt, user_message)
+            if out.get("raw"):
+                raws.append(f"[{src.name}]\n{out['raw']}")
+            if out.get("error"):
+                errors.append(f"{src.name}: {out['error']}")
+            for row in out.get("results", []):
+                url_key = row["linkedin_url"].lower()
+                if url_key and url_key in seen_urls:
+                    continue
+                if url_key:
+                    seen_urls.add(url_key)
+                merged.append(row)
 
-    raw_text = _extract_text_blocks(response)
-    try:
-        parsed = _parse_json_array(raw_text)
-    except Exception as e:
-        return {"results": [], "grouped": _empty_buckets(), "raw": raw_text, "error": f"parse_failed: {e}"}
-
-    if not isinstance(parsed, list):
-        return {"results": [], "grouped": _empty_buckets(), "raw": raw_text, "error": "not_an_array"}
-
-    seen_urls: set[str] = set()
-    cleaned: list[dict] = []
-    for row in parsed:
-        norm = _normalise_xray_row(row)
-        if not norm:
-            continue
-        url_key = norm["linkedin_url"].lower()
-        if url_key and url_key in seen_urls:
-            continue
-        if url_key:
-            seen_urls.add(url_key)
-        cleaned.append(norm)
-        if len(cleaned) >= XRAY_MAX_RESULTS:
-            break
+    # Rank high → low intent, then cap. Path tier dominates (a confirmed LinkedIn
+    # profile ready for outreach beats a context-only mention), confidence breaks ties.
+    merged.sort(key=_xray_intent_score, reverse=True)
+    merged = merged[:name_sources.XRAY_MAX_RESULTS]
 
     grouped = _empty_buckets()
-    for row in cleaned:
+    for row in merged:
+        row["intent_score"] = _xray_intent_score(row)
         grouped[row["recommended_path"]].append(row)
 
-    return {"results": cleaned, "grouped": grouped, "raw": raw_text, "error": None}
+    # Only surface an error when no source produced any usable result.
+    error = None if merged else ("; ".join(errors) or "no_results")
+    return {"results": merged, "grouped": grouped, "raw": "\n\n".join(raws), "error": error}
+
+
+_XRAY_PATH_WEIGHT = {"linkedin_direct": 3, "email_enrichment": 2, "campaign_context": 1}
+_XRAY_CONF_WEIGHT = {"high": 3, "medium": 2, "low": 1}
+
+
+def _xray_intent_score(row: dict) -> int:
+    """Rank a prospect by outreach intent: path tier (×10) then confidence."""
+    path = _XRAY_PATH_WEIGHT.get(row.get("recommended_path"), 1)
+    conf = _XRAY_CONF_WEIGHT.get(row.get("confidence"), 1)
+    return path * 10 + conf
 
 
 def _empty_buckets() -> dict:

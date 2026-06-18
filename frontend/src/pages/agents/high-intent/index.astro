@@ -1,0 +1,147 @@
+---
+import AgentLayout from '../../../layouts/AgentLayout.astro';
+import PageHeader from '../../../components/PageHeader.astro';
+import StatusDot from '../../../components/StatusDot.astro';
+import { HI_AGENT_NAME, HI_AGENT_TAGLINE, HI_NAV, SIGNAL_TYPE_LABELS, SIGNAL_TYPE_ICONS } from '../../../agents/high-intent/config';
+---
+<AgentLayout title="Overview" agentName={HI_AGENT_NAME} agentTagline={HI_AGENT_TAGLINE} navItems={HI_NAV}>
+  <div class="px-10 py-12 max-w-5xl">
+
+    <PageHeader
+      label="Workspace · High-Intent · Test"
+      heading="High-Intent Agent."
+      lead="Detect LinkedIn intent signals, enrich contacts, and compose expert Timebeat outreach — powered by Opus 4.7 detection and Sonnet 4.6 composition."
+    >
+      <StatusDot slot="meta" variant="warning" label="Status · Test / Sandbox" />
+    </PageHeader>
+
+    <div class="mb-4 px-4 py-3 bg-surface-1 border border-rule-subtle rounded font-mono text-[11px] text-ink-muted">
+      ⚠ This agent runs in sandbox mode. No data reaches the shared Vault. Admin access only.
+    </div>
+
+    <div class="grid grid-cols-4 border-y border-rule-strong mb-14">
+      <div class="px-5 py-5 border-r border-rule-subtle">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Signals detected</p>
+        <p class="font-mono text-2xl tabular text-ink-primary" id="stat-total">—</p>
+      </div>
+      <div class="px-5 py-5 border-r border-rule-subtle">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">In queue</p>
+        <p class="font-mono text-2xl tabular text-ink-primary" id="stat-queue">—</p>
+      </div>
+      <div class="px-5 py-5 border-r border-rule-subtle">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Messages sent</p>
+        <p class="font-mono text-2xl tabular text-ink-primary" id="stat-sent">—</p>
+      </div>
+      <div class="px-5 py-5">
+        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Active agents</p>
+        <p class="font-mono text-2xl tabular text-ink-primary" id="stat-agents">—</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-14">
+
+      <section>
+        <div class="flex items-baseline justify-between pb-3 mb-2 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Signal agents</h2>
+          <a href="/agents/high-intent/setup" class="font-mono text-[11px] uppercase tracking-label text-accent hover:underline">Configure →</a>
+        </div>
+        <ul id="agent-list">
+          <li class="py-4 font-mono text-xs text-ink-muted">// loading…</li>
+        </ul>
+      </section>
+
+      <section>
+        <div class="flex items-baseline justify-between pb-3 mb-2 border-b border-rule-strong">
+          <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Queue</h2>
+          <a href="/agents/high-intent/queue" class="font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">View all →</a>
+        </div>
+        <ul id="recent-queue">
+          <li class="py-4 font-mono text-xs text-ink-muted">// loading…</li>
+        </ul>
+      </section>
+
+    </div>
+  </div>
+
+  <script>
+    const SIGNAL_TYPE_LABELS: Record<string, string> = {
+      competitor_engagement: 'Competitor Engagement',
+      influencer_engagement: 'Influencer Engagement',
+      job_change: 'Recently Changed Roles',
+      funding: 'Recently Funded',
+      top_icp: 'Top 5% ICP Activity',
+      company_engagement: 'Engaged with Timebeat',
+    };
+    const SIGNAL_TYPES = Object.keys(SIGNAL_TYPE_LABELS);
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/high-intent/stats');
+        const d = await res.json();
+        const fmt = (n: number) => String(n ?? 0).padStart(2, '0');
+        document.getElementById('stat-total')!.textContent = fmt(d.signals_total);
+        document.getElementById('stat-queue')!.textContent = fmt(d.queue_depth);
+        document.getElementById('stat-sent')!.textContent = fmt(d.messages_sent);
+      } catch {}
+    }
+
+    async function loadAgents() {
+      const el = document.getElementById('agent-list')!;
+      try {
+        const res = await fetch('/api/high-intent/icp');
+        const configs = await res.json();
+        const statsRes = await fetch('/api/high-intent/stats');
+        const stats = await statsRes.json();
+
+        const activeCount = SIGNAL_TYPES.filter(t => configs[t] && Object.keys(configs[t]).length > 0).length;
+        document.getElementById('stat-agents')!.textContent = String(activeCount).padStart(2, '0');
+
+        el.innerHTML = SIGNAL_TYPES.map(t => {
+          const configured = configs[t] && Object.keys(configs[t]).length > 0;
+          const count = (stats.by_type || {})[t] || 0;
+          return `<li class="border-b border-rule-subtle last:border-0">
+            <a href="/agents/high-intent/setup?type=${t}" class="flex items-center justify-between py-3 hover:text-accent transition-colors group">
+              <div>
+                <p class="text-sm text-ink-primary group-hover:text-accent">${SIGNAL_TYPE_LABELS[t]}</p>
+                <p class="font-mono text-[11px] text-ink-muted mt-0.5">${count} signals detected</p>
+              </div>
+              <span class="font-mono text-[10px] px-2 py-0.5 rounded ${configured ? 'bg-signal-success/10 text-signal-success' : 'bg-surface-2 text-ink-muted'}">${configured ? 'configured' : 'not set'}</span>
+            </a>
+          </li>`;
+        }).join('');
+      } catch {
+        el.innerHTML = '<li class="py-4 font-mono text-xs text-signal-danger">// could not load agent status</li>';
+      }
+    }
+
+    async function loadQueue() {
+      const el = document.getElementById('recent-queue')!;
+      try {
+        const res = await fetch('/api/high-intent/queue');
+        const items = await res.json();
+        if (!items.length) {
+          el.innerHTML = '<li class="py-4 font-mono text-xs text-ink-muted">// queue is empty</li>';
+          return;
+        }
+        el.innerHTML = items.slice(0, 5).map((s: any) => {
+          const name = s.profile?.full_name || 'Unknown';
+          const co = s.profile?.company || '';
+          const strength = s.signal_strength || 'cold';
+          const colours: Record<string, string> = { hot: 'text-signal-danger', warm: 'text-signal-warning', cold: 'text-ink-muted' };
+          return `<li class="border-b border-rule-subtle last:border-0">
+            <a href="/agents/high-intent/compose?id=${s.id}" class="block py-3 hover:text-accent transition-colors">
+              <p class="font-mono text-[10px] uppercase tracking-label ${colours[strength] || 'text-ink-muted'} mb-1">${strength.toUpperCase()} · ${SIGNAL_TYPE_LABELS[s.signal_type] || s.signal_type}</p>
+              <p class="text-sm text-ink-primary truncate">${name}${co ? ` · ${co}` : ''}</p>
+            </a>
+          </li>`;
+        }).join('');
+      } catch {
+        el.innerHTML = '<li class="py-4 font-mono text-xs text-signal-danger">// could not load queue</li>';
+      }
+    }
+
+    loadStats();
+    loadAgents();
+    loadQueue();
+  </script>
+</AgentLayout>

@@ -1,39 +1,52 @@
 import json
 import os
 import tempfile
+import traceback
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 import aiofiles
 import anthropic
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from agents.shared.vault import load_vault_for_context, write_glossary_term, write_learning
-from auth import require_admin, require_authed
+from agents.shared.vault import load_vault_for_analysis, load_vault_for_context, load_vault_for_product_rec, load_vault_for_session, log_cache_usage, write_glossary_term, write_learning
+from auth import is_sandbox, require_admin, require_authed
+from paths import calls_data, calls_user_kb
 
 # ---------------------------------------------------------------------------
 # Paths (scoped to the Calls Agent)
 # ---------------------------------------------------------------------------
-AGENT_DIR = Path(__file__).parent
-KNOWLEDGE_DIR = AGENT_DIR / "knowledge"
-USER_KNOWLEDGE_DIR = KNOWLEDGE_DIR / "_user"
-DATA_DIR = AGENT_DIR / "data"
+AGENT_DIR = Path(__file__).parent  # retained for static-knowledge reads only
+DATA_DIR = calls_data()
 LEARNINGS_DIR = DATA_DIR / "learnings"
-DATA_DIR.mkdir(exist_ok=True)
-LEARNINGS_DIR.mkdir(exist_ok=True)
-USER_KNOWLEDGE_DIR.mkdir(exist_ok=True)
-SESSIONS_FILE = DATA_DIR / "sessions.json"
+USER_KNOWLEDGE_DIR = calls_user_kb()
+KNOWLEDGE_DIR = USER_KNOWLEDGE_DIR.parent  # DATA_ROOT/agents/calls/knowledge
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+LEARNINGS_DIR.mkdir(parents=True, exist_ok=True)
+USER_KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def user_learnings_json(username: str) -> Path:
-    return LEARNINGS_DIR / f"{username}.json"
+def _sessions_file(sandbox: bool) -> Path:
+    if sandbox:
+        p = DATA_DIR / "_sandbox"
+        p.mkdir(exist_ok=True)
+        return p / "sessions.json"
+    return DATA_DIR / "sessions.json"
 
 
-def user_learnings_md(username: str) -> Path:
-    d = USER_KNOWLEDGE_DIR / username
+def user_learnings_json(username: str, sandbox: bool = False) -> Path:
+    base = DATA_DIR / "_sandbox" / "learnings" if sandbox else LEARNINGS_DIR
+    base.mkdir(parents=True, exist_ok=True)
+    return base / f"{username}.json"
+
+
+def user_learnings_md(username: str, sandbox: bool = False) -> Path:
+    base = KNOWLEDGE_DIR / "_sandbox" if sandbox else USER_KNOWLEDGE_DIR
+    d = base / username
     d.mkdir(parents=True, exist_ok=True)
     return d / "learnings-auto.md"
 
@@ -131,50 +144,93 @@ def load_knowledge(_username: str) -> str:
     return load_vault_for_context()
 
 
-def get_system_prompt(user: dict) -> str:
-    name = user.get("name") or user.get("username", "the user").split()[0]
-    first_name = name.split()[0]
-    role = user.get("role") or "Account Executive"
-    knowledge = load_knowledge(user["username"])
-    return f"""You are Owl — {first_name}'s personal Timebeat knowledge partner. {first_name} is a {role} at Timebeat. You have deep knowledge of Timebeat's products, protocols, terminology, and sales signals, and you grow smarter with every call {first_name} analyses.
+# Static persona block — identical across users so the prompt-cache prefix is stable.
+_CALLS_PERSONA = """You are Owl — Timebeat's in-house knowledge partner for the sales team.
+You have deep knowledge of Timebeat's products, protocols, terminology, and sales signals,
+and you grow smarter with every call the team analyses.
 
 Your role:
 - Answer questions as a knowledgeable Timebeat colleague would — concise, practical, and sales-aware
-- Help {first_name} understand technical concepts in the context of selling them
+- Help the user understand technical concepts in the context of selling them
 - Identify buying signals, objections, and product fit in conversations
-- When {first_name} asks about a term or product, give a clear definition AND the sales relevance
-- Always frame answers in a way that helps {first_name} succeed in sales conversations
+- When the user asks about a term or product, give a clear definition AND the sales relevance
+- Always frame answers in a way that helps the user succeed in sales conversations
 
 The knowledge base below includes the full Timebeat product and protocol KB, a glossary of terms that has grown from real field conversations, and team-wide learnings extracted from every call and campaign run by the whole team. Treat all of this as validated context and reference it when relevant.
 
 Here is the complete Timebeat knowledge base:
 
-{knowledge}"""
+"""
 
 
-def load_sessions() -> list[dict]:
-    if not SESSIONS_FILE.exists():
+def _calls_identity_tail(user: dict) -> str:
+    name = user.get("name") or user.get("username", "the user").split()[0]
+    first_name = name.split()[0]
+    role = user.get("role") or "Account Executive"
+    return f"\n\nYou are speaking with {first_name}, a {role} at Timebeat. Address them by name when natural."
+
+
+def get_system_blocks(user: dict) -> list[dict]:
+    """Return the Calls-agent system prompt as Anthropic content blocks.
+
+    Block 1: persona + vault — `cache_control: ephemeral` for prompt caching.
+    Block 2: per-user identity tail — varies per user, AFTER the cache breakpoint.
+    """
+    knowledge = load_vault_for_session(user["username"])
+    return [
+        {
+            "type": "text",
+            "text": _CALLS_PERSONA + knowledge,
+            "cache_control": {"type": "ephemeral"},
+        },
+        {"type": "text", "text": _calls_identity_tail(user)},
+    ]
+
+
+def get_analysis_system_blocks(user: dict, transcript: str) -> list[dict]:
+    """System blocks for the call analyser — a transcript-scoped vault.
+
+    Unlike `get_system_blocks`, the vault is built from only what this call
+    references (`load_vault_for_analysis`), cutting the prefix from ~130k to
+    ~30k tokens. NO `cache_control`: the scoped prefix differs per call, so
+    caching would only add the 1.25x write surcharge with no read benefit.
+    """
+    knowledge = load_vault_for_analysis(transcript)
+    return [
+        {"type": "text", "text": _CALLS_PERSONA + knowledge},
+        {"type": "text", "text": _calls_identity_tail(user)},
+    ]
+
+
+def get_system_prompt(user: dict) -> str:
+    """Flat-string form — kept for callers that don't yet use the block form."""
+    return "".join(b["text"] for b in get_system_blocks(user))
+
+
+def load_sessions(sandbox: bool = False) -> list[dict]:
+    f = _sessions_file(sandbox)
+    if not f.exists():
         return []
     try:
-        return json.loads(SESSIONS_FILE.read_text())
+        return json.loads(f.read_text())
     except Exception:
         return []
 
 
-def save_session(session: dict, username: str) -> None:
+def save_session(session: dict, username: str, sandbox: bool = False) -> None:
     session["username"] = username
-    sessions = load_sessions()
+    sessions = load_sessions(sandbox)
     sessions.insert(0, session)
     sessions = sessions[:200]  # keep last 200 across all users
-    SESSIONS_FILE.write_text(json.dumps(sessions, indent=2))
+    _sessions_file(sandbox).write_text(json.dumps(sessions, indent=2))
 
 
-def load_user_sessions(username: str) -> list[dict]:
-    return [s for s in load_sessions() if s.get("username") == username]
+def load_user_sessions(username: str, sandbox: bool = False) -> list[dict]:
+    return [s for s in load_sessions(sandbox) if s.get("username") == username]
 
 
-def load_learnings(username: str) -> list[dict]:
-    path = user_learnings_json(username)
+def load_learnings(username: str, sandbox: bool = False) -> list[dict]:
+    path = user_learnings_json(username, sandbox)
     if not path.exists():
         return []
     try:
@@ -183,11 +239,11 @@ def load_learnings(username: str) -> list[dict]:
         return []
 
 
-def save_learnings_from_analysis(call_id: str, call_title: str, extracts: list[dict], username: str) -> None:
+def save_learnings_from_analysis(call_id: str, call_title: str, extracts: list[dict], username: str, sandbox: bool = False) -> None:
     if not extracts:
         return
     try:
-        learnings = load_learnings(username)
+        learnings = load_learnings(username, sandbox)
         created_at = datetime.now(timezone.utc).isoformat()
         date_label = datetime.now(timezone.utc).strftime("%d %b %Y")
         new_rows = []
@@ -198,12 +254,18 @@ def save_learnings_from_analysis(call_id: str, call_title: str, extracts: list[d
             title = str(item.get("title", "")).strip()
             content = str(item.get("content", "")).strip()
             category = str(item.get("category", "")).strip() or "general"
+            description = str(item.get("description", "")).strip()
             if not title or not content:
                 continue
+            if not description:
+                # Fallback: first sentence of content, capped at 200 chars
+                first = content.split(".")[0].strip()
+                description = (first[:200] + ("…" if len(first) > 200 else "")) or title
             entry_id = uuid.uuid4().hex
             new_rows.append({
                 "id": entry_id,
                 "title": title,
+                "description": description,
                 "content": content,
                 "category": category,
                 "source_call_id": call_id,
@@ -212,29 +274,32 @@ def save_learnings_from_analysis(call_id: str, call_title: str, extracts: list[d
             })
             md_blocks.append(
                 f"## {title} — {date_label} (from: {call_title})\n"
+                f"*{description}*\n"
                 f"*Category: {category}*\n\n"
                 f"{content}\n"
             )
-            # Write to vault (shared across all users)
-            write_learning(
-                title=title,
-                content=content,
-                category=category,
-                agent="calls",
-                contributed_by=username,
-                source_id=call_id,
-                source_title=call_title,
-            )
+            if not sandbox:
+                # Write to shared vault only in live mode
+                write_learning(
+                    title=title,
+                    description=description,
+                    content=content,
+                    category=category,
+                    agent="calls",
+                    contributed_by=username,
+                    source_id=call_id,
+                    source_title=call_title,
+                )
         if not new_rows:
             return
         learnings = new_rows + learnings
-        user_learnings_json(username).write_text(json.dumps(learnings, indent=2))
+        user_learnings_json(username, sandbox).write_text(json.dumps(learnings, indent=2))
 
         header = (
             "<!-- Auto-generated by the Calls Agent. Each analysed call appends a section below. -->\n"
             f"# Learnings from {username}'s analysed calls\n\n"
         )
-        md_path = user_learnings_md(username)
+        md_path = user_learnings_md(username, sandbox)
         existing = ""
         if md_path.exists():
             existing = md_path.read_text(encoding="utf-8")
@@ -258,12 +323,14 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/chat/stream")
-async def chat_stream(req: ChatRequest, user: dict = Depends(require_authed)):
+async def chat_stream(req: ChatRequest, request: Request, user: dict = Depends(require_authed)):
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not set. Add it to your .env file.")
 
     client = anthropic.Anthropic(api_key=api_key)
+
+    sandbox = is_sandbox(request)
 
     async def generate():
         full_response = []
@@ -271,12 +338,13 @@ async def chat_stream(req: ChatRequest, user: dict = Depends(require_authed)):
             with client.messages.stream(
                 model="claude-sonnet-4-6",
                 max_tokens=1024,
-                system=get_system_prompt(user),
+                system=get_system_blocks(user),
                 messages=req.messages,
             ) as stream:
                 for text in stream.text_stream:
                     full_response.append(text)
                     yield f"data: {json.dumps({'text': text})}\n\n"
+                log_cache_usage("calls.chat", stream.get_final_message().usage)
             yield "data: [DONE]\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
@@ -289,7 +357,7 @@ async def chat_stream(req: ChatRequest, user: dict = Depends(require_authed)):
             "title": preview or "Chat",
             "type": "chat",
             "timestamp": datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M"),
-        }, user["username"])
+        }, user["username"], sandbox)
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
@@ -299,8 +367,10 @@ class AnalyzeRequest(BaseModel):
     title: str = "Call Analysis"
 
 
-@router.post("/analyze")
-async def analyze_call(req: AnalyzeRequest, user: dict = Depends(require_authed)):
+async def run_call_analysis(text: str, title: str, user: dict, sandbox: bool = False) -> tuple[str, dict]:
+    """Core analysis logic shared by the /analyze endpoint and the Meet sub-agent."""
+    import re as _re
+
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not set.")
@@ -311,28 +381,19 @@ async def analyze_call(req: AnalyzeRequest, user: dict = Depends(require_authed)
     prompt = f"""Analyse this call or meeting transcript from a Timebeat sales perspective.
 
 Transcript:
-{req.text}
+{text}
 
 Return ONLY a valid JSON object (no markdown, no explanation) with exactly these keys:
 {{
   "buying_signals": ["list of buying signal strings found in the conversation"],
-  "product_fit": ["list of Timebeat product names that match the conversation context"],
   "objections": ["list of objections, concerns, or hesitations raised"],
   "talking_points": ["list of suggested talking points or follow-up questions for {name}"],
   "concepts_mentioned": ["list of Timebeat concepts or protocols referenced"],
   "summary": "A 2-sentence summary of the conversation from a sales perspective",
-  "product_recommendation": {{
-    "primary": "name of the single best-fit Timebeat product",
-    "reasoning": "2-3 sentences explaining exactly why this product is the best fit based on what was said in the call",
-    "all_fits": [
-      {{"product": "product name", "fit": "high/medium/low", "reason": "one sentence why"}}
-    ]
-  }},
   "knowledge_extracts": [
-    {{"title": "short title", "content": "key learning or insight from this call that {name} should remember", "category": "technical/sales/objection/industry"}}
+    {{"title": "short title", "description": "one-sentence summary of this learning (used as the file's description/preview)", "content": "key learning or insight from this call that {name} should remember", "category": "technical/sales/objection/industry"}}
   ],
   "flashcards": [
-    {{"type": "flashcard", "question": "question about a concept from this call", "answer": "clear, concise answer"}},
     {{"type": "mcq", "question": "multiple choice question about the call or product", "options": ["option A", "option B", "option C", "option D"], "correct": 0, "explanation": "why this answer is correct"}}
   ],
   "new_terms": [
@@ -350,22 +411,20 @@ Return ONLY a valid JSON object (no markdown, no explanation) with exactly these
 
 Rules:
 - knowledge_extracts: extract 3-5 genuinely useful learning points (technical insights, sales patterns, industry context)
-- flashcards: create 4-6 items mixing flashcards and multiple choice. Cover product knowledge, protocols mentioned, sales concepts, and objection handling
+- flashcards: create 6 multiple-choice questions (type "mcq" only). Cover product knowledge, protocols mentioned, sales concepts, and objection handling
 - new_terms: extract technical terms, protocols, acronyms, or company-specific concepts mentioned in this call that are NOT already in the knowledge base. For each term write a developed, standalone explanation — definition, Timebeat relevance, and a practical sales note — so the entry is useful for recall without any surrounding context. Return empty array if nothing genuinely new. Max 5 entries.
-- product_recommendation.all_fits: list ALL products relevant to this call with fit score
 - If a category has no entries, return an empty array. Be specific and actionable."""
 
-    import re as _re
     response = None
     try:
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=8192,
-            system=get_system_prompt(user),
+            system=get_analysis_system_blocks(user, text),
             messages=[{"role": "user", "content": prompt}],
         )
+        log_cache_usage("calls.analysis", response.usage)
         raw = response.content[0].text.strip()
-        # Extract JSON from a fenced block first (handles any preamble text)
         fence_match = _re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, _re.DOTALL)
         if fence_match:
             raw = fence_match.group(1)
@@ -379,12 +438,10 @@ Rules:
         print(f"[calls] JSON parse failed: {e}\nRaw (first 500): {raw_text[:500]}")
         result = {
             "buying_signals": [],
-            "product_fit": [],
             "objections": [],
             "talking_points": [],
             "concepts_mentioned": [],
             "summary": raw_text,
-            "product_recommendation": {},
             "knowledge_extracts": [],
             "flashcards": [],
             "new_terms": [],
@@ -393,48 +450,63 @@ Rules:
     call_id = uuid.uuid4().hex
     session = {
         "id": call_id,
-        "title": req.title,
+        "title": title,
         "type": "call_analysis",
         "timestamp": datetime.now(timezone.utc).strftime("%d %b %Y, %H:%M"),
         "result": result,
+        # Stored so Owl can cross-reference / deep-dive the call on demand
+        # (analysis-first, transcript on demand). Not used by product rec.
+        "transcript": text,
     }
-    save_session(session, user["username"])
-    save_learnings_from_analysis(call_id, req.title, result.get("knowledge_extracts", []) or [], user["username"])
+    save_session(session, user["username"], sandbox)
+    save_learnings_from_analysis(call_id, title, result.get("knowledge_extracts", []) or [], user["username"], sandbox)
 
-    # Persist any new terms discovered during this call into the vault glossary
-    for term_entry in result.get("new_terms", []) or []:
-        if not isinstance(term_entry, dict):
-            continue
-        term = str(term_entry.get("term", "")).strip()
-        definition = str(term_entry.get("definition", "")).strip()
-        if not term or not definition:
-            continue
-        try:
-            # Build a structured, developed body from all richer fields Claude extracted
-            timebeat_context = str(term_entry.get("timebeat_context", "")).strip()
-            sales_note = str(term_entry.get("sales_note", "")).strip()
-            related_products = [p for p in (term_entry.get("related_products") or []) if isinstance(p, str) and p.strip()]
+    if not sandbox:
+        for term_entry in result.get("new_terms", []) or []:
+            if not isinstance(term_entry, dict):
+                continue
+            term = str(term_entry.get("term", "")).strip()
+            definition = str(term_entry.get("definition", "")).strip()
+            if not term or not definition:
+                continue
+            try:
+                timebeat_context = str(term_entry.get("timebeat_context", "")).strip()
+                sales_note = str(term_entry.get("sales_note", "")).strip()
+                related_products = [p for p in (term_entry.get("related_products") or []) if isinstance(p, str) and p.strip()]
 
-            body_parts = [definition]
-            if timebeat_context:
-                body_parts.append(f"**Timebeat context:** {timebeat_context}")
-            if sales_note:
-                body_parts.append(f"**Sales note:** {sales_note}")
-            if related_products:
-                links = ", ".join(f"[[{p.strip()}]]" for p in related_products)
-                body_parts.append(f"**Related products:** {links}")
+                body_parts = [definition]
+                if timebeat_context:
+                    body_parts.append(f"**Timebeat context:** {timebeat_context}")
+                if sales_note:
+                    body_parts.append(f"**Sales note:** {sales_note}")
+                if related_products:
+                    links = ", ".join(f"[[{p.strip()}]]" for p in related_products)
+                    body_parts.append(f"**Related products:** {links}")
 
-            write_glossary_term(
-                term=term,
-                definition="\n\n".join(body_parts),
-                source_id=call_id,
-                contributed_by=user["username"],
-                aliases=term_entry.get("aliases") or [],
-                tags=term_entry.get("tags") or [],
-            )
-        except Exception as e:
-            print(f"[calls] failed to write glossary term '{term}': {e}")
+                write_glossary_term(
+                    term=term,
+                    description=definition,
+                    body="\n\n".join(body_parts),
+                    source_id=call_id,
+                    contributed_by=user["username"],
+                    aliases=term_entry.get("aliases") or [],
+                    tags=term_entry.get("tags") or [],
+                )
+            except Exception as e:
+                print(f"[calls] failed to write glossary term '{term}': {e}")
 
+    return call_id, result
+
+
+@router.post("/analyze")
+async def analyze_call(req: AnalyzeRequest, request: Request, user: dict = Depends(require_authed)):
+    try:
+        call_id, result = await run_call_analysis(req.text, req.title, user, sandbox=is_sandbox(request))
+    except HTTPException:
+        raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
     return {"id": call_id, **result}
 
 
@@ -495,18 +567,20 @@ async def transcribe_video(file: UploadFile = File(...)):
 
 
 @router.get("/sessions")
-def get_sessions(user: dict = Depends(require_authed)):
-    return load_user_sessions(user["username"])
+def get_sessions(request: Request, user: dict = Depends(require_authed)):
+    return load_user_sessions(user["username"], is_sandbox(request))
 
 
 @router.get("/stats")
-def get_stats(user: dict = Depends(require_authed)):
-    sessions = load_user_sessions(user["username"])
+def get_stats(request: Request, user: dict = Depends(require_authed)):
+    sandbox = is_sandbox(request)
+    sessions = load_user_sessions(user["username"], sandbox)
     knowledge_files = [
         f.name for f in KNOWLEDGE_DIR.iterdir()
         if f.suffix.lower() in {".md", ".txt"} and f.is_file()
     ]
-    if (USER_KNOWLEDGE_DIR / user["username"] / "learnings-auto.md").is_file():
+    md_base = KNOWLEDGE_DIR / "_sandbox" if sandbox else USER_KNOWLEDGE_DIR
+    if (md_base / user["username"] / "learnings-auto.md").is_file():
         knowledge_files.append("learnings-auto.md")
     return {
         "calls_analysed": sum(1 for s in sessions if s.get("type") == "call_analysis"),
@@ -566,8 +640,8 @@ async def upload_knowledge(file: UploadFile = File(...)):
 
 
 @router.get("/calls")
-def list_analysed_calls(user: dict = Depends(require_authed)):
-    sessions = load_user_sessions(user["username"])
+def list_analysed_calls(request: Request, user: dict = Depends(require_authed)):
+    sessions = load_user_sessions(user["username"], is_sandbox(request))
     calls = []
     for s in sessions:
         if s.get("type") != "call_analysis":
@@ -588,16 +662,130 @@ def list_analysed_calls(user: dict = Depends(require_authed)):
 
 
 @router.get("/calls/{call_id}")
-def get_analysed_call(call_id: str, user: dict = Depends(require_authed)):
-    for s in load_sessions():
+def get_analysed_call(call_id: str, request: Request, user: dict = Depends(require_authed)):
+    for s in load_sessions(is_sandbox(request)):
         if s.get("type") == "call_analysis" and s.get("id") == call_id and s.get("username") == user["username"]:
             return s
     raise HTTPException(status_code=404, detail="Call analysis not found.")
 
 
+class ProductRecRequest(BaseModel):
+    product_name: Optional[str] = None
+
+
+@router.post("/calls/{call_id}/product-recommendation")
+async def generate_product_recommendation(
+    call_id: str,
+    req: ProductRecRequest,
+    request: Request,
+    user: dict = Depends(require_authed),
+):
+    """Opt-in product fit for an already-analysed call.
+
+    Runs against the stored *analysis* (summary + signals + objections +
+    concepts + talking points), not the transcript, with a focused product
+    vault — a fraction of the full-analysis cost. Patches the result in place.
+    """
+    import re as _re
+
+    sandbox = is_sandbox(request)
+    sessions = load_sessions(sandbox)
+    target = next(
+        (
+            s for s in sessions
+            if s.get("type") == "call_analysis"
+            and s.get("id") == call_id
+            and s.get("username") == user["username"]
+        ),
+        None,
+    )
+    if target is None:
+        raise HTTPException(status_code=404, detail="Call analysis not found.")
+
+    result = target.get("result") or {}
+    if not isinstance(result, dict):
+        raise HTTPException(status_code=422, detail="Call analysis has no usable result.")
+
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not set.")
+    client = anthropic.Anthropic(api_key=api_key)
+
+    concepts = [c for c in (result.get("concepts_mentioned") or []) if isinstance(c, str)]
+
+    def _bullets(key: str) -> str:
+        items = [str(x).strip() for x in (result.get(key) or []) if str(x).strip()]
+        return "\n".join(f"- {x}" for x in items) or "- (none)"
+
+    distilled = (
+        f"Summary: {result.get('summary', '')}\n\n"
+        f"Buying signals:\n{_bullets('buying_signals')}\n\n"
+        f"Objections:\n{_bullets('objections')}\n\n"
+        f"Concepts mentioned:\n{_bullets('concepts_mentioned')}\n\n"
+        f"Talking points:\n{_bullets('talking_points')}"
+    )
+    product_hint = (
+        f"\n\nThe rep indicated the relevant product is: {req.product_name}."
+        if req.product_name else ""
+    )
+
+    prompt = f"""Based on this analysed Timebeat sales call, recommend the best-fit Timebeat product(s).
+
+Call analysis:
+{distilled}{product_hint}
+
+Return ONLY a valid JSON object (no markdown, no explanation) with exactly these keys:
+{{
+  "primary": "name of the single best-fit Timebeat product",
+  "reasoning": "2-3 sentences explaining exactly why this product is the best fit based on the call",
+  "all_fits": [
+    {{"product": "product name", "fit": "high/medium/low", "reason": "one sentence why"}}
+  ]
+}}
+
+Rules:
+- all_fits: list ALL relevant products with a fit score.
+- Be specific and actionable; ground every claim in what the call surfaced."""
+
+    knowledge = load_vault_for_product_rec(product_name=req.product_name, concepts=concepts)
+    system_blocks = [
+        {"type": "text", "text": _CALLS_PERSONA + knowledge},
+        {"type": "text", "text": _calls_identity_tail(user)},
+    ]
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2048,
+            system=system_blocks,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        log_cache_usage("calls.product_rec", response.usage)
+        raw = response.content[0].text.strip()
+        fence_match = _re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, _re.DOTALL)
+        if fence_match:
+            raw = fence_match.group(1)
+        else:
+            obj_match = _re.search(r"\{.*\}", raw, _re.DOTALL)
+            if obj_match:
+                raw = obj_match.group(0)
+        recommendation = json.loads(raw)
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Product recommendation failed: {e}")
+
+    # Patch the stored session result in place.
+    result["product_recommendation"] = recommendation
+    target["result"] = result
+    _sessions_file(sandbox).write_text(json.dumps(sessions, indent=2))
+
+    return recommendation
+
+
 @router.delete("/calls/{call_id}")
-def delete_analysed_call(call_id: str, user: dict = Depends(require_authed)):
-    sessions = load_sessions()
+def delete_analysed_call(call_id: str, request: Request, user: dict = Depends(require_authed)):
+    sandbox = is_sandbox(request)
+    sessions = load_sessions(sandbox)
     new_sessions = [
         s for s in sessions
         if not (
@@ -608,13 +796,239 @@ def delete_analysed_call(call_id: str, user: dict = Depends(require_authed)):
     ]
     if len(new_sessions) == len(sessions):
         raise HTTPException(status_code=404, detail="Call analysis not found.")
-    SESSIONS_FILE.write_text(json.dumps(new_sessions, indent=2))
+    _sessions_file(sandbox).write_text(json.dumps(new_sessions, indent=2))
     return {"ok": True}
 
 
 @router.get("/learnings")
-def get_learnings(user: dict = Depends(require_authed)):
-    return load_learnings(user["username"])
+def get_learnings(request: Request, user: dict = Depends(require_authed)):
+    return load_learnings(user["username"], is_sandbox(request))
+
+
+# ---------------------------------------------------------------------------
+# Quiz endpoints
+# ---------------------------------------------------------------------------
+
+class GenerateQuizRequest(BaseModel):
+    count: int = 10
+
+
+@router.get("/quiz/pool")
+def get_quiz_pool(request: Request, user: dict = Depends(require_authed)):
+    """Aggregate stats + per-call quizzes from all analysed calls (all users)."""
+    from collections import Counter
+    sandbox = is_sandbox(request)
+    sessions = load_sessions(sandbox)
+    calls = [s for s in sessions if s.get("type") == "call_analysis"]
+    total_questions = sum(
+        len((s.get("result") or {}).get("flashcards") or [])
+        for s in calls
+        if isinstance(s.get("result"), dict)
+    )
+    topic_counter: Counter = Counter()
+    for s in calls:
+        result = s.get("result") or {}
+        if not isinstance(result, dict):
+            continue
+        for concept in result.get("concepts_mentioned") or []:
+            if isinstance(concept, str) and concept.strip():
+                topic_counter[concept.strip()] += 1
+
+    call_quizzes = []
+    for s in calls:
+        result = s.get("result") or {}
+        if not isinstance(result, dict):
+            continue
+        flashcards = result.get("flashcards") or []
+        if not isinstance(flashcards, list) or not flashcards:
+            continue
+        call_quizzes.append({
+            "id": s.get("id"),
+            "title": s.get("title") or "Untitled call",
+            "timestamp": s.get("timestamp") or "",
+            "questions": flashcards,
+            "concepts": [
+                c.strip() for c in (result.get("concepts_mentioned") or [])
+                if isinstance(c, str) and c.strip()
+            ],
+        })
+
+    return {
+        "total_calls": len(calls),
+        "total_questions": total_questions,
+        "top_topics": [{"term": t, "count": c} for t, c in topic_counter.most_common(20)],
+        "calls": call_quizzes,
+    }
+
+
+class NewsletterQuizRequest(BaseModel):
+    count: int = 1
+
+
+@router.post("/quiz/newsletter")
+async def generate_newsletter_quiz(req: NewsletterQuizRequest, request: Request, user: dict = Depends(require_authed)):
+    """Generate 1–3 client-facing educational MCQ questions for newsletters."""
+    import re as _re
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not set.")
+
+    count = max(1, min(3, req.count))
+    glossary_text = "\n".join(f"- {g['term']}: {g['definition']}" for g in GLOSSARY)
+    products_text = "\n".join(f"- {p['name']} ({p['type']}): {p['description']}" for p in PRODUCTS)
+
+    prompt = f"""You are generating client-facing quiz questions for a newsletter published by Timebeat.
+
+Audience: tech-savvy readers (engineers, infrastructure professionals, decision-makers) — many already familiar with timing concepts, some learning. Tone: educational, curious, friendly. Never sales-y. Never patronising.
+
+Your task: create exactly {count} multiple-choice question(s).
+
+CONTENT RULES:
+- Focus mostly on general timing/synchronisation concepts (PTP, NTP, GNSS, clock drift, synchronisation, time distribution, network timing, accuracy classes, jitter, holdover, etc.) — accessible to any tech-savvy reader
+- Occasionally (not every question) anchor a question in a Timebeat product or capability where it adds genuine educational value — never as a sales pitch
+- Each question must teach something — the explanation is as important as the question
+- Use plain language; if a jargon term is unavoidable, define it briefly in the question
+- Do NOT mention client names, prospect names, company names, or sales scenarios
+- Do NOT use language like "our products", "buy", "contact sales", or any pitch framing
+
+FORMAT RULES:
+- Exactly 4 options per question
+- Exactly one correct answer (0-indexed)
+- A clear, ~2-sentence explanation of why the correct answer is right and what the reader learns
+
+TIMEBEAT PRODUCTS (reference — for occasional Timebeat-anchored questions):
+{products_text}
+
+TIMEBEAT GLOSSARY (reference):
+{glossary_text}
+
+Return ONLY a valid JSON array (no markdown, no extra text) of exactly {count} objects:
+[
+  {{
+    "type": "mcq",
+    "question": "Question text",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correct": 0,
+    "explanation": "Why this is correct and what the reader learns"
+  }}
+]"""
+
+    client = anthropic.Anthropic(api_key=api_key)
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = response.content[0].text.strip()
+        fence_match = _re.search(r"```(?:json)?\s*(\[.*?\])\s*```", raw, _re.DOTALL)
+        if fence_match:
+            raw = fence_match.group(1)
+        else:
+            arr_match = _re.search(r"\[.*\]", raw, _re.DOTALL)
+            if arr_match:
+                raw = arr_match.group(0)
+        questions = json.loads(raw)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Newsletter quiz generation failed: {e}")
+
+    return {
+        "questions": questions,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/quiz/generate")
+async def generate_quiz(req: GenerateQuizRequest, request: Request, user: dict = Depends(require_authed)):
+    """Generate a generalised driving-test MCQ quiz from all call data."""
+    import re as _re
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not set.")
+
+    sandbox = is_sandbox(request)
+    sessions = load_sessions(sandbox)
+    calls = [s for s in sessions if s.get("type") == "call_analysis"]
+
+    # Collect anonymised material — no names, only concepts/scenarios
+    scenarios = []
+    for s in calls:
+        result = s.get("result") or {}
+        if not isinstance(result, dict):
+            continue
+        entry: dict = {}
+        if result.get("concepts_mentioned"):
+            entry["concepts"] = [c for c in result["concepts_mentioned"] if isinstance(c, str)]
+        if result.get("objections"):
+            entry["objections"] = [o for o in result["objections"] if isinstance(o, str)]
+        if result.get("buying_signals"):
+            entry["buying_signals"] = [b for b in result["buying_signals"] if isinstance(b, str)]
+        rec = result.get("product_recommendation")
+        if isinstance(rec, dict) and rec.get("reasoning"):
+            entry["product_reasoning"] = rec["reasoning"]
+        if entry:
+            scenarios.append(entry)
+
+    count = max(5, min(20, req.count))
+    glossary_text = "\n".join(f"- {g['term']}: {g['definition']}" for g in GLOSSARY)
+    products_text = "\n".join(f"- {p['name']} ({p['type']}): {p['description']}" for p in PRODUCTS)
+    scenarios_text = json.dumps(scenarios[:50], indent=2) if scenarios else "No call data yet — generate questions from the glossary and products above."
+
+    prompt = f"""You are generating a professional product knowledge certification quiz for Timebeat sales and technical staff.
+
+Your task: create exactly {count} multiple-choice questions (MCQ) testing deep knowledge of Timebeat products, protocols, and sales skills.
+
+RULES:
+- Do NOT mention any client names, company names, prospect names, or call-specific identifiers
+- Convert real-world scenarios from the field data into generalised questions testing the underlying concept
+- Each question must have exactly 4 answer options, one correct answer (0-indexed), and a clear explanation
+- Vary difficulty and topic coverage — mix product selection, protocol knowledge, use-case matching, and objection handling
+- Weight topics towards what appears most in the call scenarios provided
+
+TIMEBEAT PRODUCTS:
+{products_text}
+
+TIMEBEAT GLOSSARY:
+{glossary_text}
+
+FIELD CALL SCENARIOS (anonymised — use these as raw material to form general questions):
+{scenarios_text}
+
+Return ONLY a valid JSON array (no markdown, no extra text) of exactly {count} objects:
+[
+  {{
+    "type": "mcq",
+    "question": "Question testing a Timebeat concept",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correct": 0,
+    "explanation": "Why this answer is correct and why the other options are not"
+  }}
+]"""
+
+    client = anthropic.Anthropic(api_key=api_key)
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=4096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = response.content[0].text.strip()
+        fence_match = _re.search(r"```(?:json)?\s*(\[.*?\])\s*```", raw, _re.DOTALL)
+        if fence_match:
+            raw = fence_match.group(1)
+        else:
+            arr_match = _re.search(r"\[.*\]", raw, _re.DOTALL)
+            if arr_match:
+                raw = arr_match.group(0)
+        questions = json.loads(raw)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Quiz generation failed: {e}")
+
+    return {
+        "questions": questions,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "source_calls": len(calls),
+    }
 
 
 PROTECTED_KNOWLEDGE_FILES = {"timebeat-ivos.md", "learnings-auto.md", "timebeat-campaign-knowledge-base.md"}

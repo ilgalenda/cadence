@@ -69,8 +69,8 @@ Recipient:
   linkedin_url: {rli}
 """
 
-    return f"""Use the lead analysis and configuration below to write a {n}-touch
-outbound email sequence for Timebeat.
+    return f"""Write a {n}-touch outbound email sequence for Timebeat that reads
+like one sharp salesperson wrote it to one specific person — not a template.
 
 Signal strength: {strength or 'unspecified'}. Hard word limit per email: {word_limit}.
 {recipient_block}
@@ -80,16 +80,23 @@ Lead analysis (account-level context — same for all recipients):
 Configuration:
 {json.dumps(config, indent=2)}
 
-Rules:
+How to make it sound human, not automated:
+- Open each email differently. Vary sentence length and rhythm. Contractions are fine.
+- Say something only Timebeat would say to *this* person — a specific protocol,
+  product, regulation, or pain that fits their world. Generic = delete it.
+- One idea per email. Earn the next email; don't cram the whole pitch into touch 1.
+- Write the way you'd actually email a busy engineer or buyer: direct, curious,
+  a little informal, never gushing or salesy.
+
+Guardrails (hard):
 - Each email strictly under {word_limit} words.
-- No filler phrases ("I hope this finds you well", "Just following up", "Circling back", "Touching base").
-- Subject lines: specific, no clickbait.
-- Touch 1: acknowledge what they did or why they fit, no hard pitch.
-- Touch 2: one concrete Timebeat insight or result relevant to their world.
-- Touch 3: soft ask — one question or a 15-min call offer.
-- Touch 4 (if applicable): different angle or pain point.
-- Touch 5 (if applicable): break-up email, low pressure, door open.
-- If materials provided, weave them in naturally at the most relevant touch.
+- Banned filler: "I hope this finds you well", "Just following up", "Circling
+  back", "Touching base", "I wanted to reach out", "quick question".
+- Subject lines: specific and concrete, lowercase is fine, no clickbait, no emoji.
+- The sequence should build naturally — early touches earn attention, later ones
+  add a new angle or gently make the ask. Don't follow a rigid script; let the
+  lead's situation shape the arc. If materials are provided, use them where they
+  genuinely help, not everywhere.
 
 Return ONLY a JSON object:
 {{
@@ -206,12 +213,22 @@ Return ONLY the refined JSON in the same shape as the pass-1 output."""
 
 def owl_refine_sequence_prompt(claude_output: dict, analysis: dict, config: dict) -> str:
     word_limit = _word_limit_for((analysis or {}).get("signal_strength"))
-    return f"""You are refining an email sequence produced by another model.
-Rewrite bodies in the Timebeat voice. Replace generic product claims with
-specific Timebeat product / protocol references that exist in the knowledge
-base. Tighten subject lines. Enforce the under-{word_limit}-word limit and the
-no-filler rule (no "I hope this finds you well", "Just following up", "Circling
-back", "Touching base").
+    return f"""You are refining an email sequence produced by another model so it
+sounds like a real, knowledgeable Timebeat salesperson wrote it — human and
+interesting, never automated or templated.
+
+Do this:
+- Rewrite anything that reads like AI or a mail-merge. Vary the openings; no two
+  emails should start the same way. Use natural rhythm and the occasional
+  contraction. Cut throat-clearing — get to the point.
+- Replace generic claims with specific, real Timebeat product / protocol
+  references from the knowledge base (never invent). One concrete idea per email.
+- Tighten subject lines to something a busy person would actually open.
+- Keep the facts from the lead (names, company, role) intact.
+
+Guardrails (hard): under {word_limit} words per email; no filler ("I hope this
+finds you well", "Just following up", "Circling back", "Touching base", "I wanted
+to reach out", "quick question").
 
 Lead analysis:
 {json.dumps(analysis, indent=2)}
@@ -445,11 +462,11 @@ Target job-title variants (rank these in order of fit, broaden if too narrow):
 
 # Your job
 
-Identify up to 10 named individuals at the target company who match this ICP and argue why each one is worth approaching.
+Identify up to 15 named individuals at the target company who match this ICP and argue why each one is worth approaching.
 
 # Search strategy — MANDATORY
 
-You MUST use web_search. Do not fabricate names. Do not return any result you did not find via a real tool call. If a query returns nothing, run a broader variant before giving up. Run a minimum of 4 searches.
+You MUST use web_search. Do not fabricate names. Do not return any result you did not find via a real tool call. Run 3-4 searches — be efficient, this is a fast prospecting pass. Favour broad queries that surface several people at once so you can reach up to 15 candidates in just a few searches.
 
 Use a mix of query patterns:
 
@@ -460,7 +477,7 @@ Use a mix of query patterns:
 5. `"[company]" "[title]" interview OR podcast`
 6. Specific platforms: `site:github.com "[company]"`, `site:medium.com "[company]" "[title]"`, regulatory filings
 
-Run 4-6 queries total, mixing strategies. If a strict query returns nothing, broaden it (drop the title quotes; widen the title; drop the location). Stop once you have up to 10 strong candidates. Quality beats quantity — 3 well-grounded names is better than 10 weak ones.
+Run 3-4 queries total, mixing strategies. Prefer one broad `site:linkedin.com "[company]" (title OR title OR title)` query that surfaces several people at once over many narrow ones. Aim for up to 15 strong candidates. Quality still beats quantity — a well-grounded name is better than a weak one.
 
 For each result, extract:
 - full_name
@@ -484,7 +501,7 @@ Drop:
 - Duplicates across queries (dedupe by linkedin_url).
 - Any row where you cannot produce a substantive match_reason.
 
-Return ONLY a raw JSON array — no markdown fences, no preamble, no commentary. Every element MUST correspond to a real person confirmed via web_search. Maximum 10 elements:
+Return ONLY a raw JSON array — no markdown fences, no preamble, no commentary. Every element MUST correspond to a real person confirmed via web_search. Maximum 15 elements:
 
 [
   {
@@ -501,6 +518,35 @@ Return ONLY a raw JSON array — no markdown fences, no preamble, no commentary.
 
 If no results meet the quality bar, return [].
 """
+
+
+def xray_system_prompt(personas: str | None = None, focus: list[str] | None = None) -> str:
+    """X-Ray system prompt grounded in the real customer-persona file.
+
+    The base prompt carries a generic ICP as a fallback; when the team's
+    Persona.md is available we append it as the authoritative persona reference,
+    plus an optional instruction to narrow to specific personas.
+    """
+    prompt = XRAY_SYSTEM_PROMPT
+    personas = (personas or "").strip()
+    if personas:
+        prompt += (
+            "\n\n# Timebeat customer personas (AUTHORITATIVE — overrides the generic ICP above)\n\n"
+            "The following personas are derived from Timebeat's actual customers. "
+            "Prefer these job titles, areas of expertise, and role-stage priorities "
+            "when judging fit and writing each match_reason:\n\n"
+            f"{personas}\n"
+        )
+    focus = [f.strip() for f in (focus or []) if f and f.strip()]
+    if focus:
+        prompt += (
+            "\n\n# Focus for THIS search\n\n"
+            "Prioritise individuals matching these personas / titles; treat others "
+            "as lower priority or campaign_context only:\n- "
+            + "\n- ".join(focus)
+            + "\n"
+        )
+    return prompt
 
 
 def xray_user_payload(signal_final: dict | None, structured: dict | None) -> dict:
@@ -562,10 +608,9 @@ Target company: {company}
 
 Instructions:
 1. Use web_search now. Do NOT skip the tool call.
-2. Run a minimum of 4 searches using the query patterns in your system prompt.
-3. Mix open-web queries with site:linkedin.com queries — do not use only one pattern.
-4. For each person found, verify name + company match in the snippet before including them.
-5. Return ONLY the JSON array described in your system prompt. No preamble, no markdown fences.
+2. Run 3-4 efficient searches — favour a broad site:linkedin.com query that returns several people at once (aim for up to 15 people).
+3. For each person found, verify name + company match in the snippet before including them.
+4. Return ONLY the JSON array described in your system prompt. No preamble, no markdown fences.
 
 Start searching immediately."""
 

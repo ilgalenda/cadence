@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IvanOS Meet Capture</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 280px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+    }
+    .header {
+      padding: 16px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .header h1 {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+    .header .tagline {
+      font-size: 13px;
+      color: #e2e8f0;
+      margin-top: 4px;
+    }
+    .body { padding: 16px; }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #334155;
+      flex-shrink: 0;
+    }
+    .dot.recording { background: #ef4444; animation: pulse 1.4s infinite; }
+    .dot.done { background: #22c55e; animation: none; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .status-text { font-size: 12px; color: #94a3b8; }
+    .line-count { font-size: 11px; font-family: monospace; color: #475569; margin-left: auto; }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 9px 14px;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #2563eb; }
+    .btn-danger { background: #1e293b; color: #ef4444; border: 1px solid #ef4444; }
+    .btn-danger:hover:not(:disabled) { background: #ef4444; color: #fff; }
+    .btn-link {
+      background: transparent;
+      color: #3b82f6;
+      border: 1px solid #1e3a5f;
+      font-size: 11px;
+    }
+    .btn-link:hover:not(:disabled) { background: #1e3a5f; }
+    .result-link {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: #0d2137;
+      border: 1px solid #1e3a5f;
+      border-radius: 4px;
+    }
+    .result-link p { font-size: 11px; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .result-link a { font-size: 12px; color: #3b82f6; text-decoration: none; word-break: break-all; }
+    .result-link a:hover { text-decoration: underline; }
+    .settings { margin-top: 12px; border-top: 1px solid #1e293b; padding-top: 12px; }
+    .settings label { display: block; font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+    .settings input {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      color: #e2e8f0;
+      font-size: 12px;
+      padding: 6px 8px;
+      outline: none;
+    }
+    .settings input:focus { border-color: #3b82f6; }
+    .error { font-size: 11px; color: #ef4444; margin-top: 8px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>IvanOS</h1>
+    <p class="tagline">Meet Capture</p>
+  </div>
+  <div class="body">
+    <div class="status-row">
+      <div class="dot" id="dot"></div>
+      <span class="status-text" id="status-text">Idle</span>
+      <span class="line-count" id="line-count"></span>
+    </div>
+
+    <button class="btn btn-primary" id="btn-start">Start recording</button>
+    <button class="btn btn-danger" id="btn-end" disabled>End call &amp; analyse →</button>
+
+    <div class="result-link" id="result-link">
+      <p>Analysis ready</p>
+      <a href="#" id="result-anchor" target="_blank">Open in IvanOS →</a>
+    </div>
+
+    <p class="error" id="error-msg"></p>
+
+    <div class="settings">
+      <label for="backend-url">Backend URL</label>
+      <input type="text" id="backend-url" placeholder="http://localhost:8000" />
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

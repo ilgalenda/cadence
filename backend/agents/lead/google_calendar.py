@@ -22,7 +22,9 @@ from typing import Any
 import httpx
 from fastapi import Request
 
-TOKENS_FILE = Path(__file__).parent / "data" / "google_tokens.json"
+from paths import lead_google_tokens
+
+TOKENS_FILE = lead_google_tokens()
 
 OAUTH_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token"

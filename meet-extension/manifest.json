@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "IvanOS Meet Capture",
+  "version": "1.0.0",
+  "description": "Captures Google Meet captions and sends them to IvanOS for analysis.",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["https://meet.google.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "IvanOS Meet Capture"
+  }
+}

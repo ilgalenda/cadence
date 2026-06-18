@@ -38,8 +38,11 @@ def compute_landed_cost(
         raise ValueError("monetary inputs must be non-negative")
     if not (0 <= duty_rate <= 1) or not (0 <= vat_rate <= 1):
         raise ValueError("rates must be fractions between 0 and 1")
+    basis = str(valuation_basis).strip().upper()
+    if basis not in ("CIF", "FOB"):
+        raise ValueError("valuation_basis must be 'CIF' or 'FOB'")
 
-    dutiable_value = goods_value + (freight + insurance if valuation_basis == "CIF" else 0.0)
+    dutiable_value = goods_value + (freight + insurance if basis == "CIF" else 0.0)
     duty = dutiable_value * duty_rate
     vat_base = goods_value + freight + insurance + duty + other_fees
     vat = vat_base * vat_rate
@@ -48,7 +51,7 @@ def compute_landed_cost(
 
     return {
         "currency": currency,
-        "valuation_basis": valuation_basis,
+        "valuation_basis": basis,
         "inputs": {
             "goods_value": _round(goods_value),
             "freight": _round(freight),

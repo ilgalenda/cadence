@@ -36,6 +36,8 @@ import { DUTY_AGENT_NAME, DUTY_AGENT_TAGLINE, DUTY_NAV } from '../../../agents/d
   </div>
 
   <script>
+    import { escHtml } from '../../../lib/owlChat';
+
     async function load() {
       try {
         const s = await (await fetch('/api/duty/stats')).json();
@@ -46,13 +48,14 @@ import { DUTY_AGENT_NAME, DUTY_AGENT_TAGLINE, DUTY_NAV } from '../../../agents/d
         const items = await (await fetch('/api/duty/quotes')).json();
         if (!items.length) { el.innerHTML = '<li class="py-4 font-mono text-xs text-ink-muted">// no quotes yet — start one</li>'; return; }
         el.innerHTML = items.slice(0, 8).map((q: any) => {
-          const dest = q.destination || (q.request ? q.request.slice(0, 60) : '—');
-          const landed = q.breakdown ? `${q.breakdown.currency} ${q.breakdown.landed_cost}` : '—';
+          const dest = escHtml(String(q.destination || (q.request ? q.request.slice(0, 60) : '—')));
+          const landed = q.breakdown ? `${escHtml(String(q.breakdown.currency))} ${q.breakdown.landed_cost}` : '—';
           const mode = q.mode === 'assist' ? 'assist' : 'structured';
+          const hs = q.hs_code ? ` · HS ${escHtml(String(q.hs_code))}` : '';
           return `<li class="border-b border-rule-subtle last:border-0 flex items-center justify-between py-3">
             <div class="min-w-0">
-              <p class="text-sm text-ink-primary truncate">${dest}${q.hs_code ? ` · HS ${q.hs_code}` : ''}</p>
-              <p class="font-mono text-[10px] uppercase tracking-label text-ink-muted mt-0.5">${mode} · ${q.updated_at || ''}</p>
+              <p class="text-sm text-ink-primary truncate">${dest}${hs}</p>
+              <p class="font-mono text-[10px] uppercase tracking-label text-ink-muted mt-0.5">${mode} · ${escHtml(String(q.updated_at || ''))}</p>
             </div>
             <span class="font-mono text-sm tabular text-ink-primary shrink-0">${landed}</span>
           </li>`;

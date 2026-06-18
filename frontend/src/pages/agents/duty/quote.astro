@@ -51,7 +51,7 @@ import { DUTY_AGENT_NAME, DUTY_AGENT_TAGLINE, DUTY_NAV } from '../../../agents/d
   </style>
 
   <script>
-    import { streamChat, renderMarkdown } from '../../../lib/owlChat';
+    import { streamChat, renderMarkdown, escHtml } from '../../../lib/owlChat';
 
     // Mode toggle
     const panels: Record<string, HTMLElement> = {
@@ -85,7 +85,7 @@ import { DUTY_AGENT_NAME, DUTY_AGENT_TAGLINE, DUTY_NAV } from '../../../agents/d
         url: '/api/duty/assist',
         messages: [{ role: 'user', content: text }],
         onText: (_d, full) => { assistResult.innerHTML = renderMarkdown(full); },
-        onError: (m) => { assistResult.innerHTML = `<p class="font-mono text-xs text-signal-danger">// ${m}</p>`; },
+        onError: (m) => { assistResult.innerHTML = `<p class="font-mono text-xs text-signal-danger">// ${escHtml(String(m))}</p>`; },
       });
       assistGo.disabled = false;
     });
@@ -110,12 +110,12 @@ import { DUTY_AGENT_NAME, DUTY_AGENT_TAGLINE, DUTY_NAV } from '../../../agents/d
         });
         if (!res.ok) throw new Error((await res.json()).detail || String(res.status));
         const d = await res.json();
-        const b = d.breakdown, cur = b.currency;
+        const b = d.breakdown, cur = escHtml(String(b.currency));
         const row = (label: string, v: number, strong = false) =>
           `<tr class="border-b border-rule-subtle"><td class="py-2 ${strong ? 'text-ink-primary font-medium' : 'text-ink-secondary'}">${label}</td><td class="py-2 text-right font-mono tabular ${strong ? 'text-ink-primary font-medium' : 'text-ink-secondary'}">${cur} ${v}</td></tr>`;
         calcResult.innerHTML = `
           <div class="border border-rule-subtle rounded p-4 max-w-md bg-surface-1">
-            <p class="font-mono text-[10px] uppercase tracking-label text-ink-muted mb-3">Landed cost · ${b.valuation_basis} basis · duty ${(d.rate.duty_rate*100).toFixed(1)}% · VAT ${(d.rate.vat_rate*100).toFixed(1)}%</p>
+            <p class="font-mono text-[10px] uppercase tracking-label text-ink-muted mb-3">Landed cost · ${escHtml(String(b.valuation_basis))} basis · duty ${(d.rate.duty_rate*100).toFixed(1)}% · VAT ${(d.rate.vat_rate*100).toFixed(1)}%</p>
             <table class="w-full text-sm">
               ${row('Goods value', b.inputs.goods_value)}
               ${row('Freight', b.inputs.freight)}
@@ -125,11 +125,11 @@ import { DUTY_AGENT_NAME, DUTY_AGENT_TAGLINE, DUTY_NAV } from '../../../agents/d
               ${row('Total taxes', b.total_taxes)}
               ${row('Landed cost', b.landed_cost, true)}
             </table>
-            ${d.rate.notes ? `<p class="font-mono text-[10px] text-ink-muted mt-3">// ${d.rate.notes}</p>` : ''}
+            ${d.rate.notes ? `<p class="font-mono text-[10px] text-ink-muted mt-3">// ${escHtml(String(d.rate.notes))}</p>` : ''}
             <p class="font-mono text-[10px] text-ink-muted mt-1">// estimate from sample rate data — not customs advice</p>
           </div>`;
       } catch (e: any) {
-        calcResult.innerHTML = `<p class="font-mono text-xs text-signal-danger">// ${e?.message || e}</p>`;
+        calcResult.innerHTML = `<p class="font-mono text-xs text-signal-danger">// ${escHtml(String(e?.message || e))}</p>`;
       }
       calcGo.disabled = false;
     });

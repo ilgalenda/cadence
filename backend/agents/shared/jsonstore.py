@@ -2,12 +2,19 @@ from __future__ import annotations
 """Generic per-user JSON-list storage for Cadence agents.
 
 Extracts the load / get / upsert / patch / delete pattern the Lead and
-High-Intent agents use by hand, so new agents don't re-implement it (and the
-known read-modify-write weakness is fixed in one place if it ever needs to be).
-Records are dicts carrying `id`, `created_at`, `updated_at`, and — when scoped —
-`username`. Stored newest-first and capped.
+High-Intent agents use by hand, so new agents don't re-implement it. Records are
+dicts carrying `id`, `created_at`, `updated_at`, and — when scoped — `username`.
+Stored newest-first and capped.
+
+Concurrency: each write is atomic (written to a temp file, then `os.replace`d),
+so a reader never sees a half-written file. Concurrent *upserts* to the same
+collection are still last-writer-wins — `load → mutate → write` is not locked.
+That's acceptable for the low-concurrency, single-operator use this is built for;
+a multi-writer deployment should add a file lock (or move that collection to
+SQLite, as the Owl agent does).
 """
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,13 +34,16 @@ def read_json(path: Path, default):
         return default
     try:
         return json.loads(path.read_text())
-    except Exception:
+    except (OSError, json.JSONDecodeError):
+        # Unreadable/corrupt file — fall back to the default rather than crash.
         return default
 
 
 def write_json(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2))
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2))
+    os.replace(tmp, path)  # atomic on POSIX/Windows — no torn reads
 
 
 class JsonCollection:

@@ -58,6 +58,20 @@ def test_rejects_bad_inputs():
         raise AssertionError(f"expected ValueError for {kwargs}")
 
 
+def test_valuation_basis_normalised_and_validated():
+    # Lowercase / padded basis is accepted and normalised — not silently FOB.
+    b = calc.compute_landed_cost(goods_value=1000, freight=100, duty_rate=0.05, vat_rate=0.2, valuation_basis=" cif ")
+    assert b["valuation_basis"] == "CIF"
+    assert b["dutiable_value"] == 1100.0
+    # An unrecognised basis is rejected rather than silently treated as FOB.
+    try:
+        calc.compute_landed_cost(goods_value=1000, duty_rate=0.05, vat_rate=0.2, valuation_basis="EXW")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError for unknown valuation_basis")
+
+
 def test_mock_provider_known_and_default():
     p = MockDutyRateProvider()
     gb = p.lookup(destination="GB", hs_code="8517.12")  # phones, chapter 85

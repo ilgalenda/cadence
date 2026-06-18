@@ -10,8 +10,9 @@ from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
-from agents.forecast import analytics, storage
+from agents.forecast import analytics, pipeline_manager, storage
 from agents.forecast.crm import get_connector
+from agents.shared.notifications import send_admin_email
 from auth import is_sandbox, require_agent_access
 
 _user = require_agent_access("forecast")
@@ -76,3 +77,24 @@ def stats(request: Request, user: dict = Depends(_user)):
         "open_value": fc["open_value"],
         "weighted_forecast": fc["weighted_forecast"],
     }
+
+
+# ---------------------------------------------------------------------------
+# Pipeline Manager — the daily morning briefing (deterministic)
+# ---------------------------------------------------------------------------
+
+@router.get("/briefing")
+def briefing(request: Request, user: dict = Depends(_user)):
+    """Today's deterministic pipeline briefing: summary + quiet + aging + overdue."""
+    today = datetime.now(timezone.utc).date()
+    return pipeline_manager.build_briefing(_deals(user, request), today)
+
+
+@router.post("/briefing/send")
+def send_briefing(request: Request, user: dict = Depends(_user)):
+    """Email today's briefing via the configured admin SMTP. {sent:false} if SMTP is unset."""
+    today = datetime.now(timezone.utc).date()
+    brief = pipeline_manager.build_briefing(_deals(user, request), today)
+    body = pipeline_manager.render_briefing_text(brief)
+    sent = send_admin_email(f"[Cadence] Pipeline morning briefing — {brief['date']}", body)
+    return {"sent": sent}

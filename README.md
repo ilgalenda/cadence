@@ -99,6 +99,11 @@ Pipeline, hygiene, and revenue analysis.
 
 - Pipeline split by vertical and stage, a probability-weighted revenue forecast, and pipeline-hygiene flags (stale deals, missing amounts/close dates, past-due closes)
 - Deals are pulled from a swappable `CRMConnector` — a mock HubSpot connector with sample data ships by default; implement the interface (OAuth shape mirrors the Lead agent's Google Calendar connector) to connect a real CRM
+- **Pipeline Manager** — a deterministic daily briefing (no LLM) that surfaces deals **gone quiet** and prospects **sitting too long** (in the pipeline or a single stage), alongside the open/weighted summary and overdue closes. Preview it on the page (`GET /api/forecast/briefing`) or email it (`POST /api/forecast/briefing/send`, via the admin SMTP). To get it **every morning**, schedule the cron entry:
+  ```bash
+  # weekdays at 07:00 — emails ADMIN_NOTIFY_EMAIL
+  0 7 * * 1-5 cd /path/to/cadence/backend && python scripts/morning_briefing.py --user admin
+  ```
 
 ---
 

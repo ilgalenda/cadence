@@ -2,7 +2,7 @@
 // To ship a new version: bump CADENCE_VERSION and prepend a new entry to CHANGELOG.
 // Also bump /package.json and /frontend/package.json to match.
 
-export const CADENCE_VERSION = '1.5.0';
+export const CADENCE_VERSION = '1.5.1';
 
 export type ChangeLabel = 'Added' | 'Changed' | 'Fixed' | 'Security' | 'Removed';
 
@@ -19,6 +19,27 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.5.1',
+    date: '2026-06-18',
+    headline: 'Pipeline Manager — deterministic morning briefing on the Forecasting agent',
+    sections: [
+      {
+        label: 'Added',
+        items: [
+          'Pipeline Manager (a sub-capability of the Forecasting agent): a deterministic daily briefing that surfaces deals **gone quiet** (no activity past a threshold) and prospects **sitting too long** (in the pipeline or a single stage), plus the open/weighted summary and overdue closes. No LLM — every figure is computed from the synced deals.',
+          'New endpoints `GET /api/forecast/briefing` (preview) and `POST /api/forecast/briefing/send` (email via the configured admin SMTP). A "Morning briefing" section on the Forecasting page previews it and triggers the email.',
+          'Cron entry `backend/scripts/morning_briefing.py --user <name>` emails the briefing each morning (runs in-process, no auth; no-ops gracefully if SMTP is unset). Deal model gains `created_at` / `stage_entered_at` to drive the "sitting too long" check.',
+        ],
+      },
+      {
+        label: 'Fixed',
+        items: [
+          'Forecasting page now escapes deal-derived strings before `innerHTML` (vertical names, deal names, hygiene/briefing text), closing a latent injection path once a real CRM connector is wired in.',
+        ],
+      },
+    ],
+  },
   {
     version: '1.5.0',
     date: '2026-06-18',

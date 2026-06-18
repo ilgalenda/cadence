@@ -53,9 +53,31 @@ import { FORECAST_AGENT_NAME, FORECAST_AGENT_TAGLINE, FORECAST_NAV } from '../..
         <ul id="hygiene"><li class="py-4 font-mono text-xs text-ink-muted">// sync to load</li></ul>
       </section>
     </div>
+
+    <!-- Pipeline Manager — morning briefing -->
+    <section class="mt-14">
+      <div class="flex items-baseline justify-between pb-3 mb-2 border-b border-rule-strong">
+        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Morning briefing</h2>
+        <button id="brief-send" class="font-mono text-[11px] uppercase tracking-label text-accent hover:underline">Email to me →</button>
+      </div>
+      <p class="font-mono text-[11px] text-ink-muted mb-4">Deals gone quiet and prospects sitting too long. Delivered by email each morning (<code>scripts/morning_briefing.py</code>); previewed here.</p>
+      <span id="brief-note" class="font-mono text-[11px] text-ink-muted"></span>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 mt-2">
+        <div>
+          <p class="font-mono text-[10px] uppercase tracking-label text-ink-muted mb-2">Gone quiet</p>
+          <ul id="brief-quiet"><li class="py-3 font-mono text-xs text-ink-muted">// sync to load</li></ul>
+        </div>
+        <div>
+          <p class="font-mono text-[10px] uppercase tracking-label text-ink-muted mb-2">Sitting too long</p>
+          <ul id="brief-aging"><li class="py-3 font-mono text-xs text-ink-muted">// sync to load</li></ul>
+        </div>
+      </div>
+    </section>
   </div>
 
   <script>
+    import { escHtml } from '../../../lib/owlChat';
+
     const money = (n: number) => {
       if (n >= 1000) return `${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k`;
       return String(n);
@@ -75,7 +97,7 @@ import { FORECAST_AGENT_NAME, FORECAST_AGENT_TAGLINE, FORECAST_NAV } from '../..
         const verts = Object.entries(p.by_vertical || {});
         vEl.innerHTML = verts.length ? verts.map(([k, v]: any) =>
           `<li class="flex items-center justify-between py-2.5 border-b border-rule-subtle last:border-0">
-             <span class="text-sm text-ink-secondary">${k} <span class="font-mono text-[10px] text-ink-muted">· ${v.count}</span></span>
+             <span class="text-sm text-ink-secondary">${escHtml(String(k))} <span class="font-mono text-[10px] text-ink-muted">· ${v.count}</span></span>
              <span class="font-mono text-sm tabular text-ink-primary">${money(v.amount)}</span>
            </li>`).join('') : '<li class="py-4 font-mono text-xs text-ink-muted">// no open deals</li>';
       } catch {}
@@ -86,11 +108,38 @@ import { FORECAST_AGENT_NAME, FORECAST_AGENT_TAGLINE, FORECAST_NAV } from '../..
         const hEl = document.getElementById('hygiene')!;
         hEl.innerHTML = (h.issues || []).length ? h.issues.map((i: any) =>
           `<li class="py-2.5 border-b border-rule-subtle last:border-0">
-             <p class="text-sm text-ink-primary truncate">${i.name}</p>
-             <p class="font-mono text-[10px] uppercase tracking-label text-signal-warning mt-0.5">${i.issue}</p>
+             <p class="text-sm text-ink-primary truncate">${escHtml(String(i.name ?? ''))}</p>
+             <p class="font-mono text-[10px] uppercase tracking-label text-signal-warning mt-0.5">${escHtml(String(i.issue ?? ''))}</p>
            </li>`).join('') : '<li class="py-4 font-mono text-xs text-signal-success">// pipeline is clean</li>';
       } catch {}
+
+      try {
+        const b = await (await fetch('/api/forecast/briefing')).json();
+        const fmtList = (items: any[], fmt: (i: any) => string, empty: string) =>
+          items.length ? items.map(i =>
+            `<li class="py-2.5 border-b border-rule-subtle last:border-0 text-sm text-ink-secondary">${fmt(i)}</li>`
+          ).join('') : `<li class="py-3 font-mono text-xs text-signal-success">${empty}</li>`;
+        document.getElementById('brief-quiet')!.innerHTML = fmtList(
+          b.quiet || [],
+          (i) => `${escHtml(String(i.name))} <span class="font-mono text-[10px] text-signal-warning">quiet ${i.days_quiet}d</span>`,
+          '// nothing quiet');
+        document.getElementById('brief-aging')!.innerHTML = fmtList(
+          b.aging || [],
+          (i) => `${escHtml(String(i.name))} <span class="font-mono text-[10px] text-signal-warning">${escHtml(String(i.reason))}</span>`,
+          '// nothing aging');
+      } catch {}
     }
+
+    document.getElementById('brief-send')!.addEventListener('click', async () => {
+      const note = document.getElementById('brief-note')!;
+      note.textContent = '// sending…';
+      try {
+        const r = await (await fetch('/api/forecast/briefing/send', { method: 'POST' })).json();
+        note.textContent = r.sent ? '// briefing emailed' : '// SMTP not configured — set it to enable email';
+      } catch {
+        note.textContent = '// send failed';
+      }
+    });
 
     document.getElementById('sync')!.addEventListener('click', async () => {
       const note = document.getElementById('sync-note')!;

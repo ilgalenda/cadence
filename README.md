@@ -13,30 +13,33 @@ The example domain throughout (a timing-technology sales team) is just illustrat
 ## System overview
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      Astro Frontend                     │
-│        Dashboard · Calls · Lead · Owl drawer            │
-└───────────────────────┬─────────────────────────────────┘
-                        │ REST + SSE (streaming)
-┌───────────────────────▼─────────────────────────────────┐
-│                   FastAPI Backend                       │
-│                                                         │
-│  ┌─────────────┐  ┌─────────────┐  ┌────────────────┐  │
-│  │ Calls Agent │  │ Lead Agent  │  │   Owl Agent    │  │
-│  └──────┬──────┘  └──────┬──────┘  └───────┬────────┘  │
-│         │                │                  │           │
-│         └────────────────┼──────────────────┘           │
-│                          │                              │
-│               ┌──────────▼──────────┐                  │
-│               │    Shared Vault     │                  │
-│               │  (Obsidian-compat.) │                  │
-│               └─────────────────────┘                  │
-└─────────────────────────────────────────────────────────┘
-                          │
-              ┌───────────▼───────────┐
-              │  Anthropic API        │
-              │  Haiku 4.5 · Sonnet   │
-              └───────────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│                           Astro Frontend                            │
+│    Dashboard · Calls · Lead · Owl · Duty · Onboarding · Forecast    │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ REST + SSE (streaming)
+┌──────────────────────────────▼──────────────────────────────────────┐
+│                          FastAPI Backend                            │
+│                                                                     │
+│   Sales / GTM                          Operations                   │
+│   ┌───────┐ ┌──────┐ ┌─────┐    ┌──────┐ ┌────────────┐ ┌──────────┐│
+│   │ Calls │ │ Lead │ │ Owl │    │ Duty │ │ Onboarding │ │ Forecast ││
+│   └───┬───┘ └──┬───┘ └──┬──┘    └──┬───┘ └─────┬──────┘ └────┬─────┘│
+│       └────────┴────────┴─────┬────┴───────────┴─────────────┘      │
+│                               │                                     │
+│          ┌────────────────────▼─────────────────────┐              │
+│          │                Shared Vault               │              │
+│          │              (Obsidian-compat.)           │              │
+│          └───────────────────────────────────────────┘              │
+│                                                                     │
+│   Agent Creator (CLI) → scaffolds new agents from a spec            │
+│   Duty & Forecast also call swappable external connectors           │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+                 ┌─────────────▼──────────────┐
+                 │         Anthropic API        │
+                 │       Haiku 4.5 · Sonnet      │
+                 └──────────────────────────────┘
 ```
 
 ---
@@ -152,40 +155,40 @@ Frontmatter contract: every runtime write requires both `title` and `description
 ```
 cadence/
 ├── backend/
-│   ├── main.py                    # FastAPI app, auth middleware, router mounting
-│   ├── auth.py                    # Login, session, role helpers
-│   ├── paths.py                   # Resolves every mutable path under DATA_ROOT
-│   ├── seed_users.py              # Seeds your user accounts + credentials
-│   ├── .env.example               # Required environment variables
+│   ├── main.py                     # FastAPI app, auth middleware, router mounting
+│   ├── auth.py                     # Login, session, role + per-agent-access helpers
+│   ├── paths.py                    # Resolves every mutable path under DATA_ROOT
+│   ├── seed_users.py               # Seeds your user accounts + credentials
+│   ├── .env.example                # Required environment variables
 │   ├── requirements.txt
 │   ├── agents/
-│   │   ├── calls/
-│   │   │   ├── routes.py          # Upload, analysis, product-recommendation, glossary, learnings endpoints
-│   │   │   └── knowledge/         # Product knowledge base (add your own .md files)
-│   │   ├── lead/
-│   │   │   ├── routes.py          # Campaign, lead, calendar endpoints
-│   │   │   ├── pipeline.py        # Lead scoring and enrichment logic
-│   │   │   ├── prompts.py         # Claude prompt definitions
-│   │   │   ├── knowledge.py       # Knowledge loader + Owl system prompt builder
-│   │   │   ├── storage.py         # Campaign and lead persistence
-│   │   │   ├── google_calendar.py # Google Calendar OAuth + event management
-│   │   │   └── knowledge/         # Lead intelligence knowledge (add your own .md files)
-│   │   ├── owl/
-│   │   │   ├── routes.py          # Chat stream (+ call-aware grounding & fetch_transcript tool) + session history endpoints
-│   │   │   ├── routing.py         # Haiku vs Sonnet routing logic
-│   │   │   ├── topics.py          # Keyword-based topic extraction
-│   │   │   └── storage.py         # Per-user session persistence
+│   │   ├── calls/                  # Call analysis, glossary, learnings, opt-in product fit
+│   │   ├── lead/                   # Campaigns, prospecting, scoring, Google Calendar
+│   │   ├── owl/                    # Grounded chat (SQLite), model routing, topics
+│   │   ├── high_intent/            # LinkedIn intent signals + outreach (admin sandbox)
+│   │   ├── meet/                   # Google Meet transcript capture
+│   │   ├── duty/                   # Duty & Tax — calc.py, rates.py, tool-use routes
+│   │   ├── onboarding/             # Role-aware guided chat + curriculum.md
+│   │   ├── forecast/               # Pipeline analytics + crm.py connector
 │   │   └── shared/
-│   │       └── vault.py           # Vault read/write, entity linking, frontmatter
-│   └── scripts/                   # Maintenance utilities (e.g. vault normalisation)
+│   │       ├── vault.py            # Vault read/write, entity linking, frontmatter
+│   │       ├── anthropic_client.py # Shared Claude client + rate-limit slot + model ids
+│   │       ├── jsonstore.py        # Generic per-user JSON CRUD (used by new agents)
+│   │       ├── jsonparse.py        # Tolerant JSON extraction from model output
+│   │       └── notifications.py    # Admin email (approval flow)
+│   ├── scripts/
+│   │   ├── create_agent.py         # Agent Creator — scaffold a new agent from a spec
+│   │   ├── templates/agent/        # Templates the generator renders
+│   │   ├── specs/                  # Example agent specs (duty, onboarding, forecast)
+│   │   └── normalise_company_truth.py
+│   └── tests/                      # Deterministic unit tests (scoring, duty, forecast)
 └── frontend/
     ├── src/
-    │   ├── pages/
-    │   │   ├── agents/calls/      # Call upload, analysis view, glossary, knowledge
-    │   │   ├── agents/lead/       # Lead list, campaign view, new lead flow
-    │   │   └── dashboard.astro
-    │   ├── components/            # Shared UI components (Owl drawer, tabs, toasts)
-    │   └── layouts/               # AgentLayout, DashboardLayout, LoginLayout
+    │   ├── agents/                 # Per-agent UI config (name, tagline, nav)
+    │   ├── pages/agents/           # calls · lead · owl · duty · onboarding · forecast
+    │   ├── components/             # Shared UI (Owl drawer, page header, status dot)
+    │   ├── layouts/                # AgentLayout, DashboardLayout, LoginLayout
+    │   └── lib/                    # owlChat.ts (SSE client + markdown), leadCards.ts, version.ts
     └── astro.config.mjs
 ```
 

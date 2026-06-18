@@ -1,0 +1,9 @@
+{
+  "slug": "duty",
+  "name": "Duty & Tax",
+  "tagline": "Autonomous shipment duty & tax calculator",
+  "icon": "📦",
+  "kind": "tool",
+  "entity": "quote",
+  "status": "active"
+}

@@ -38,21 +38,21 @@ _DEFAULT_PROFILES = [
         "name": "Admin User",
         "role": "Administrator",
         "access": "admin",
-        "agents": ["calls", "lead", "high-intent"],
+        "agents": ["calls", "lead", "high-intent", "duty", "onboarding", "forecast"],
     },
     {
         "username": "user1",
         "name": "User One",
         "role": "Sales",
         "access": "user",
-        "agents": ["calls", "lead"],
+        "agents": ["calls", "lead", "duty", "onboarding", "forecast"],
     },
     {
         "username": "user2",
         "name": "User Two",
         "role": "SDR",
         "access": "user",
-        "agents": ["calls", "lead"],
+        "agents": ["calls", "lead", "duty", "onboarding", "forecast"],
     },
 ]
 

@@ -75,6 +75,28 @@ A conversational assistant with intelligent model routing.
 - Tags each session with extracted topics for browsable history
 - **Call-aware mode**: opened on an analysed call (`?call_id=…`), Owl is grounded in that call's analysis as its default context and scopes the vault to it; the verbatim transcript is pulled in only on demand via a `fetch_transcript` tool, so a call deep-dive stays cheap until exact wording is actually needed
 
+### Duty & Tax
+
+Autonomous shipment landed-cost estimation for operations teams.
+
+- Describe a shipment in plain language and the agent classifies the HS code, looks up duty/VAT rates, and computes the breakdown via a tool-use loop — or enter the figures directly for a deterministic quote
+- The arithmetic (`agents/duty/calc.py`) and the rates (`agents/duty/rates.py`) are deterministic local functions; the model only orchestrates and explains
+- Rates come from a swappable `DutyRateProvider` — a generic sample table ships by default; implement the interface against a real tariff/customs API to go live
+
+### Onboarding
+
+A role-aware guided chat for new sales and ops users.
+
+- Grounded in the shared knowledge vault and an editable onboarding curriculum (`agents/onboarding/curriculum.md`)
+- Picks a track (sales / GTM or operations) and walks newcomers through the platform one step at a time, with a per-user progress checklist
+
+### Forecasting
+
+Pipeline, hygiene, and revenue analysis.
+
+- Pipeline split by vertical and stage, a probability-weighted revenue forecast, and pipeline-hygiene flags (stale deals, missing amounts/close dates, past-due closes)
+- Deals are pulled from a swappable `CRMConnector` — a mock HubSpot connector with sample data ships by default; implement the interface (OAuth shape mirrors the Lead agent's Google Calendar connector) to connect a real CRM
+
 ---
 
 ## Cadence Knowledge — three-pillar architecture
@@ -242,6 +264,12 @@ You can now log in with one of the accounts you seeded (e.g. `admin` with the `A
 1. **Add product/company knowledge.** Drop markdown into `${DATA_ROOT}/vault/company/` (and `agents/calls/knowledge/`, `agents/lead/knowledge/`), then run `python3 backend/scripts/normalise_company_truth.py` to normalise frontmatter and wikilinks. This is what grounds every agent.
 2. **Define your users.** Edit `_DEFAULT_PROFILES` in `backend/seed_users.py` and re-run `seed_users.py --rewrite-profiles`.
 3. **Tune the agents.** Prompts live in `backend/agents/*/prompts.py`; Owl's model routing in `backend/agents/owl/routing.py`.
+4. **Add your own agent.** Scaffold one from a small spec with the Agent Creator — it emits the backend dir, the frontend config + page, and all the wiring:
+   ```bash
+   python backend/scripts/create_agent.py --slug renewals --name "Renewals" \
+     --tagline "Track and forecast renewals" --kind crud --entity renewal
+   # or from a spec file: --spec backend/scripts/specs/<slug>.json  (add --dry-run to preview)
+   ```
 
 ### Admin per-session sandbox (in-app)
 

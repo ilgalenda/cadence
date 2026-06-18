@@ -83,3 +83,21 @@ def owl_data() -> Path:
 # High-Intent
 def high_intent_data() -> Path:
     return data_root() / "agents" / "high_intent" / "data"
+
+
+# Duty & Tax
+def duty_data() -> Path:
+    return data_root() / "agents" / "duty" / "data"
+
+
+# Onboarding
+def onboarding_data() -> Path:
+    return data_root() / "agents" / "onboarding" / "data"
+
+
+# Forecasting
+def forecast_data() -> Path:
+    return data_root() / "agents" / "forecast" / "data"
+
+
+# >>> cadence:paths — `create_agent.py` inserts new per-agent path helpers above this line.

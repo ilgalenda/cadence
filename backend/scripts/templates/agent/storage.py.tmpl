@@ -1,0 +1,13 @@
+from __future__ import annotations
+"""@@NAME@@ storage — scaffolded by create_agent.py.
+
+One capped, per-user JSON collection via the shared `JsonCollection` helper.
+Add more collections (or richer records) as the agent grows.
+"""
+from agents.shared.jsonstore import JsonCollection
+from paths import @@MOD@@_data
+
+DATA_DIR = @@MOD@@_data()
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+@@ENTITY_PLURAL@@ = JsonCollection(DATA_DIR, "@@ENTITY_PLURAL@@", cap=200)

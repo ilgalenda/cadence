@@ -1,0 +1,9 @@
+{
+  "slug": "forecast",
+  "name": "Forecasting",
+  "tagline": "Pipeline, hygiene & revenue forecasting across verticals",
+  "icon": "📈",
+  "kind": "crud",
+  "entity": "deal",
+  "status": "active"
+}

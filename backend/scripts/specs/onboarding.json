@@ -1,0 +1,9 @@
+{
+  "slug": "onboarding",
+  "name": "Onboarding",
+  "tagline": "Guided onboarding for sales & ops, grounded in Cadence knowledge",
+  "icon": "🧭",
+  "kind": "chat",
+  "entity": "session",
+  "status": "active"
+}

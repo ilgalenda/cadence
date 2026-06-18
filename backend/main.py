@@ -21,6 +21,10 @@ from agents.high_intent.routes import router as high_intent_router
 from agents.lead.routes import router as lead_router
 from agents.meet.routes import router as meet_router
 from agents.owl.routes import router as owl_router
+from agents.duty.routes import router as duty_router
+from agents.onboarding.routes import router as onboarding_router
+from agents.forecast.routes import router as forecast_router
+# >>> cadence:agent-imports — `create_agent.py` inserts new agent router imports above this line.
 from auth import current_user, is_sandbox, public_user, require_admin, verify_login
 
 # Cadence auth config — set in backend/.env:
@@ -142,6 +146,10 @@ app.include_router(high_intent_router)
 app.include_router(lead_router)
 app.include_router(meet_router)
 app.include_router(owl_router)
+app.include_router(duty_router)
+app.include_router(onboarding_router)
+app.include_router(forecast_router)
+# >>> cadence:agent-routers — `create_agent.py` inserts new app.include_router(...) calls above this line.
 
 
 # ---------------------------------------------------------------------------

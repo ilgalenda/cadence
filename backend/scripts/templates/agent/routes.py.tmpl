@@ -1,0 +1,37 @@
+from __future__ import annotations
+"""@@NAME@@ agent (kind: @@KIND@@) — scaffolded by create_agent.py.
+
+Replace the placeholder endpoints below with the agent's real logic. The
+router is gated by `require_agent_access("@@SLUG@@")`, so only users whose
+profile lists "@@SLUG@@" in `agents` can reach it.
+"""
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel
+
+from agents.@@MOD@@ import storage
+from auth import is_sandbox, require_agent_access
+
+_user = require_agent_access("@@SLUG@@")
+router = APIRouter(prefix="/api/@@SLUG@@", tags=["@@SLUG@@"], dependencies=[Depends(_user)])
+
+
+class @@ENTITY_TITLE@@Request(BaseModel):
+    title: str = ""
+    data: dict = {}
+
+
+@router.get("/stats")
+def stats(request: Request, user: dict = Depends(_user)):
+    items = storage.@@ENTITY_PLURAL@@.load_user(user["username"], sandbox=is_sandbox(request))
+    return {"@@ENTITY_PLURAL@@_total": len(items)}
+
+
+@router.get("/@@ENTITY_PLURAL@@")
+def list_@@ENTITY_PLURAL@@(request: Request, user: dict = Depends(_user)):
+    return storage.@@ENTITY_PLURAL@@.load_user(user["username"], sandbox=is_sandbox(request))
+
+
+@router.post("/@@ENTITY_PLURAL@@")
+def create_@@ENTITY@@(req: @@ENTITY_TITLE@@Request, request: Request, user: dict = Depends(_user)):
+    record = {"title": req.title, "data": req.data}
+    return storage.@@ENTITY_PLURAL@@.upsert(record, username=user["username"], sandbox=is_sandbox(request))

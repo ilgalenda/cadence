@@ -2,7 +2,7 @@
 // To ship a new version: bump CADENCE_VERSION and prepend a new entry to CHANGELOG.
 // Also bump /package.json and /frontend/package.json to match.
 
-export const CADENCE_VERSION = '1.4.0';
+export const CADENCE_VERSION = '1.5.0';
 
 export type ChangeLabel = 'Added' | 'Changed' | 'Fixed' | 'Security' | 'Removed';
 
@@ -19,6 +19,23 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.5.0',
+    date: '2026-06-18',
+    headline: 'Platform expansion: Agent Creator + Duty & Tax, Onboarding, Forecasting',
+    sections: [
+      {
+        label: 'Added',
+        items: [
+          '**Agent Creator** — `python backend/scripts/create_agent.py` scaffolds a new agent from a small spec (the platform parameters): backend dir, frontend config + page, and all the wiring (`paths.py`, `main.py`, dashboard, seeded profiles) via anchor comments. Idempotent, with `--dry-run`.',
+          '**Duty & Tax agent** (`/agents/duty`) — autonomous landed-cost estimation. Describe a shipment in plain language and it classifies the HS code, looks up duty/VAT rates, and computes the breakdown via a tool-use loop; or enter figures directly for a deterministic quote. Rates come from a swappable `DutyRateProvider` (mock sample data by default).',
+          '**Onboarding agent** (`/agents/onboarding`) — role-aware (sales / ops) guided chat grounded in the knowledge vault and an editable onboarding curriculum, with a per-user progress checklist.',
+          '**Forecasting agent** (`/agents/forecast`) — pipeline by vertical and stage, a probability-weighted revenue forecast, and pipeline-hygiene flags, over deals pulled from a swappable CRM connector (mock HubSpot by default).',
+          'Shared platform helpers: `agents/shared/anthropic_client.py` (one shared client + a single org-wide rate-limit slot + model constants) and `agents/shared/jsonstore.py` (generic per-user JSON CRUD), used by the generated agents.',
+        ],
+      },
+    ],
+  },
   {
     version: '1.4.0',
     date: '2026-06-16',

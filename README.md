@@ -16,7 +16,7 @@ stay private.
 > with their prompt bodies withheld.
 >
 > It is real code, and it checks out: `npm run build` runs the frontend tests,
-> the design-system adherence gate and 28 pages; `pytest` runs green. What it
+> the design-system adherence gate and 28 routes; `pytest` runs green. What it
 > will not do is useful work — the agents whose prompts are withheld cannot
 > reason, and there is no vault content for them to reason over. Read it to see
 > how the thing is built, not to run it.
@@ -33,7 +33,7 @@ short and the interesting code is in the layer underneath them.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  Astro frontend — one shell, 27 pages                    │
+│  Astro frontend — one shell, 26 pages                    │
 └──────────────────────────┬───────────────────────────────┘
                            │ REST + SSE
 ┌──────────────────────────▼───────────────────────────────┐
@@ -103,7 +103,7 @@ client is still here.
 
 ![The studio](docs/images/screen-owl-workspace.png)
 
-One system across 27 pages — "the studio". `tokens.css` is the source of truth
+One system across 26 pages — "the studio". `tokens.css` is the source of truth
 and a build gate fails on raw `px`, so a value outside the system cannot quietly
 appear in a page.
 
@@ -151,7 +151,7 @@ backend/
 frontend/src/
   design-system/ tokens, primitives, components, previews
   lib/           behaviour, with unit tests beside it
-  pages/         the 27-page surface
+  pages/         the 26-page surface
 docs/            architecture, design system, operations, per-agent pages
 tools/           the publication boundary
 ```

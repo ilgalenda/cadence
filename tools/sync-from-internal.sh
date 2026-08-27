@@ -74,8 +74,11 @@ SUPERSEDED=(
   frontend/src/pages/agents/calls
   frontend/src/pages/agents/lead
   frontend/src/pages/agents/high-intent
-  # High-Intent does not exist in 2.0; its doc page must not outlive it.
+  # The v1 agents do not exist in 2.0; their doc pages must not outlive them.
   docs/agents/high-intent.md
+  docs/agents/calls.md
+  docs/agents/lead.md
+  docs/agents/owl.md
   frontend/src/pages/agents/owl
   frontend/src/pages/agents
   # Astro build cache, tracked at v1 by accident.

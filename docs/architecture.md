@@ -13,7 +13,7 @@ That is what most of this document is about.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Astro frontend — one shell, 27 pages                        │
+│  Astro frontend — one shell, 26 pages                        │
 │  workspace · agent pages · knowledge wiki · call library     │
 └───────────────────────────┬──────────────────────────────────┘
                             │  REST + SSE
@@ -81,6 +81,8 @@ choice. Consolidating them bought the things you only get from a single seam:
 | `persona.py` | the single voice, plus the chat stance overlay |
 | `memory.py`, `memory_db.py` | per-user memory over SQLite |
 | `usage.py` | token and cost accounting |
+| `contributions_block.py` | contributed knowledge, demoted and fenced before it reaches a prompt |
+| `memory_seed.py` | first-run memory for a new user |
 
 ### Persona — one voice, one overlay
 
@@ -143,6 +145,7 @@ writing like each other.
 | `mail_draft.py` | filing an approved draft into Gmail |
 | `style_personalisation.py` | the per-user writing overlay |
 | `sitemap.py` | keeping the page-taxonomy map in step with the live site |
+| `name_sources.py` | the second name source behind X-ray discovery |
 
 Two of these are deterministic on purpose. **A model that could move the lead
 score would make the score meaningless**, and the same argument applies to the

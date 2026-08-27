@@ -1,7 +1,7 @@
 # The design system — "the studio"
 
 Cadence runs on one design system, rebuilt 2026-08-19 and ratified 2026-08-20.
-It is not a component library bolted onto the app; it is the reason 27 pages
+It is not a component library bolted onto the app; it is the reason 26 pages
 look like one product.
 
 `frontend/src/design-system/tokens.css` is the source of truth for colour, type,

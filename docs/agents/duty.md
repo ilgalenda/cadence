@@ -1,5 +1,12 @@
 # Duty & Tax Agent
 
+> **Operations — part two.**
+> A v1 agent, kept deliberately. It predates the Owl Mind and still calls the
+> retired `agents.shared.anthropic_client` directly, so it is not registered in
+> `backend/main.py` and does not run in this build. Bringing these onto the Mind
+> is the next section of work; see [Operations](../operations.md).
+
+
 Autonomous shipment landed-cost estimation for operations teams. Describe a
 shipment in plain language and the agent classifies the HS code, looks up
 duty/VAT rates, and computes the breakdown via a tool-use loop — or enter the

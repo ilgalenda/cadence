@@ -1,5 +1,12 @@
 # Forecasting Agent
 
+> **Operations — part two.**
+> A v1 agent, kept deliberately. It predates the Owl Mind and still calls the
+> retired `agents.shared.anthropic_client` directly, so it is not registered in
+> `backend/main.py` and does not run in this build. Bringing these onto the Mind
+> is the next section of work; see [Operations](../operations.md).
+
+
 Pipeline, hygiene, and revenue analysis over deals synced from a CRM. Splits the
 pipeline by vertical and stage, computes a probability-weighted forecast, and
 flags data-quality issues — all deterministic, no LLM. It also hosts the

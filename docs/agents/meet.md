@@ -1,7 +1,14 @@
 # Meet Agent
 
+> **Operations — part two.**
+> A v1 agent, kept deliberately. It predates the Owl Mind and still calls the
+> retired `agents.shared.anthropic_client` directly, so it is not registered in
+> `backend/main.py` and does not run in this build. Bringing these onto the Mind
+> is the next section of work; see [Operations](../operations.md).
+
+
 A lightweight capture endpoint for Google Meet transcripts. It stores a raw
-transcript and hands the text off to the [Calls](calls.md) agent for analysis —
+transcript and hands the text off to the [Calls](call-analysis.md) agent for analysis —
 no LLM of its own.
 
 Router prefix: `/api/meet` (gated by `require_authed`). Backend: `backend/agents/meet/`.

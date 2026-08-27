@@ -1,324 +1,161 @@
-# Cadence — an Agentic GTM Platform
+# Cadence
 
-Cadence gives sales and GTM teams purpose-built AI agents backed by a shared knowledge vault that grows with every interaction. Analyse calls, run prospect pipelines, and chat with an assistant that learns from both.
+An agentic platform for sales and operations. Eleven purpose-built agents on a
+shared brain: one governed gateway to the model, one voice, a three-pillar
+knowledge vault, and per-user memory.
 
-This repository is the **open architecture**, not a turnkey product with data inside. Clone it, point it at your own Anthropic key and your own knowledge, seed your own users, and you have your own system. It ships **code and structure only** — no vault content, no runtime data, no user records.
+Built for Acme, the company I work for. Published here as an **architecture
+showcase** — the knowledge vault, all operational data and the prompt library
+stay private.
 
-> **What's included vs what you bring.** The repo contains the application, the agent logic, and an empty vault/knowledge skeleton. The knowledge vault, agent runtime state (campaigns, leads, sessions, learnings), and user accounts are **created at runtime under your `DATA_ROOT`** — see [Where runtime data lives](#where-runtime-data-lives) and [Getting started](#getting-started). Nothing proprietary is committed here.
+![Cadence home](docs/images/screen-cadence-home.png)
 
-The example domain throughout (a timing-technology sales team) is just illustrative — Cadence is domain-agnostic. Swap in your own product knowledge and personas and it adapts.
-
----
-
-## System overview
-
-```
-┌───────────────────────────────────────────────────────────────────┐
-│                           Astro Frontend                            │
-│    Dashboard · Calls · Lead · Owl · Duty · Onboarding · Forecast    │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │ REST + SSE (streaming)
-┌──────────────────────────────▼──────────────────────────────────────┐
-│                          FastAPI Backend                            │
-│                                                                     │
-│   Sales / GTM                          Operations                   │
-│   ┌───────┐ ┌──────┐ ┌─────┐    ┌──────┐ ┌────────────┐ ┌──────────┐│
-│   │ Calls │ │ Lead │ │ Owl │    │ Duty │ │ Onboarding │ │ Forecast ││
-│   └───┬───┘ └──┬───┘ └──┬──┘    └──┬───┘ └─────┬──────┘ └────┬─────┘│
-│       └────────┴────────┴─────┬────┴───────────┴─────────────┘      │
-│                               │                                     │
-│          ┌────────────────────▼─────────────────────┐              │
-│          │                Shared Vault               │              │
-│          │              (Obsidian-compat.)           │              │
-│          └───────────────────────────────────────────┘              │
-│                                                                     │
-│   Agent Creator (CLI) → scaffolds new agents from a spec            │
-│   Duty & Forecast also call swappable external connectors           │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │
-                 ┌─────────────▼──────────────┐
-                 │         Anthropic API        │
-                 │       Haiku 4.5 · Sonnet      │
-                 └──────────────────────────────┘
-```
+> **This is a showcase repository.** The architecture, the orchestration, the
+> design system and three exemplar agents are here in full, working code. The
+> other eight agents ship with their signatures, docstrings and contracts, and
+> with their prompt bodies withheld.
+>
+> It is real code, and it checks out: `npm run build` runs the frontend tests,
+> the design-system adherence gate and 28 pages; `pytest` runs green. What it
+> will not do is useful work — the agents whose prompts are withheld cannot
+> reason, and there is no vault content for them to reason over. Read it to see
+> how the thing is built, not to run it.
 
 ---
 
-## Documentation
+## The idea
 
-Full reference docs live in [`docs/`](docs/README.md):
+**Agents should be thin because the platform is thick.**
 
-- **[Architecture](docs/architecture.md)** — layers, request lifecycle, auth &
-  access control, the `DATA_ROOT` data model, the three-pillar vault, the shared
-  Claude client, and frontend conventions.
-- **[Agent Creator](docs/agent-creator.md)** — scaffold a new agent from a spec.
-- **Per-agent guides** — [Calls](docs/agents/calls.md) ·
-  [Lead](docs/agents/lead.md) · [Owl](docs/agents/owl.md) ·
-  [High-Intent](docs/agents/high-intent.md) · [Meet](docs/agents/meet.md) ·
-  [Duty & Tax](docs/agents/duty.md) · [Onboarding](docs/agents/onboarding.md) ·
-  [Forecasting](docs/agents/forecast.md) (incl. the Pipeline Manager).
+Reasoning, voice, knowledge and memory are platform services. What is left of an
+agent is one job and the seam either side of it — which is why the modules are
+short and the interesting code is in the layer underneath them.
 
-The sections below are a quick tour; the per-agent docs are the detail.
+```
+┌──────────────────────────────────────────────────────────┐
+│  Astro frontend — one shell, 27 pages                    │
+└──────────────────────────┬───────────────────────────────┘
+                           │ REST + SSE
+┌──────────────────────────▼───────────────────────────────┐
+│  FastAPI backend                                         │
+│                                                          │
+│   eleven sales agents — each one job, each a tool on Owl │
+│                          │                               │
+│   ┌──────────────────────▼──────────────────────────┐    │
+│   │  OWL                                            │    │
+│   │  Mind · Persona · Knowledge · Memory            │    │
+│   └──────────────────────┬──────────────────────────┘    │
+│                          │                               │
+│   capability services · integrations                     │
+└──────────────────────────┬───────────────────────────────┘
+                           │
+                  ┌────────▼────────┐
+                  │  Anthropic API  │
+                  └─────────────────┘
+```
 
-## Agents
-
-### Calls Agent
-
-Analyses sales call recordings and transcripts using Claude.
-
-- Upload an audio file or paste a transcript
-- Streams a structured analysis: summary, buying signals, objections raised, follow-up talking points, concepts mentioned, learnings, new glossary terms, and a short multiple-choice quiz
-- Product fit is **opt-in** — generated on demand (`POST /api/calls/{id}/product-recommendation`, optionally naming the product) rather than on every call, since the rep usually already knows the product
-- Extracts atomic learnings from each call and stores them per-user
-- Learnings accumulate over time into a personal knowledge layer, injected into future sessions as context
-- Grounded in a **transcript-scoped slice of the vault** (`load_vault_for_analysis`) — only the entities, glossary terms, and learnings the call references, plus a small always-on core — so each analysis stays cheap without losing relevant context
-
-### Lead Agent
-
-Manages prospect pipelines and campaign intelligence.
-
-- Analyses companies for ICP fit, buying intent signals, and product alignment
-- Generates outreach recommendations and campaign summaries
-- Google Calendar integration for scheduling follow-ups
-- Connects to the shared vault so call-derived intelligence informs lead strategy
-
-### Owl
-
-A conversational assistant with intelligent model routing.
-
-- Full chat interface grounded in the combined knowledge vault
-- Routes each message to the cheapest model that can handle it well:
-  - **Haiku** — simple lookups, short factual questions
-  - **Sonnet** — analytical questions, strategy, multi-step reasoning
-- Routing is keyword-based with length heuristics (see `backend/agents/owl/routing.py`)
-- Tags each session with extracted topics for browsable history
-- **Call-aware mode**: opened on an analysed call (`?call_id=…`), Owl is grounded in that call's analysis as its default context and scopes the vault to it; the verbatim transcript is pulled in only on demand via a `fetch_transcript` tool, so a call deep-dive stays cheap until exact wording is actually needed
-
-### Duty & Tax
-
-Autonomous shipment landed-cost estimation for operations teams.
-
-- Describe a shipment in plain language and the agent classifies the HS code, looks up duty/VAT rates, and computes the breakdown via a tool-use loop — or enter the figures directly for a deterministic quote
-- The arithmetic (`agents/duty/calc.py`) and the rates (`agents/duty/rates.py`) are deterministic local functions; the model only orchestrates and explains
-- Rates come from a swappable `DutyRateProvider` — a generic sample table ships by default; implement the interface against a real tariff/customs API to go live
-
-### Onboarding
-
-A role-aware guided chat for new sales and ops users.
-
-- Grounded in the shared knowledge vault and an editable onboarding curriculum (`agents/onboarding/curriculum.md`)
-- Picks a track (sales / GTM or operations) and walks newcomers through the platform one step at a time, with a per-user progress checklist
-
-### Forecasting
-
-Pipeline, hygiene, and revenue analysis.
-
-- Pipeline split by vertical and stage, a probability-weighted revenue forecast, and pipeline-hygiene flags (stale deals, missing amounts/close dates, past-due closes)
-- Deals are pulled from a swappable `CRMConnector` — a mock HubSpot connector with sample data ships by default; implement the interface (OAuth shape mirrors the Lead agent's Google Calendar connector) to connect a real CRM
-- **Pipeline Manager** — a deterministic daily briefing (no LLM) that surfaces deals **gone quiet** and prospects **sitting too long** (in the pipeline or a single stage), alongside the open/weighted summary and overdue closes. Preview it on the page (`GET /api/forecast/briefing`) or email it (`POST /api/forecast/briefing/send`, via the admin SMTP). To get it **every morning**, schedule the cron entry:
-  ```bash
-  # weekdays at 07:00 — emails ADMIN_NOTIFY_EMAIL
-  0 7 * * 1-5 cd /path/to/cadence/backend && python scripts/morning_briefing.py --user admin
-  ```
+Read [the architecture](docs/architecture.md) for how that actually works.
 
 ---
 
-## Cadence Knowledge — three-pillar architecture
+## Two rules the platform enforces
 
-Every agent writes to and reads from a shared vault at `${DATA_ROOT}/vault/`. It is a valid [Obsidian](https://obsidian.md) vault — open the directory directly to browse the full knowledge graph. `[[wikilinks]]` cross pillar boundaries freely, so Obsidian renders the three pillars as a single connected graph.
+1. **Agents draft and populate; the human always sends.** The Google grant is
+   `gmail.compose` — it can create a draft, and can neither read the mailbox nor
+   send. Google enforces the restraint, not our discipline.
+2. **Every consequential step passes a human review gate.**
 
-The vault is split into three pillars, each with a distinct lifecycle:
+---
 
-```
-vault/
-├── company/        # Pillar 1 — Company Truth (locked, canonical)
-│   ├── products/         # hardware, solutions, industries, datasheets
-│   ├── research/         # learn pillars, clusters, weekly digests
-│   ├── knowledge/        # curated KB markdown
-│   ├── entities/         # product / protocol / customer definitions
-│   └── glossary/         # seed glossary terms
-├── dynamic/        # Pillar 2 — Dynamic Truth (auto-grown)
-│   ├── calls/            # learnings extracted from every analysed call
-│   ├── lead/             # learnings from every outreach campaign
-│   └── glossary/         # new terms discovered at runtime
-└── added/          # Pillar 3 — Added Knowledge (admin-gated)
-    ├── pending/          # awaiting admin review — NOT loaded by Owl
-    ├── approved/         # admin-approved corrections — loaded by Owl
-    └── rejected/         # archived; never loaded
-```
+## The eleven agents
 
-**Pillar 1 — Company Truth.** Hand-curated, canonical knowledge for your organisation — products, protocols, research. Locked: the runtime never writes here. New folders are dropped into `company/` and normalised with `python3 backend/scripts/normalise_company_truth.py`, which adds the `tier: company`, `locked: true`, `description`, and `[[wikilink]]` injection in place. Idempotent — safe to re-run. This is the pillar you populate to make Cadence your own.
+| | Job |
+|---|---|
+| **[Lead Scoring](docs/agents/scoring.md)** | How hot is this lead, and why. The score is deterministic — a model that could move the number would make the number meaningless |
+| **[GTM](docs/agents/gtm.md)** | Propose accounts worth approaching. Fast and deliberately unverified; checking happens downstream where the path already puts it |
+| **[X-ray](docs/agents/xray.md)** | Given an account and why it matters, find the people who could own the problem |
+| **[Research](docs/agents/research.md)** | The brief you read before you write anything |
+| **[Campaign Intelligence](docs/agents/campaign-intelligence.md)** | What this market already told us, before you write to it |
+| **[Campaign Selection](docs/agents/campaign-selection.md)** | The shape of the campaign. No LLM call anywhere in the module |
+| **[Composer](docs/agents/composer.md)** | The outreach touches, in Owl's voice, for a human to send |
+| **[Call Analysis](docs/agents/call-analysis.md)** | A transcript, read the way a sales colleague would read it |
+| **[Recap](docs/agents/recap.md)** | The follow-up the client gets, in writing, for a human to send |
+| **[Knowledge Capture](docs/agents/knowledge-capture.md)** | What a call taught the company, written down |
+| **[Signals](docs/agents/signals.md)** | The watchlist that notices things |
 
-**Pillar 2 — Dynamic Truth.** Empirical insights extracted by the Calls and Lead agents from real customer interactions. Every entry carries both a `title` and a one-sentence `description`, enforced by the vault writer.
+Lead Scoring, GTM and X-ray are published with their prompts intact.
 
-**Pillar 3 — Added Knowledge.** When a user corrects Owl in conversation ("actually that's wrong, X is…"), a lightweight classifier detects the correction intent and shows an inline confirmation card in the Owl drawer. On confirm, the correction lands in `added/pending/`. The admin gets an in-app badge on the `/admin` Approvals tab and an email (if SMTP is configured). On approve, the file moves to `added/approved/` and is loaded into Owl's context on the next turn. On reject, it moves to `added/rejected/` and is never loaded.
+---
 
-**Loader precedence.** Owl assembles context in this order, so Company Truth is never crowded out: Company Truth → Entities → Glossary (company first, then dynamic) → Dynamic Truth (scored top-N) → Approved Added Knowledge (capped) → linked entities pulled in via `[[wikilinks]]`.
+## Operations — part two
 
-Frontmatter contract: every runtime write requires both `title` and `description`; Added entries also carry `status: pending|approved|rejected` plus `reviewed_by` / `reviewed_at` / `review_notes` once an admin acts.
+Four v1 agents — Duty & Tax, Forecasting, Onboarding and Meet — are kept in this
+repository on purpose. They predate the Owl Mind, still call the layer it
+replaced, and are **not registered** in `backend/main.py`. Bringing them onto the
+Mind is the next section of work.
+
+See [Operations](docs/operations.md) for what that involves and why the old
+client is still here.
+
+---
+
+## The design system
+
+![The studio](docs/images/screen-owl-workspace.png)
+
+One system across 27 pages — "the studio". `tokens.css` is the source of truth
+and a build gate fails on raw `px`, so a value outside the system cannot quietly
+appear in a page.
+
+[See the whole thing](docs/design-system.md) — screens, colour, type, motion,
+material, components.
+
+---
+
+## What is deliberately not here
+
+| | Why |
+|---|---|
+| The knowledge vault's content | It is real company knowledge, and the architecture is the part worth showing. Ships as empty scaffolding |
+| Call learnings, campaigns, sessions, the user roster | Operational data. It lives outside the repository entirely, under `DATA_ROOT` |
+| The prompt library | The commercial edge. Eight agents keep their signatures, docstrings and contracts; the bodies raise `NotImplementedError` |
+| Credentials of any kind | `.env.example` shows the shape; nothing else |
+
+The boundary is mechanical rather than remembered — `tools/sync-from-internal.sh`
+copies by allowlist and fails on anything not named in it, and
+`backend/paths.py` routes every mutable path through `DATA_ROOT` so operational
+writes never land in the working tree in the first place.
 
 ---
 
 ## Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | [Astro](https://astro.build), Tailwind CSS |
-| Backend | Python, [FastAPI](https://fastapi.tiangolo.com), Uvicorn |
-| AI | [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python), streaming via SSE |
-| Models | Claude Haiku 4.5, Claude Sonnet 4.6 |
-| Auth | Session-based (bcrypt passwords, `starlette` sessions) |
+Astro · Tailwind · FastAPI · Uvicorn · SQLite · the Anthropic API over SSE, with
+Haiku, Sonnet and Opus routed per task by `agents/mind/registry.py`.
 
----
-
-## Project structure
+## Layout
 
 ```
-cadence/
-├── backend/
-│   ├── main.py                     # FastAPI app, auth middleware, router mounting
-│   ├── auth.py                     # Login, session, role + per-agent-access helpers
-│   ├── paths.py                    # Resolves every mutable path under DATA_ROOT
-│   ├── seed_users.py               # Seeds your user accounts + credentials
-│   ├── .env.example                # Required environment variables
-│   ├── requirements.txt
-│   ├── agents/
-│   │   ├── calls/                  # Call analysis, glossary, learnings, opt-in product fit
-│   │   ├── lead/                   # Campaigns, prospecting, scoring, Google Calendar
-│   │   ├── owl/                    # Grounded chat (SQLite), model routing, topics
-│   │   ├── high_intent/            # LinkedIn intent signals + outreach (admin sandbox)
-│   │   ├── meet/                   # Google Meet transcript capture
-│   │   ├── duty/                   # Duty & Tax — calc.py, rates.py, tool-use routes
-│   │   ├── onboarding/             # Role-aware guided chat + curriculum.md
-│   │   ├── forecast/               # Pipeline analytics + crm.py connector
-│   │   └── shared/
-│   │       ├── vault.py            # Vault read/write, entity linking, frontmatter
-│   │       ├── anthropic_client.py # Shared Claude client + rate-limit slot + model ids
-│   │       ├── jsonstore.py        # Generic per-user JSON CRUD (used by new agents)
-│   │       ├── jsonparse.py        # Tolerant JSON extraction from model output
-│   │       └── notifications.py    # Admin email (approval flow)
-│   ├── scripts/
-│   │   ├── create_agent.py         # Agent Creator — scaffold a new agent from a spec
-│   │   ├── templates/agent/        # Templates the generator renders
-│   │   ├── specs/                  # Example agent specs (duty, onboarding, forecast)
-│   │   └── normalise_company_truth.py
-│   └── tests/                      # Deterministic unit tests (scoring, duty, forecast)
-└── frontend/
-    ├── src/
-    │   ├── agents/                 # Per-agent UI config (name, tagline, nav)
-    │   ├── pages/agents/           # calls · lead · owl · duty · onboarding · forecast
-    │   ├── components/             # Shared UI (Owl drawer, page header, status dot)
-    │   ├── layouts/                # AgentLayout, DashboardLayout, LoginLayout
-    │   └── lib/                    # owlChat.ts (SSE client + markdown), leadCards.ts, version.ts
-    └── astro.config.mjs
+backend/
+  agents/
+    mind/        the governed gateway: client, registry, governor, cache,
+                 tooling, persona, memory, usage
+    services/    deterministic capability: scoring, review, selection,
+                 discovery, enrichment, outreach, style
+    sales/       the eleven agents
+    owl/         workspace: projects, threads, search
+    learn/  wiki/  admin/
+    duty/ forecast/ onboarding/     Operations — part two
+  integrations/  Google OAuth, Gmail, Calendar, contact enrichment
+  tests/         42 suites, green
+frontend/src/
+  design-system/ tokens, primitives, components, previews
+  lib/           behaviour, with unit tests beside it
+  pages/         the 27-page surface
+docs/            architecture, design system, operations, per-agent pages
+tools/           the publication boundary
 ```
-
----
-
-## Where runtime data lives
-
-Cadence stores all mutable state (vault, leads, sessions, Owl conversations, `users.json`, `users_credentials.json`, etc.) under a directory named by the `DATA_ROOT` env var. **None of it is committed to this repo** — it is created the first time you run the app.
-
-| Variable | Purpose | Default |
-|---|---|---|
-| `DATA_ROOT` | Root for all mutable state | `~/cadence-data` if unset; set it explicitly for production, e.g. `/srv/cadence/backend` |
-
-Two files split the user model, and **neither is committed**:
-
-- `${DATA_ROOT}/agents/users.json` — profiles (name, role, access, agents). Generate it from your own roster with `python backend/seed_users.py --rewrite-profiles` (edit `_DEFAULT_PROFILES` in that file first).
-- `${DATA_ROOT}/agents/users_credentials.json` — per-environment bcrypt password hashes. Each machine runs `python backend/seed_users.py` once to populate it from the local `.env`.
-
-> **Optional: data-in-git.** If you want a team to share live data through the repo, you can point `DATA_ROOT` at the repo's own `backend/` directory and run a cron that commits and pushes new data back — every clone then stays coherent. This is an advanced, opt-in pattern; keep your repo **private** if you do this, since the vault and runtime state then contain your real data. By default `DATA_ROOT` lives outside the repo and nothing operational is ever committed.
-
----
-
-## Getting started
-
-**Prerequisites:** Python 3.11+, Node 18+, an [Anthropic API key](https://console.anthropic.com/).
-
-**Environment variables you supply (see `backend/.env.example`):**
-
-| Variable | Where to get it |
-|---|---|
-| `ANTHROPIC_API_KEY` | console.anthropic.com → Settings → API Keys |
-| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` (optional) | Google Cloud Console → APIs & Services → Credentials → Create OAuth client (Web). Only needed for the Lead agent's Calendar integration. Add `GOOGLE_REDIRECT_URI` to "Authorised redirect URIs" |
-| `GOOGLE_REDIRECT_URI` (optional) | The deployment URL + `/api/lead/google/callback` (e.g. `https://your-deployment-host/api/lead/google/callback`) |
-| `SESSION_SECRET` | Generate: `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
-| `SMTP_*` (optional) | For admin approval emails. Gmail needs an App Password. The system degrades gracefully if unset |
-
-**Steps:**
-
-```bash
-# 1. Clone
-git clone https://github.com/ilgalenda/cadence.git
-cd cadence
-
-# 2. Backend env
-cd backend
-cp .env.example .env
-# In .env, set at minimum:
-#   DATA_ROOT=/path/to/cadence-data        (a directory OUTSIDE the repo)
-#   SESSION_SECRET, ANTHROPIC_API_KEY
-#   DEBUG=true                             (false in production)
-#   A password per profile in seed_users.py, e.g. ADMIN_PASSWORD, USER1_PASSWORD
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-# 3. Seed your users
-#    --rewrite-profiles writes users.json from _DEFAULT_PROFILES (edit it first
-#    for your own team). Drop the flag on later runs to refresh credentials only.
-#    Both files land under DATA_ROOT and are gitignored.
-python seed_users.py --rewrite-profiles
-
-# 4. Start the backend
-python main.py                # starts on http://localhost:8000
-
-# 5. Frontend (separate terminal)
-cd frontend
-npm install
-npm run dev                   # hot reload on :4321, proxies the API to :8000
-```
-
-For a production-style run, build the frontend once (`npm run build`) — the backend then serves the built UI from `frontend/dist/` at `/`.
-
-You can now log in with one of the accounts you seeded (e.g. `admin` with the `ADMIN_PASSWORD` you set). Anything the app writes — Owl conversations, learnings, leads, vault changes — lands under your `DATA_ROOT`, so `git status` stays clean while you experiment.
-
-### Make it your own
-
-1. **Add product/company knowledge.** Drop markdown into `${DATA_ROOT}/vault/company/` (and `agents/calls/knowledge/`, `agents/lead/knowledge/`), then run `python3 backend/scripts/normalise_company_truth.py` to normalise frontmatter and wikilinks. This is what grounds every agent.
-2. **Define your users.** Edit `_DEFAULT_PROFILES` in `backend/seed_users.py` and re-run `seed_users.py --rewrite-profiles`.
-3. **Tune the agents.** Prompts live in `backend/agents/*/prompts.py`; Owl's model routing in `backend/agents/owl/routing.py`.
-4. **Add your own agent.** Scaffold one from a small spec with the Agent Creator — it emits the backend dir, the frontend config + page, and all the wiring:
-   ```bash
-   python backend/scripts/create_agent.py --slug renewals --name "Renewals" \
-     --tagline "Track and forecast renewals" --kind crud --entity renewal
-   # or from a spec file: --spec backend/scripts/specs/<slug>.json  (add --dry-run to preview)
-   ```
-
-### Admin per-session sandbox (in-app)
-
-Admins can flip a session-scoped sandbox toggle (`POST /api/admin/sandbox/enable`) to route writes for the active session into `_sandbox/` subdirs alongside the canonical paths. Use this to try a flow in a real deployment without polluting production data. Disable to return to normal.
-
-### Connecting Google Calendar (optional)
-
-`google_tokens.json` is never committed. In the Lead agent → "Connect Google Calendar" → complete OAuth → the token file is created automatically under `${DATA_ROOT}/agents/lead/data/`.
-
----
-
-## Deploying
-
-Run `bin/deploy.sh` on the server. It pulls the latest code, installs frontend deps, **rebuilds `frontend/dist/`**, and restarts the backend — in that order.
-
-```bash
-bin/deploy.sh
-# override the service name if it isn't "cadence":
-CADENCE_SERVICE=my-service bin/deploy.sh
-```
-
-> ⚠️ Do **not** deploy with `git pull && systemctl restart cadence` alone. The backend serves the UI from `frontend/dist/`, which is gitignored and built on the server — a plain pull updates the source but not `dist/`, so the **old UI keeps being served** until `npm run build` runs. `bin/deploy.sh` is that missing build step wrapped up so it can't be forgotten.
-
----
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

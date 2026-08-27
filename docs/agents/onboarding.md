@@ -1,5 +1,12 @@
 # Onboarding Agent
 
+> **Operations — part two.**
+> A v1 agent, kept deliberately. It predates the Owl Mind and still calls the
+> retired `agents.shared.anthropic_client` directly, so it is not registered in
+> `backend/main.py` and does not run in this build. Bringing these onto the Mind
+> is the next section of work; see [Operations](../operations.md).
+
+
 A role-aware guided chat that walks new sales and operations users through the
 platform, grounded in the team's knowledge vault and an editable curriculum.
 Used by both tracks.

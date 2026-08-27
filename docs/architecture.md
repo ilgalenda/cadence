@@ -1,147 +1,243 @@
 # Architecture
 
-Cadence is an extensible, multi-agent platform: an Astro frontend talks to a
-FastAPI backend over REST + SSE; each agent is a self-contained backend package
-plus a frontend config and pages; all agents share one knowledge vault, one
-Claude client, and one storage convention. Everything mutable lives under
-`DATA_ROOT` — the repository is code and structure only.
+Cadence is an agentic platform for sales and operations. Its organising idea is
+that **the agents should be thin because the platform is thick**: reasoning,
+voice, knowledge and memory are platform services, so an agent is left with one
+job and the seam either side of it.
+
+That is what most of this document is about.
+
+---
+
+## The four layers
 
 ```
-Astro frontend ──REST + SSE──▶ FastAPI backend ──▶ agents/* ──▶ Shared Vault
-                                                  └──▶ Anthropic API (Haiku · Sonnet)
+┌──────────────────────────────────────────────────────────────┐
+│  Astro frontend — one shell, 27 pages                        │
+│  workspace · agent pages · knowledge wiki · call library     │
+└───────────────────────────┬──────────────────────────────────┘
+                            │  REST + SSE
+┌───────────────────────────▼──────────────────────────────────┐
+│  FastAPI backend                                             │
+│                                                              │
+│   eleven sales agents  ──────────────┐                       │
+│   each one job, each a tool on Owl   │                       │
+│                                      ▼                       │
+│   ┌──────────────────────────────────────────────────────┐   │
+│   │  OWL — the platform brain                            │   │
+│   │                                                      │   │
+│   │  Mind       one governed gateway to the model        │   │
+│   │  Persona    one voice, with a stance overlay         │   │
+│   │  Knowledge  the three-pillar vault                   │   │
+│   │  Memory     per-user accounts, deals, preferences    │   │
+│   └──────────────────────────────────────────────────────┘   │
+│                                      ▲                       │
+│   capability services ───────────────┘                       │
+│   scoring · review · selection · discovery · enrichment      │
+│   outreach · mail drafting · style personalisation           │
+│                                                              │
+│   integrations: Google OAuth · Gmail · Calendar · enrichment │
+└───────────────────────────┬──────────────────────────────────┘
+                            │
+                   ┌────────▼────────┐
+                   │  Anthropic API  │
+                   └─────────────────┘
 ```
 
-## Layers
+---
 
-| Layer | Where | Responsibility |
-|---|---|---|
-| Frontend | `frontend/src/` | Per-agent config (`agents/<slug>/config.ts`), pages (`pages/agents/<slug>/`), shared UI (`components/`, `layouts/`), shared client libs (`lib/owlChat.ts`, `lib/leadCards.ts`) |
-| API + auth | `backend/main.py`, `backend/auth.py` | App assembly, session auth middleware, router mounting, login/sandbox endpoints |
-| Agents | `backend/agents/<slug>/` | One package per capability — `routes.py` (+ `storage.py`, `prompts.py`, `pipeline.py`, `knowledge.py` as needed) |
-| Shared | `backend/agents/shared/` | Vault, Claude client, JSON storage, JSON parsing, notifications |
-| Paths | `backend/paths.py` | Resolves every mutable path under `DATA_ROOT` |
+## Mind — one gateway, not thirteen call sites
+
+`backend/agents/mind/` is the only place in Cadence that talks to a model.
+
+Before it existed there were thirteen hand-rolled call sites, each with its own
+retry behaviour, its own idea of how to parse a response and its own model
+choice. Consolidating them bought the things you only get from a single seam:
+
+- **A task-shaped API.** Callers ask for `analyze`, `compose`, `chat`,
+  `classify` or `research` — not for a model and a temperature. Which model
+  serves a task is a routing decision (`registry.py`), made once and changed
+  once.
+- **A governor.** `governor.py` holds a `BoundedSemaphore`, default size 1
+  (`MIND_MAX_CONCURRENCY`). Concurrency against a rate-limited API is a property
+  of the platform, not something each agent should rediscover.
+- **Prompt caching that actually hits.** `blocks.py` assembles the system prompt
+  as an ordered set of blocks with the stable content first, so the cached prefix
+  stays byte-identical across calls. Anything per-run rides at the tail.
+- **One parser.** `jsonparse` handles the model returning prose around JSON,
+  which it sometimes does, in one place instead of eleven.
+- **Usage accounting.** `usage.py` records tokens and cost per call, so an
+  expensive path is visible rather than inferred from the bill.
+
+| module | job |
+|---|---|
+| `core.py` | the task-shaped API every agent calls |
+| `client.py` | the Anthropic client and its retry behaviour |
+| `registry.py` | which model serves which task |
+| `governor.py` | concurrency ceiling |
+| `blocks.py` | system-prompt assembly, cache-stable ordering |
+| `cache.py` | prompt-cache bookkeeping |
+| `tooling.py` | the tool-use loop |
+| `persona.py` | the single voice, plus the chat stance overlay |
+| `memory.py`, `memory_db.py` | per-user memory over SQLite |
+| `usage.py` | token and cost accounting |
+
+### Persona — one voice, one overlay
+
+There used to be three Owls: a chat Owl, a refinement Owl and a composition Owl,
+each with its own drifting personality. `persona.py` is the correction. One
+persona core, plus a `CHAT_STANCE` overlay that applies **only** to conversational
+surfaces. Composition and analysis never see it, so the voice that writes to a
+customer cannot pick up the register of a chat window.
+
+---
+
+## Knowledge — three pillars, in priority order
+
+The vault is Markdown on disk, Obsidian-compatible, under `${DATA_ROOT}/vault`.
+
+1. **Company Truth** (`company/`) — hand-curated, canonical, locked. When pillars
+   conflict, this wins.
+2. **Dynamic Truth** (`dynamic/`) — learnings the platform extracted from real
+   calls and campaigns. Written automatically; strong signal about how the
+   company actually sells today.
+3. **Added Knowledge** (`added/`) — user-submitted corrections, `pending/` until
+   an admin approves them into `approved/`.
+
+Loader precedence is what protects canon: a lower pillar can add to the picture
+but cannot overwrite the top one. Every write requires a `title` and a
+`description`, so nothing enters the vault anonymously.
+
+**Contributed knowledge is untrusted input on a direct path into a prompt**, and
+is treated as such: headings in a contribution are demoted below `###` so a
+submission cannot forge a section boundary, and instruction-shaped content is
+*refused* rather than stripped — a rejection the contributor can see beats a
+silent edit they cannot.
+
+The vault ships in this repo as empty scaffolding. Content is data, and data does
+not travel.
+
+---
+
+## Memory — per user, and deliberately not shared
+
+`memory_db.py` keeps accounts, deals, context and preferences per user in SQLite.
+Style Personalisation is per-user and private: it shapes what *you* draft and
+never feeds the shared Owl persona. Two people using Cadence do not end up
+writing like each other.
+
+---
+
+## Capability services
+
+`backend/agents/services/` holds the work that is not reasoning:
+
+| service | job |
+|---|---|
+| `lead_scoring.py` | the deterministic score — rules, not a model |
+| `campaign_selection.py` | the deterministic campaign shape |
+| `review.py` | the approval queue every consequential step passes through |
+| `web_discovery.py` | grounded search |
+| `enrichment.py` | contact reveal, per person, paid per credit |
+| `outreach.py` | the two-pass draft → refine primitive |
+| `mail_draft.py` | filing an approved draft into Gmail |
+| `style_personalisation.py` | the per-user writing overlay |
+| `sitemap.py` | keeping the page-taxonomy map in step with the live site |
+
+Two of these are deterministic on purpose. **A model that could move the lead
+score would make the score meaningless**, and the same argument applies to the
+campaign shape. Where a number has to be reproducible and tunable, it is rules;
+the model's job is only to read raw signal into structure.
+
+---
+
+## The two platform rules
+
+Both are architectural, not policy notes.
+
+1. **Agents draft and populate; the human always sends.** The Google grant is
+   `gmail.compose`, which can create a draft and can neither read the mailbox nor
+   send. The restraint is enforced by Google rather than by our own discipline.
+2. **Every consequential step passes a review gate.** `services/review.py` is the
+   queue; approving is what moves work forward.
+
+---
 
 ## Request lifecycle
 
-1. The browser calls `/api/...`. `require_api_auth` middleware (`main.py`) rejects
-   unauthenticated calls to `/api/*` (except `/api/login`, `/api/logout`,
-   `/api/auth/status`).
-2. The matched agent router runs its dependency (`require_authed` /
-   `require_admin` / `require_agent_access("<slug>")`), which returns the `user`
-   dict.
-3. The handler reads `is_sandbox(request)` and threads `username` + `sandbox`
-   into storage and vault calls.
-4. JSON handlers return a dict; streaming handlers return a
-   `StreamingResponse` of `text/event-stream` (see [SSE](#sse-streaming)).
-
-## Auth & access control
-
-`backend/auth.py`:
-
-- `require_authed(request) -> user` — 401 if not logged in.
-- `require_admin(request) -> user` — 401/403 unless `access == "admin"`.
-- `require_agent_access(slug)` — dependency factory; 403 unless `slug` is in the
-  user's `agents` list. Agents gate their whole router with this.
-- `is_sandbox(request) -> bool` — true only for an admin who has toggled sandbox
-  on for the session.
-- `public_user(user)` — the client-safe projection (`username`, `name`, `role`,
-  `access`, `agents`) returned by `/api/auth/status`.
-
-User profiles (`name`, `role`, `access`, `agents`) live in
-`${DATA_ROOT}/agents/users.json`; password hashes in the gitignored
-`users_credentials.json`. Both are generated by `seed_users.py` — neither is
-committed.
-
-### Sandbox
-
-Admins flip a session-scoped sandbox (`POST /api/admin/sandbox/enable`). When on,
-storage routes writes into `_sandbox/` subdirectories alongside the canonical
-files, so a flow can be tried in a real deployment without touching production
-data. The High-Intent agent is **always** sandboxed.
-
-## Data model (`DATA_ROOT`)
-
-`paths.py` resolves all mutable state under `DATA_ROOT` (default `~/cadence-data`;
-in production usually the repo's `backend/`). Per-agent helpers return
-`data_root()/agents/<agent>/data`, e.g. `lead_data()`, `forecast_data()`,
-`duty_data()`. Nothing here is committed.
-
-Most agents persist through **`agents/shared/jsonstore.py`** — `JsonCollection`,
-a capped, newest-first, per-user JSON list:
-
-```python
-deals = JsonCollection(forecast_data(), "deals", cap=200)
-deals.upsert(record, username=user["username"], sandbox=is_sandbox(request))
-deals.load_user(username, sandbox=...)   # get / patch / delete also available
+```
+browser  →  /api/sales/<agent>/…            FastAPI route
+         →  agent.<verb>()                  one job
+         →  mind.<task>()                   governed model call
+         →  services / integrations         deterministic work, side effects
+         →  review queue                    if consequential
+         ←  SSE stream or JSON
 ```
 
-`upsert` stamps `id`, `created_at`, `updated_at` and caps the list; passing
-`sandbox=True` routes to `_sandbox/`. Owl is the exception — it uses SQLite
-(`agents/owl/db.py`) for conversation history.
+Long-running agent work streams over SSE. One exception is recorded rather than
+hidden: see Known limitations below.
 
-## Knowledge vault (three pillars)
+---
 
-A single Obsidian-compatible vault under `${DATA_ROOT}/vault/`, assembled by
-`agents/shared/vault.py`:
+## Auth and access
 
-- **Company Truth** (`vault/company/`) — locked, canonical knowledge. The runtime
-  never writes here; curate it and run `scripts/normalise_company_truth.py`.
-- **Dynamic Truth** (`vault/dynamic/`) — learnings the Calls/Lead agents extract
-  at runtime (`write_learning`, `write_glossary_term`).
-- **Added Knowledge** (`vault/added/`) — user corrections to Owl, admin-gated
-  (`write_added_knowledge` → `approve_added` / `reject_added`).
+Session cookies via starlette, bcrypt password hashes written to
+`${DATA_ROOT}/agents/users_credentials.json` by `seed_users.py`. Credentials never
+enter git; the roster is regenerated per environment.
 
-Read paths an agent uses:
+---
 
-- `load_vault_for_context(...)` — full assembly (Owl's general chat).
-- `load_vault_for_session(username)` — byte-stable, 5-min memoised so the system
-  prompt prefix hits the Anthropic prompt cache.
-- `load_vault_for_analysis(transcript)` — transcript-scoped slice (the Calls
-  analyser), keeping each analysis cheap.
-- `load_vault_for_product_rec(...)` — product-focused slice.
+## Data model — `DATA_ROOT`
 
-Writes invalidate the session cache (`invalidate_vault_cache()`), so a new
-learning surfaces in everyone's next turn. Every runtime write requires a `title`
-and a one-sentence `description`.
+`backend/paths.py` resolves every mutable path through `DATA_ROOT`, and this is
+the mechanism that keeps operational content out of version control:
 
-## Shared Claude client
+- **Development:** point `DATA_ROOT` at a directory *outside* the repo. Test
+  writes then never appear in `git status`, so there is no daily judgement call
+  about what to stage.
+- **Production:** point it at the deployment's own data directory.
 
-`agents/shared/anthropic_client.py` is the one way agents call Claude:
+The separation is structural. Nothing has to remember to exclude anything.
 
-- `call_claude(system=, messages=, model=, max_tokens=, tools=)` /
-  `call_claude_text(...)` — non-streaming, with retry/backoff on 429.
-- `slot()` — a context manager wrapping a streaming call.
-- One process-wide client and **one shared semaphore**, so concurrent token spend
-  across all agents stays under the org TPM ceiling.
-- Model ids in one place: `SONNET = "claude-sonnet-4-6"`,
-  `HAIKU = "claude-haiku-4-5-20251001"`, `OPUS = "claude-opus-4-7"`.
-
-System prompts are assembled as content blocks with a `cache_control: ephemeral`
-breakpoint after the persona+vault prefix and the per-user tail placed after it,
-so the cached prefix isn't invalidated per user.
+---
 
 ## Frontend conventions
 
-- **Config** — `frontend/src/agents/<slug>/config.ts` exports `<NAME>`,
-  `<TAGLINE>`, and a `<NAV>` array (`{href, label, icon, id}`).
-- **Pages** — `frontend/src/pages/agents/<slug>/*.astro` wrap `AgentLayout`
-  (sidebar nav) + `PageHeader`, then fetch `/api/<slug>/...` in a client script.
-- **Dashboard** — `pages/dashboard.astro` holds the agent cards; the list is
-  filtered client-side against the user's `agents` access array.
-- **Streaming** — `lib/owlChat.ts` `streamChat({url, messages, onText, ...})`
-  consumes the SSE shape below; `renderMarkdown`/`escHtml` render model output
-  safely. `lib/leadCards.ts` provides the shared card/escaping vocabulary —
-  always escape API/model-derived strings before `innerHTML`.
+Astro, one shell (`PlatformLayout`), with the design system in
+`frontend/src/design-system/` — see [the design system](design-system.md).
+`tokens.css` is the source of truth for colour, type, space and motion; a build
+gate fails on raw `px`. Behaviour lives in `frontend/src/lib/` as plain
+TypeScript modules with unit tests beside them, so page code stays declarative.
 
-### SSE streaming
-
-Streaming endpoints emit `data: {json}\n\n` frames and a final `data: [DONE]`.
-Recognised keys: `conversation_id`, `text` (a delta), `model`, `error`, and
-agent-specific extras. Any agent that emits this shape can reuse `streamChat` by
-passing its own `url`.
+---
 
 ## Testing
 
-Deterministic logic ships with unit tests under `backend/tests/` (e.g.
-`test_scoring.py`, `test_duty.py`, `test_forecast.py`, `test_pipeline_manager.py`).
-Each runs under pytest or directly (`python backend/tests/<file>.py`).
+`backend/tests/` — 42 suites, green in this build. The discipline is that the
+acceptance bar is written
+or refreshed before a change is trusted, and it is contract-shaped rather than
+unit-shaped where the contract is what matters: `test_request_shape.py` pins what
+actually goes to the API, `test_models_pinned.py` pins model routing,
+`test_system_blocks.py` pins the cache-stable prompt assembly.
+
+---
+
+## Known limitations
+
+Stated rather than tidied away, because a showcase that hides its rough edges is
+not showing you the work.
+
+- **`require_agent_access` has no call sites.** `backend/auth.py` defines
+  per-agent access control; nothing calls it. Page access is enforced in the
+  frontend only. Anyone running this for real should wire it up server-side
+  before trusting it.
+- **`mind.research` is non-streaming** (`mind/core.py`). A multi-minute research
+  turn can be disconnected outright, and nothing in that path retries. It is why
+  GTM was deliberately moved *off* grounded search — see [GTM](agents/gtm.md).
+- **`tool_choice: "any"` is re-sent every round** by `tooling.run_tool_loop`, so
+  it keeps forcing a tool call after `max_uses` is spent; the model thrashes and
+  never emits its terminal JSON. `research/agent.py` and `signals/agent.py` still
+  ride it. `services/name_sources.py` already uses `"auto"`, which is the fix.
+- **No reply or bounce detection.** `gmail.compose` cannot read the mailbox, so
+  suppression is manual.
+- **The Operations agents are not registered.** See [Operations](operations.md).

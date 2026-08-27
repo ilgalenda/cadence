@@ -1,36 +1,45 @@
 # Cadence documentation
 
-Reference docs for the Cadence platform and each of its agents. Start with the
-[architecture](architecture.md) for how the platform fits together, then dive
-into a specific agent. To build your own agent, see the
-[Agent Creator](agent-creator.md).
+Start with [the architecture](architecture.md) — it explains the one idea the
+rest of the system follows from. Then read an agent, or look at
+[the design system](design-system.md).
 
 ## Platform
 
-- **[Architecture](architecture.md)** — layers, request lifecycle, auth & access
-  control, the `DATA_ROOT` data model, the three-pillar knowledge vault, the
-  shared Claude client, and the frontend conventions.
-- **[Agent Creator](agent-creator.md)** — scaffold a new agent from a spec, the
-  shared helpers every agent reuses, and the wiring it touches.
+- **[Architecture](architecture.md)** — the four layers, the Owl Mind, the
+  three-pillar vault, per-user memory, the deterministic services, the two
+  platform rules, and the known limitations.
+- **[The design system](design-system.md)** — "the studio": the position, the
+  tokens, and the screens, rendered from the system's own preview pages.
+- **[Operations](operations.md)** — the four v1 agents kept for part two, and
+  what integrating them onto the Mind involves.
+- **[Agent Creator](agent-creator.md)** — the v1 scaffolding tool, retained as
+  part of the record.
 
-## Agents
+## The eleven sales agents
 
-| Agent | Track | What it does |
+Each one has a single job and is registered as a tool on Owl, so a user can name
+it or let Owl pick it.
+
+| Agent | Job | Prompts in this build |
 |---|---|---|
-| [Calls](agents/calls.md) | Sales / GTM | Analyse call transcripts → signals, objections, learnings, quizzes |
-| [Lead](agents/lead.md) | Sales / GTM | Campaigns, prospect X-Ray, outreach sequences, calendar |
-| [Owl](agents/owl.md) | Sales / GTM | Grounded chat with model routing + correction capture |
-| [High-Intent](agents/high-intent.md) | Sales / GTM | LinkedIn intent signals → outreach (admin sandbox) |
-| [Meet](agents/meet.md) | Sales / GTM | Google Meet transcript capture (feeds Calls) |
-| [Duty & Tax](agents/duty.md) | Operations | Autonomous shipment duty/VAT landed-cost estimation |
-| [Onboarding](agents/onboarding.md) | Both | Role-aware guided onboarding chat |
-| [Forecasting](agents/forecast.md) | Operations | Pipeline analytics, weighted forecast, hygiene, + the **Pipeline Manager** morning briefing |
+| [Lead Scoring](agents/scoring.md) | How hot is this lead, and why — score deterministic, reading by model | **yes** |
+| [GTM](agents/gtm.md) | Propose accounts worth approaching; fast, unverified, checked downstream | **yes** |
+| [X-ray](agents/xray.md) | Given an account and why it matters, find the people | **yes** |
+| [Research](agents/research.md) | The brief you read before writing anything | withheld |
+| [Campaign Intelligence](agents/campaign-intelligence.md) | What this market already told us | withheld |
+| [Campaign Selection](agents/campaign-selection.md) | The campaign shape — rules, no model at all | withheld |
+| [Composer](agents/composer.md) | The outreach touches, for a human to send | withheld |
+| [Call Analysis](agents/call-analysis.md) | A transcript, read as a colleague would read it | withheld |
+| [Recap](agents/recap.md) | The follow-up email, for a human to send | withheld |
+| [Knowledge Capture](agents/knowledge-capture.md) | What a call taught the company, written down | withheld |
+| [Signals](agents/signals.md) | The watchlist that notices things | withheld |
 
-## Conventions used in these docs
+## Conventions
 
-- Endpoint paths include the router prefix (e.g. `POST /api/forecast/sync`).
-- "Per-user scoped" means data is filtered by the authenticated `username`.
-- "Sandbox" refers to the admin per-session sandbox that routes writes into
-  `_sandbox/` directories (see [architecture](architecture.md#sandbox)).
-- All mutable state lives under `DATA_ROOT` and is never committed — this repo is
-  code and structure only.
+- Endpoint paths include the router prefix (e.g. `POST /api/sales/gtm/identify`).
+- "Per-user scoped" means data filtered by the authenticated `username`.
+- All mutable state lives under `DATA_ROOT` and never enters git — see
+  [architecture](architecture.md).
+- Agent pages are generated from their module docstrings by
+  `tools/build-agent-docs.py`. Edit the code, not the page.

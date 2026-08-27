@@ -1,0 +1,25 @@
+---
+/**
+ * `/learn` has no landing of its own.
+ *
+ * The rail lists the Learn surfaces directly, so a page here would be a menu
+ * duplicating a menu. But the URL is guessable and typed, and a 404 on it would
+ * read as "Learn is broken" — so it sends you to Knowledge, the surface you
+ * reach for most.
+ *
+ * Static output means this is a client-side redirect rather than a 302.
+ */
+---
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="refresh" content="0; url=/learn/knowledge" />
+  <link rel="canonical" href="/learn/knowledge" />
+  <title>Learn — Cadence</title>
+</head>
+<body>
+  <p><a href="/learn/knowledge">Continue to Knowledge</a></p>
+  <script>window.location.replace('/learn/knowledge');</script>
+</body>
+</html>

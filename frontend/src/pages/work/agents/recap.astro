@@ -1,0 +1,314 @@
+---
+/**
+ * Recap — the follow-up the client gets, after the call.
+ *
+ * Built from an analysed call, so the page starts by asking which one rather than
+ * for a transcript: the summary, the objections and the agreed next steps are what
+ * a follow-up is made of, and Call Analysis has already extracted them.
+ *
+ * **Nothing here sends, and as of Phase 4a it no longer has to be pasted.** Every
+ * recap is filed to the review queue; approving it puts an addressed draft in the
+ * person's Gmail. The grant cannot send, so pressing send stays entirely theirs.
+ * The recipient is asked for here because a call analysis will never supply one.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import AgentViewStyles from '../../../components/AgentViewStyles.astro';
+---
+<PlatformLayout title="Recap" requires="calls">
+  <div class="agent-page">
+    <div class="agent-page__column">
+      <header class="agent-page__head ds-arrive">
+        <p class="ds-eyebrow">Agent</p>
+        <h1 class="ds-heading ds-page__title">Recap</h1>
+        <p class="ds-lead ds-page__intro">
+          The follow-up email after a call — what was covered and what happens next, in writing.
+          Written from the call's own reading, in Owl's voice and your own. Filed for your review;
+          it never sends.
+        </p>
+      </header>
+
+      <div class="form ds-arrive" style="--arrive: var(--dur-step)">
+        <div class="form__cell">
+          <label class="ds-label" for="call">Which call</label>
+          <select class="ds-select" id="call">
+            <option value="">Choose an analysed call…</option>
+          </select>
+          <p class="ds-help" id="call-help" hidden>
+            No analysed calls yet — read a call first and it appears here.
+          </p>
+        </div>
+
+        <div class="form__cell">
+          <label class="ds-label" for="recipient">Send to <span class="form__optional">their email, for the draft</span></label>
+          <input class="ds-field" id="recipient" type="email" placeholder="lena@northgate.com" autocomplete="off" />
+          <p class="ds-help">Without it the follow-up is still written and filed — just not draftable.</p>
+        </div>
+
+        <div class="form__cell">
+          <label class="ds-label" for="notes">Anything it should take account of <span class="form__optional">optional</span></label>
+          <input class="ds-field" id="notes" placeholder="They asked for pricing in euros" autocomplete="off" />
+        </div>
+
+        <div class="form__actions">
+          <button class="ds-btn ds-btn--accent" type="button" id="run" disabled>Write the follow-up</button>
+          <span class="ds-mark ds-mark--live" id="running" hidden>writing</span>
+          <span class="ds-error" id="error"></span>
+        </div>
+      </div>
+
+      <section class="result ds-arrive" id="result" hidden>
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow" id="result-title">Follow-up</h2>
+          <div class="result__actions">
+            <button class="ds-btn ds-btn--secondary ds-btn--sm" type="button" id="copy">Copy</button>
+            <button class="ds-btn ds-btn--primary ds-btn--sm" type="button" id="approve">I will send this</button>
+          </div>
+        </div>
+
+        <div class="touch">
+          <div class="touch__field">
+            <p class="touch__key">subject</p>
+            <p class="touch__value" id="subject"></p>
+          </div>
+          <div class="touch__field">
+            <p class="touch__key">body</p>
+            <p class="touch__value" id="body"></p>
+          </div>
+          <div class="touch__field" id="steps-field" hidden>
+            <p class="touch__key">next steps</p>
+            <ul class="touch__points" id="steps"></ul>
+          </div>
+        </div>
+
+        <p class="ds-caption touch__note" id="gate-note">
+          Approving records that you intend to send it, not that it went — Cadence cannot send.
+        </p>
+      </section>
+
+      <section class="waiting ds-arrive" id="waiting" hidden>
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow">Awaiting your review</h2>
+          <span class="ds-mono" id="waiting-count"></span>
+        </div>
+        <ul class="waiting__list ds-stagger" id="waiting-list"></ul>
+      </section>
+    </div>
+  </div>
+
+  <AgentViewStyles />
+
+  <style is:global>
+    /* Screen-level layout only. The page frame is the shared `.agent-page`
+       column; everything tonal and typographic comes from the design system. */
+    .form { max-width: var(--measure-form); }
+    .form__cell { margin-bottom: var(--space-4); }
+    .form__optional { color: rgb(var(--ink-muted)); font-weight: var(--weight-regular); }
+    .form__actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-2); }
+
+    .result { margin-top: var(--space-12); }
+    .result__actions { display: flex; gap: var(--space-3); flex-shrink: 0; }
+
+    .waiting { margin-top: var(--space-16); }
+    .waiting__list { list-style: none; margin: 0; padding: 0; }
+    .waiting__list li {
+      display: flex; align-items: baseline; gap: var(--space-4);
+      padding: var(--space-3);
+    }
+    /* Hairline between rows only — never under the last one. */
+    .waiting__list li + li { border-top: 1px solid rgb(var(--rule-hairline)); }
+    .waiting__what { flex: 1; min-width: 0; color: rgb(var(--ink)); }
+  </style>
+
+  <script>
+    const byId = (id: string) => document.getElementById(id)!;
+
+    let current: any = null;
+    let reviewId: string | null = null;
+
+    function fail(message: string): void {
+      byId('error').textContent = message;
+    }
+
+    /** The whole follow-up as one block, for pasting into a mail client. */
+    function asText(): string {
+      if (!current) return '';
+      const steps = (current.next_steps ?? []).map((s: string) => `- ${s}`).join('\n');
+      return `${current.subject}\n\n${current.body}` + (steps ? `\n\n${steps}` : '');
+    }
+
+    function show(out: any): void {
+      current = out.recap;
+      reviewId = out.review_id;
+
+      byId('result-title').textContent = out.call?.title || 'Follow-up';
+      byId('subject').textContent = current.subject;
+      byId('body').textContent = current.body;
+
+      const steps = current.next_steps ?? [];
+      byId('steps-field').hidden = steps.length === 0;
+      const list = byId('steps');
+      list.replaceChildren();
+      for (const step of steps) {
+        const li = document.createElement('li');
+        li.className = 'ds-small';
+        li.textContent = step;
+        list.append(li);
+      }
+
+      (byId('approve') as HTMLButtonElement).disabled = false;
+      (byId('approve') as HTMLButtonElement).textContent = 'I will send this';
+      byId('result').hidden = false;
+      byId('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    async function loadCalls(): Promise<void> {
+      try {
+        const res = await fetch('/api/sales/calls');
+        if (!res.ok) throw new Error(String(res.status));
+        const calls = await res.json();
+
+        const select = byId('call') as HTMLSelectElement;
+        // Only calls with a reading can be recapped; the rest would produce a
+        // follow-up written from a title.
+        const usable = calls.filter((c: any) => c.summary);
+        for (const call of usable) {
+          const option = document.createElement('option');
+          option.value = call.id;
+          option.textContent = `${call.title} · ${call.timestamp}`;
+          select.append(option);
+        }
+        byId('call-help').hidden = usable.length > 0;
+      } catch {
+        fail('Could not load your calls — is the backend running?');
+      }
+    }
+
+    (byId('call') as HTMLSelectElement).addEventListener('change', (event) => {
+      (byId('run') as HTMLButtonElement).disabled = !(event.target as HTMLSelectElement).value;
+    });
+
+    byId('run').addEventListener('click', async () => {
+      const callId = (byId('call') as HTMLSelectElement).value;
+      if (!callId) return;
+
+      const button = byId('run') as HTMLButtonElement;
+      fail('');
+      button.disabled = true;
+      byId('running').hidden = false;
+
+      try {
+        const res = await fetch('/api/sales/recap/draft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            call_id: callId,
+            recipient: (byId('recipient') as HTMLInputElement).value.trim(),
+            notes: (byId('notes') as HTMLInputElement).value.trim(),
+          }),
+        });
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}));
+          throw new Error(detail.detail || `HTTP ${res.status}`);
+        }
+        show(await res.json());
+        await loadWaiting();
+      } catch (err: any) {
+        fail(err?.message || 'Could not write the follow-up.');
+      } finally {
+        button.disabled = false;
+        byId('running').hidden = true;
+      }
+    });
+
+    byId('copy').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(asText());
+        (byId('copy') as HTMLButtonElement).textContent = 'Copied ✓';
+        window.setTimeout(() => { (byId('copy') as HTMLButtonElement).textContent = 'Copy'; }, 1500);
+      } catch {
+        fail('Your browser blocked the clipboard — select the text instead.');
+      }
+    });
+
+    byId('approve').addEventListener('click', async () => {
+      if (!reviewId) return;
+      const button = byId('approve') as HTMLButtonElement;
+      button.disabled = true;
+      try {
+        const res = await fetch('/api/sales/recap/decide', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ review_id: reviewId, approve: true }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const decided = await res.json();
+        button.textContent = 'Recorded ✓';
+        reportDraft(decided.outcome ?? {});
+        await loadWaiting();
+      } catch {
+        fail('Could not record the decision.');
+        button.disabled = false;
+      }
+    });
+
+    /**
+     * What became of the Gmail draft, said plainly.
+     *
+     * An approval that silently produced no draft is the failure worth guarding
+     * against: someone would believe a follow-up was queued when nothing is.
+     */
+    function reportDraft(outcome: Record<string, any>): void {
+      const note = byId('gate-note');
+      if (outcome.gmail_draft_id) {
+        note.textContent = 'Drafted in your Gmail — addressed and unsent. Sending it is yours.';
+        return;
+      }
+      if (outcome.gmail_error) {
+        note.textContent = `Decision recorded, but no draft was created: ${outcome.gmail_error}`;
+        return;
+      }
+      note.textContent = 'Decision recorded.';
+    }
+
+    async function loadWaiting(): Promise<void> {
+      try {
+        const res = await fetch('/api/sales/recap/pending');
+        if (!res.ok) throw new Error(String(res.status));
+        const items = await res.json();
+
+        byId('waiting').hidden = items.length === 0;
+        byId('waiting-count').textContent = `${items.length}`;
+
+        const list = byId('waiting-list');
+        list.replaceChildren();
+        for (const item of items) {
+          const li = document.createElement('li');
+          const what = document.createElement('span');
+          what.className = 'ds-small waiting__what';
+          what.textContent = item.payload?.call_title || 'A call';
+          const when = document.createElement('span');
+          when.className = 'ds-mono';
+          when.textContent = item.created_at || '';
+          li.append(what, when);
+          list.append(li);
+        }
+      } catch {
+        // The queue is a convenience; drafting works without it.
+      }
+    }
+
+    // Arriving from a call analysis with the call already chosen.
+    (async () => {
+      await loadCalls();
+      const arriving = new URLSearchParams(window.location.search).get('call_id');
+      if (arriving) {
+        const select = byId('call') as HTMLSelectElement;
+        select.value = arriving;
+        // Only enable if the call was actually in the list — a stale id must not
+        // leave a button that fails on press.
+        (byId('run') as HTMLButtonElement).disabled = select.value !== arriving;
+      }
+      loadWaiting();
+    })();
+  </script>
+</PlatformLayout>

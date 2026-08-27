@@ -2,7 +2,7 @@
 // To ship a new version: bump CADENCE_VERSION and prepend a new entry to CHANGELOG.
 // Also bump /package.json and /frontend/package.json to match.
 
-export const CADENCE_VERSION = '1.5.1';
+export const CADENCE_VERSION = '2.0.0';
 
 export type ChangeLabel = 'Added' | 'Changed' | 'Fixed' | 'Security' | 'Removed';
 
@@ -20,39 +20,55 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '1.5.1',
-    date: '2026-06-18',
-    headline: 'Pipeline Manager — deterministic morning briefing on the Forecasting agent',
+    version: '2.0.0',
+    date: '2026-08-14',
+    headline: 'One platform: Owl Core, the sales section, and the design system',
     sections: [
       {
         label: 'Added',
         items: [
-          'Pipeline Manager (a sub-capability of the Forecasting agent): a deterministic daily briefing that surfaces deals **gone quiet** (no activity past a threshold) and prospects **sitting too long** (in the pipeline or a single stage), plus the open/weighted summary and overdue closes. No LLM — every figure is computed from the synced deals.',
-          'New endpoints `GET /api/forecast/briefing` (preview) and `POST /api/forecast/briefing/send` (email via the configured admin SMTP). A "Morning briefing" section on the Forecasting page previews it and triggers the email.',
-          'Cron entry `backend/scripts/morning_briefing.py --user <name>` emails the briefing each morning (runs in-process, no auth; no-ops gracefully if SMTP is unset). Deal model gains `created_at` / `stage_entered_at` to drive the "sitting too long" check.',
+          '**Owl Core — the Mind** (`agents/mind`): the single governed LLM gateway every agent composes. Agents call task-shaped methods (`classify` · `compose` · `analyze` · `chat` · `chat_stream` · `research`) instead of the Anthropic SDK. One shared client, one retry policy, one place model IDs live (`registry.py` — Haiku 4.5 · Sonnet 5 · Opus 4.8), and a per-task profile fixing tier, token budget, thinking and backoff.',
+          '**Unified tool loop** (`mind/tooling.py`): one implementation that continues a turn on `tool_use`, `pause_turn` (server-side web search) and `max_tokens`, so a client tool, a web search and a truncated reply are all handled the same way everywhere.',
+          '**Per-user working memory** (`mind/memory.py`, SQLite + WAL): preferences, ongoing context, accounts, deals and per-account topics, persisted per user and injected on Owl’s uncached system tail so the cached persona+vault prefix stays byte-stable. `topics_for_vertical` cross-references what has already resonated on similar-vertical accounts. Idempotent backfill from existing research briefs and legacy campaigns.',
+          '**One Persona** (`mind/persona.py`): a single owned identity, house voice and knowledge-governance stance, with a thin role overlay per agent — ending the three separately-drifting Owl prompts.',
+          '**Owl organisation**: projects carrying standing instructions that ride into every conversation filed under them, nested folders, placement and search. Containment is soft — deleting a container never destroys the conversations inside it.',
+          '**The sales section** (`agents/sales`, `/api/sales`): eleven agents, each its own module with its own routes — Call Analysis, Knowledge Capture, Recap, Research, Campaign Intelligence, Campaign Selection, Composer, GTM, X-ray, Signals, Scoring. Every one is reachable two ways, through its own page and by asking Owl, from a single registration that pairs the tool schema with the runner so Owl can never be offered a tool nothing can execute.',
+          '**Capability services** (`agents/services`): the shared skills agents compose rather than duplicate — behavioural lead scoring and campaign selection (both deterministic, no LLM), web discovery, Lusha enrichment, the two-pass outreach composer, per-user style personalisation, the sitemap and name-source providers.',
+          '**The review gate** (`services/review.py`): the platform’s one human-in-the-loop primitive. Consequential output is submitted as `pending` and does nothing until a human approves it; the primitive has no send or execute action at all, so *agents draft, the human decides* is enforced structurally rather than by convention.',
+          '**Integrations layer** (`backend/integrations`): the Google grant split out of the Calendar client and shared, with per-user tokens and its own surface at `/api/integrations/google`; Gmail **drafts only** — the grant requested cannot send, so the fence sits outside our code; Lusha person enrichment with a two-tier reveal (email automatically, phone only on explicit request) so credits are spent deliberately.',
+          '**Signals**: a lean watchlist that notices funding rounds and timing technographics on named accounts, keeping a fingerprint of every finding already reported so a sweep returns what is new rather than repeating the same search.',
+          '**Acme Learning** (`agents/learn`, `/learn`): the quiz pool, the certification quiz and the client-facing newsletter questions, moved out of the calls module and anonymised as a rule; plus the call library and the knowledge reader.',
+          '**The wiki** (`agents/wiki`, `/api/wiki`): the vault made readable by a human instead of a prompt — every knowledge page indexed with its provenance, ranked search, and one page as structured blocks with its links and backlinks.',
+          '**The Cadence Design System, in the repo** (`frontend/src/design-system`): tokens, primitives, components, the spring motion vocabulary, fonts and previews, mirroring the design project. Enforced by an adherence gate (`npm run check:design`) with three severities — errors for off-inventory tokens, colours and fonts, a per-file ratchet for raw px so debt can never deepen, and loudly-reported gaps in the system itself. It runs in the build.',
+          '**The platform shell**: one rail for the whole product — Work · Owl · Learn — built from `lib/platform.ts` so it cannot advertise a surface that does not exist, with a breadcrumb and a home surface.',
+          '**A backend test suite**: around forty pytest modules covering the Mind, memory, persona, routing, the tool registry, every sales agent, the capability services, the integrations, the wiki and quizzes, X-ray output quality against a rubric, request shape, and a test that pins the model generation.',
+        ],
+      },
+      {
+        label: 'Changed',
+        items: [
+          'Information architecture rebuilt around the job rather than the code: `/work`, `/owl` and `/learn` replace `/dashboard` and the per-agent `/agents/*` trees. `main.py` now mounts four routers and stops changing as agents land.',
+          'Call Analysis does one job — reading the transcript. The follow-up email, the learnings filed into the vault and the product-fit read are their own agents now, so a failure in one can no longer cost the analysis somebody is waiting for.',
+          'No module builds its own Anthropic client or names a model any more; upgrading the whole platform is an edit to `MODELS`.',
+          'Concurrency is one process-wide governor instead of two independent semaphores, applied at pipeline orchestration boundaries only so a batch run never serialises interactive chat behind it. Behaviour change: the two pipelines that used to run concurrently now contend for one slot (`MIND_MAX_CONCURRENCY`).',
+          'Cost logging is rate-correct per tier. The old table hard-coded Sonnet rates for every call and mis-reported every non-Sonnet one.',
+          '`paths.py` accessors renamed `lead_*` → `sales_*`, and now state the rule explicitly: a package may move, a live data snapshot does not. The directories keep their old names on purpose.',
         ],
       },
       {
         label: 'Fixed',
         items: [
-          'Forecasting page now escapes deal-derived strings before `innerHTML` (vertical names, deal names, hygiene/briefing text), closing a latent injection path once a real CRM connector is wired in.',
+          'A reply that hits the token ceiling now continues instead of being cut mid-sentence.',
+          'One rail implementation for every surface. The second, hand-rolled one — a mono wordmark the design system bans, typed glyphs where the system draws icons, no search or collapsed state — is what the misaligned menus were.',
+          'The changelog now renders its own inline formatting rather than printing the asterisks and backticks.',
         ],
       },
-    ],
-  },
-  {
-    version: '1.5.0',
-    date: '2026-06-18',
-    headline: 'Platform expansion: Agent Creator + Duty & Tax, Onboarding, Forecasting',
-    sections: [
       {
-        label: 'Added',
+        label: 'Removed',
         items: [
-          '**Agent Creator** — `python backend/scripts/create_agent.py` scaffolds a new agent from a small spec (the platform parameters): backend dir, frontend config + page, and all the wiring (`paths.py`, `main.py`, dashboard, seeded profiles) via anchor comments. Idempotent, with `--dry-run`.',
-          '**Duty & Tax agent** (`/agents/duty`) — autonomous landed-cost estimation. Describe a shipment in plain language and it classifies the HS code, looks up duty/VAT rates, and computes the breakdown via a tool-use loop; or enter figures directly for a deterministic quote. Rates come from a swappable `DutyRateProvider` (mock sample data by default).',
-          '**Onboarding agent** (`/agents/onboarding`) — role-aware (sales / ops) guided chat grounded in the knowledge vault and an editable onboarding curriculum, with a per-user progress checklist.',
-          '**Forecasting agent** (`/agents/forecast`) — pipeline by vertical and stage, a probability-weighted revenue forecast, and pipeline-hygiene flags, over deals pulled from a swappable CRM connector (mock HubSpot by default).',
-          'Shared platform helpers: `agents/shared/anthropic_client.py` (one shared client + a single org-wide rate-limit slot + model constants) and `agents/shared/jsonstore.py` (generic per-user JSON CRUD), used by the generated agents.',
+          'The `calls`, `lead`, `high_intent` and `meet` packages, retired whole — their work redistributed across the sales agents, Learn and the wiki. No endpoint serves the same job twice.',
+          'The old frontend: the dashboard, the `/agents/*` pages, both layouts, `OwlDrawer`, `Tabs`, `StatusDot`, `PageHeader`, `LeadHandoffButton` and `owl.css`.',
+          'The Meet Chrome extension, and the `faster-whisper` dependency with it — transcription happens outside Cadence.',
         ],
       },
     ],
@@ -96,11 +112,11 @@ export const CHANGELOG: ChangelogEntry[] = [
         items: [
           'Conversational campaign builder (`agents/lead/builder.py`): Owl chats with the user to shape an outreach campaign for a specific lead, then drives the existing generation pipeline via tool use; each tool result is persisted onto the campaign so the frontend re-hydrates the produced artifact (sequence / boolean / ABM matrix). New `/campaigns/{id}/chat` and `/campaigns/from-prospects` endpoints.',
           'Deterministic behavioural lead scoring (`agents/lead/scoring.py`, no LLM): parses Leadinfo page-visit data and scores buying intent from pages visited, time on product vs blog pages, low-intent-page penalties, bounce detection, and company size. All weights are tunable in one config block. Exposed via `/prospect/score`, with a `test_scoring.py` suite.',
-          'Self-updating site map (`agents/lead/sitemap.py`): fetches the live timebeat.app sitemap and pre-classifies every path into `page_map.json` so new pages are scored automatically; scoring itself stays offline. New `/page-map` and `/page-map/refresh` endpoints.',
+          'Self-updating site map (`agents/lead/sitemap.py`): fetches the live acme.example sitemap and pre-classifies every path into `page_map.json` so new pages are scored automatically; scoring itself stays offline. New `/page-map` and `/page-map/refresh` endpoints.',
           'X-Ray name sources (`agents/lead/name_sources.py`): pluggable provider architecture for prospect discovery — WebSearch provider always on, ZoomInfo/gtm.ai provider stubbed and disabled pending a seat.',
           'Prospect workflow: new prospect store and CRUD (`/prospects`, `/xray`, `/personas`) plus a new Prospect page in the Lead agent.',
           'Owl moved to a SQLite store (`agents/owl/db.py`) with WAL mode and per-call connections, replacing the shared `sessions.json` that suffered read-modify-write races; one-time importer `migrate_owl_sqlite.py` (idempotent, non-destructive). Session rename/delete via `PATCH`/`DELETE /sessions/{id}`. New standalone Owl chat page.',
-          'Timebeat ICP / Persona knowledge entry in the vault.',
+          'Acme ICP / Persona knowledge entry in the vault.',
           'Shared JSON-extraction helpers (`agents/shared/jsonparse.py`) for stripping fenced/prose-wrapped model output in one place.',
         ],
       },
@@ -176,7 +192,7 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Admin link surfaced in Dashboard and Agent layout headers, gated on admin access.',
           'High-Intent agent — end-to-end LinkedIn signal detection and outreach: signal-type catalogue, per-type ICP configuration, signal detection pipeline, queue management, 3-touch sequence composer, follow-up generator, and history view.',
           'Meet agent backend: transcript submit and retrieval endpoints.',
-          '"IvanOS Meet Capture" Chrome extension (MV3): observes Google Meet caption DOM and forwards transcripts to Cadence.',
+          '"SamOS Meet Capture" Chrome extension (MV3): observes Google Meet caption DOM and forwards transcripts to Cadence.',
           'Calls / Meet flow: analyze.astro auto-fills from the extension\'s hash payload, runs a 3-second countdown, then auto-submits; raw transcript persisted and exposed via a "Download transcript →" link on the AnalysisResult component.',
           'Calls Quiz: Question Bank and Newsletter Quiz endpoints (`/quiz/pool`, `/quiz/newsletter`, `/quiz/generate`) and a new Quiz page in the Calls agent.',
           'Admin sandbox mode: per-session toggle (admin-only) with status, enable, and disable endpoints; header toggle in both layouts and an amber pulse indicator on the dashboard.',
@@ -193,7 +209,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         items: [
           'Calls and Lead storage helpers are now sandbox-aware throughout; every route threads the request so sandbox state propagates end-to-end.',
           'Lead Owl system prompt extended for the knowledge architecture.',
-          'Seed users: replaced the placeholder `test` user with a configurable set of profiles (admin + standard users); each profile takes a matching `<NAME>_PASSWORD` env var.',
+          'Seed users: replaced placeholder `test` user with real users — `ian` (Co-Founder, admin) and `martin` (Head of Sales); env vars renamed to `IVAN_/IAN_/MARTIN_/JAKUB_PASSWORD`.',
           'Credentials split from profiles: password hashes moved out of the committed `users.json` into a gitignored `users_credentials.json` under `DATA_ROOT`, so each environment (laptop, server) carries its own credentials and `seed_users.py` never touches the committed profile file.',
           'Dashboard, Calls analyze page, Dashboard layout, and Agent layout updated to surface the new admin link, sandbox toggle, and Meet-capture entry point.',
           'README refreshed for the v1.1.0 surface and the new deployment model.',

@@ -1,0 +1,213 @@
+---
+/**
+ * Newsletter quiz — educational questions for publication.
+ *
+ * Lifted out of `agents/calls/quiz.astro`, where it sat below the staff quiz for
+ * no better reason than a shared `/api/learn/quiz/*` prefix. The two have opposite
+ * audiences: Practice tests the reader, this writes something for a client-facing
+ * newsletter. Being an agent means the rail can show it, which it never could
+ * while it was a section halfway down a learning page.
+ *
+ * The output is an HTML snippet to paste into a newsletter editor, so the snippet
+ * is built as a string on purpose — it is the deliverable, not this page's markup.
+ * Nothing generated here is ever injected into this document.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+---
+<PlatformLayout title="Newsletter quiz" requires="calls">
+  <div class="agent-page">
+    <div class="agent-page__column">
+      <header class="agent-page__head ds-arrive">
+        <p class="ds-eyebrow">Agent</p>
+        <h1 class="ds-heading ds-page__title">Newsletter quiz</h1>
+        <p class="ds-lead ds-page__intro">
+          One to three multiple-choice questions for the newsletter — mostly general timing concepts,
+          occasionally anchored to something we make. Educational, never a pitch. Copy the HTML
+          straight into the editor.
+        </p>
+      </header>
+
+      <div class="controls ds-arrive" style="--arrive: var(--dur-step)">
+        <div class="ds-segment" id="count" role="group" aria-label="How many questions">
+          <button class="ds-segment__item is-active" type="button" data-count="1" aria-pressed="true">1</button>
+          <button class="ds-segment__item" type="button" data-count="2" aria-pressed="false">2</button>
+          <button class="ds-segment__item" type="button" data-count="3" aria-pressed="false">3</button>
+        </div>
+        <button class="ds-btn ds-btn--accent" type="button" id="generate">Write the questions</button>
+        <span class="ds-caption controls__status" id="status" hidden></span>
+      </div>
+
+      <div class="ds-stagger" id="output"></div>
+
+      <div class="all ds-arrive" id="all" hidden>
+        <button class="ds-btn ds-btn--secondary" type="button" id="copy-all">Copy all as HTML</button>
+      </div>
+    </div>
+  </div>
+
+  <style is:global>
+    /* Screen-level layout only. The page frame is the shared `.agent-page`
+       column; everything tonal and typographic comes from the design system. */
+    .controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-4); margin-bottom: var(--space-8); }
+    .controls__status { color: rgb(var(--ink-muted)); }
+
+    .question { padding: var(--space-6); margin-bottom: var(--space-4); }
+    .question__text { margin: 0 0 var(--space-4); color: rgb(var(--ink)); }
+    /* An option is a soft well row, not a bordered readout; the right answer
+       wears the locked wash, as a mark would. */
+    .option {
+      padding: var(--space-2) var(--space-4);
+      margin-bottom: var(--space-2);
+      background: rgb(var(--surface-sunken));
+      border-radius: var(--radius-md);
+      font-size: var(--text-small);
+      color: rgb(var(--ink-secondary));
+    }
+    .option--right { background: rgb(var(--signal-locked-wash)); color: rgb(var(--signal-locked)); }
+    .question__why {
+      margin: var(--space-4) 0 var(--space-4);
+      padding-top: var(--space-3);
+      border-top: 1px solid rgb(var(--rule-hairline));
+      color: rgb(var(--ink-secondary)); line-height: var(--leading-relaxed);
+    }
+    .all { margin-top: var(--space-6); }
+  </style>
+
+  <script>
+    interface NewsletterQuestion {
+      question: string;
+      options: string[];
+      correct: number;
+      explanation: string;
+    }
+
+    const byId = (id: string) => document.getElementById(id)!;
+    const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      return node;
+    };
+    const letter = (i: number) => String.fromCharCode(65 + i);
+
+    let wanted = 1;
+    let questions: NewsletterQuestion[] = [];
+
+    /** Only well-formed questions are shown — the generator is a model. */
+    function usable(raw: unknown): NewsletterQuestion[] {
+      if (!Array.isArray(raw)) return [];
+      return raw.filter((q): q is NewsletterQuestion =>
+        q && typeof q.question === 'string' && q.question.trim().length > 0
+        && Array.isArray(q.options) && q.options.length > 1
+        && q.options.every((o: unknown) => typeof o === 'string')
+        && typeof q.correct === 'number' && q.correct >= 0 && q.correct < q.options.length
+        && typeof q.explanation === 'string');
+    }
+
+    /**
+     * The deliverable: a self-contained HTML block for a newsletter editor, which
+     * has no access to our stylesheet. Inline styles are correct here for the
+     * same reason an exported document carries its own values.
+     */
+    function snippetFor(q: NewsletterQuestion): string {
+      const options = q.options.map((option, i) => `${letter(i)}) ${option}`).join('<br>');
+      return [
+        // `em` rather than px: newsletter clients scale text, and a block that
+        // scales with it holds its spacing where a fixed value does not.
+        '<div style="margin: 1.5em 0;">',
+        `  <p><strong>Q:</strong> ${q.question}</p>`,
+        `  <p>${options}</p>`,
+        `  <p><strong>Answer:</strong> ${letter(q.correct)}) ${q.options[q.correct]}</p>`,
+        `  <p><em>Why:</em> ${q.explanation}</p>`,
+        '</div>',
+      ].join('\n');
+    }
+
+    async function copy(text: string, button: HTMLButtonElement, label: string): Promise<void> {
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = 'Copied ✓';
+      } catch {
+        button.textContent = 'Could not copy';
+      }
+      window.setTimeout(() => { button.textContent = label; }, 1500);
+    }
+
+    function paint(): void {
+      const host = byId('output');
+      host.replaceChildren();
+      byId('all').hidden = questions.length === 0;
+
+      questions.forEach((q) => {
+        const card = el('div', 'ds-panel question');
+
+        const text = el('p', 'ds-lead question__text');
+        text.textContent = q.question;
+        card.append(text);
+
+        q.options.forEach((option, i) => {
+          const row = el('div', i === q.correct ? 'option option--right' : 'option');
+          row.textContent = `${letter(i)})  ${option}`;
+          card.append(row);
+        });
+
+        const why = el('p', 'ds-small question__why');
+        why.textContent = `Why · ${q.explanation}`;
+        card.append(why);
+
+        const button = el('button', 'ds-btn ds-btn--secondary ds-btn--sm');
+        button.type = 'button';
+        button.textContent = 'Copy HTML';
+        button.addEventListener('click', () => copy(snippetFor(q), button, 'Copy HTML'));
+        card.append(button);
+
+        host.append(card);
+      });
+    }
+
+    byId('count').addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest('[data-count]') as HTMLButtonElement | null;
+      if (!button) return;
+      wanted = Number(button.dataset.count);
+      byId('count').querySelectorAll('button').forEach((b) => {
+        b.setAttribute('aria-pressed', String(b === button));
+        b.classList.toggle('is-active', b === button);
+      });
+    });
+
+    byId('generate').addEventListener('click', async () => {
+      const button = byId('generate') as HTMLButtonElement;
+      const status = byId('status');
+      button.disabled = true;
+      status.hidden = false;
+      status.textContent = 'writing…';
+
+      try {
+        const res = await fetch('/api/learn/quiz/newsletter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ count: wanted }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const data = await res.json();
+        questions = usable(data.questions);
+
+        if (questions.length) {
+          status.hidden = true;
+        } else {
+          status.textContent = 'nothing usable came back — try again';
+        }
+        paint();
+      } catch {
+        status.textContent = 'could not generate — is the backend running?';
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    byId('copy-all').addEventListener('click', (event) => {
+      if (!questions.length) return;
+      copy(questions.map(snippetFor).join('\n\n'), event.currentTarget as HTMLButtonElement,
+           'Copy all as HTML');
+    });
+  </script>
+</PlatformLayout>

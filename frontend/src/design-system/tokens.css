@@ -1,0 +1,331 @@
+/* ============================================================================
+   Cadence Design System — tokens
+   ----------------------------------------------------------------------------
+   The single source of truth for colour, type, space, motion and elevation.
+   Every value in the platform traces back to a token defined here.
+
+   Grounded in the brand guidelines (v1.0, Oct 2024), which are binding:
+   White and Charcoal Grey are the primary pair; Blue, Green, Amber and Gold are
+   the secondaries; Roboto is the brand face and Kode Mono the caption face.
+
+   Design position — "the studio" (rebuilt 2026-08-19, replacing "the instrument"):
+   A white field, soft grey wells, pill geometry and generous air. Charcoal is
+   an ACCENT — the authority colour of committing actions — not a frame. Colour
+   arrives in occasional full-bleed fields built from the brand secondaries.
+   Kode Mono is demoted to a whisper: timestamps and identifiers only.
+   Motion stays critically damped — things arrive and stop.
+
+   Colours are stored as space-separated RGB channels so Tailwind can apply
+   opacity: rgb(var(--accent) / 0.2).
+
+   SOURCE OF TRUTH: the Cadence Design System project on claude.ai/design. This
+   file is byte-identical to the copy there — change it in the design project
+   first, then pull it down, never the reverse.
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Kode Mono Variable';
+  src: url('fonts/KodeMono-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Kode Mono';
+  src: url('fonts/KodeMono-VariableFont_wght.ttf') format('truetype-variations');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ── Canvas & surfaces ────────────────────────────────────────────────────
+     White everywhere. The page IS the sheet now — there is no frame for it to
+     sit in. Depth comes from soft grey wells pressed into the white and from
+     cards lifted gently off it. */
+  --canvas: 255 255 255; /* @kind color */ /* Brand White — the whole field */
+  --surface: 255 255 255; /* @kind color */ /* cards, panels — same white, lifted by shadow */
+  --surface-sunken: 244 243 241; /* @kind color */ /* #F4F3F1 — wells, pills, inputs at rest */
+  --surface-raised: 255 255 255; /* @kind color */
+  --surface-ink: 26 26 25; /* @kind color */ /* charcoal — black pills, dark CTAs; same value as --chrome */
+
+  /* ── Ink ────────────────────────────────────────────────────────────────── */
+  --ink: 18 18 18; /* @kind color */ /* #121212 — 18.1:1 on white */
+  --ink-secondary: 92 90 86; /* @kind color */ /* #5C5A56 — 6.7:1 */
+  --ink-muted: 112 109 103; /* @kind color */ /* #706D67 — 5.0:1 — the AA floor */
+  --ink-on-ink: 249 248 245; /* @kind color */ /* on charcoal pills and CTAs */
+
+  /* ── Charcoal — the authority accent ──────────────────────────────────────
+     No longer a frame. Charcoal appears as OBJECTS on the white field: the
+     primary pill button, the bulk bar, a toast, a tooltip. The tokens keep
+     their names so nothing downstream breaks. */
+  --chrome: 26 26 25; /* @kind color */ /* #1A1A19 — the one charcoal */
+  --chrome-raised: 38 38 36; /* @kind color */ /* hover inside a charcoal object */
+  --chrome-rule: 56 55 52; /* @kind color */ /* separation inside charcoal */
+  --chrome-ink: 245 244 241; /* @kind color */ /* text on charcoal · 15.8:1 */
+  --chrome-ink-muted: 152 149 142; /* @kind color */ /* metadata on charcoal · 5.8:1 */
+
+  /* ── Accent — Brand Blue ──────────────────────────────────────────────────
+     #0084FF stays the active/live colour. 3.66:1 on white — legal for fills
+     and large text, never for body copy; accent text uses --accent-ink. */
+  --accent: 0 132 255; /* @kind color */ /* #0084FF — fills, focus, live marks */
+  --accent-pressed: 0 108 214; /* @kind color */
+  --accent-ink: 0 90 184; /* @kind color */ /* #005AB8 — 6.7:1 — accent-coloured text */
+  --accent-wash: 232 243 255; /* @kind color */ /* selected rows, live chips */
+  --accent-hairline: 173 213 255; /* @kind color */
+
+  /* ── Signal — sync semantics ──────────────────────────────────────────────
+     locked · drift · fault. Fault is a brand extension (the guidelines define
+     no red); it sits beside amber rather than shouting over it. */
+  --signal-locked: 42 136 0; /* @kind color */ /* #2A8800 — confirmed, in sync */
+  --signal-drift: 246 161 0; /* @kind color */ /* #F6A100 — pending, attention */
+  --signal-fault: 193 45 34; /* @kind color */ /* #C12D22 — error, destructive */
+
+  /* Lifted variants for text on charcoal objects (toasts, bulk bar). */
+  --signal-locked-on-chrome: 122 200 84; /* @kind color */
+  --signal-drift-on-chrome: 250 181 61; /* @kind color */
+  --signal-fault-on-chrome: 231 112 98; /* @kind color */
+  --gold-on-chrome: 217 181 112; /* @kind color */
+  --accent-on-chrome: 77 166 255; /* @kind color */
+
+  --signal-locked-wash: 233 244 228; /* @kind color */
+  --signal-drift-wash: 254 244 224; /* @kind color */
+  --signal-fault-wash: 251 234 232; /* @kind color */
+
+  /* ── Gold — exclusive ─────────────────────────────────────────────────────
+     One meaning only: canonical / promoted knowledge. */
+  --gold: 195 154 73; /* @kind color */ /* #C39A49 */
+  --gold-deep: 93 73 35; /* @kind color */ /* gold-coloured text — 6.9:1 */
+
+  /* ── Colour fields ────────────────────────────────────────────────────────
+     Full-bleed colour moments — a featured card, an insights panel, a hero.
+     Built from the brand secondaries and nothing invented. Each field names
+     the ink that sits on it; no other pairing is legal. Fields are for
+     FEATURED surfaces, never for state — a colour field says "look here",
+     a signal colour says "this is the condition". At most one field per view.
+     (Added 2026-08-19.) */
+  --field-blue: 0 132 255; /* @kind color */ /* white ink · 3.7:1 — display text only */
+  --field-blue-ink: 255 255 255; /* @kind color */
+  --field-sky: 168 216 240; /* @kind color */ /* charcoal ink · derived light of brand blue */
+  --field-sky-ink: 18 18 18; /* @kind color */
+  --field-amber: 246 161 0; /* @kind color */ /* charcoal ink · 9.1:1 */
+  --field-amber-ink: 18 18 18; /* @kind color */
+  --field-gold: 195 154 73; /* @kind color */ /* charcoal ink · gold field = canon featured */
+  --field-gold-ink: 18 18 18; /* @kind color */
+
+  /* ── Series — categorical data ────────────────────────────────────────────
+     Colour as identity, charts only. Six slots, fixed order, never cycled;
+     order is the colour-blindness safety mechanism. Green/amber/red/gold are
+     absent — status colours never impersonate a series. Adjacency-safe to six;
+     all-pairs forms separate only the first three. */
+  --series-1: var(--accent); /* @kind color */
+  --series-2: 196 45 129; /* @kind color */ /* #C42D81 */
+  --series-3: 143 75 209; /* @kind color */ /* #8F4BD1 */
+  --series-4: 0 157 189; /* @kind color */ /* #009DBD */
+  --series-5: 0 126 96; /* @kind color */ /* #007E60 */
+  --series-6: 184 94 182; /* @kind color */ /* #B85EB6 */
+  --series-other: var(--ink-muted); /* @kind color */
+
+  /* ── Rules & borders ──────────────────────────────────────────────────────
+     Structure is space first, tone second, a hairline last. */
+  --rule-hairline: 236 235 232; /* @kind color */ /* barely there */
+  --rule: 221 219 214; /* @kind color */ /* structural */
+  --rule-strong: 18 18 18; /* @kind color */ /* emphatic — rare */
+
+  /* ── Typography ───────────────────────────────────────────────────────────
+     Roboto carries everything. Hierarchy comes from SIZE and WEIGHT together —
+     big, bold, tight headlines over calm regular body. Kode Mono survives in
+     one register only: timestamps, ids, keyboard hints. If a mono string is a
+     sentence, it is in the wrong face. */
+  --font-sans: 'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Kode Mono Variable', 'Kode Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --weight-thin: 100; /* @kind font */
+  --weight-light: 300; /* @kind font */
+  --weight-regular: 400; /* @kind font */
+  --weight-medium: 500; /* @kind font */
+  --weight-bold: 700; /* @kind font */
+
+  --text-micro:      0.6875rem; /* @kind font */ /* 11px — mono readouts */
+  --text-caption:    0.75rem; /* @kind font */ /* 12px — captions, helper text */
+  --text-small:      0.8125rem; /* @kind font */ /* 13px — dense UI, cells */
+  --text-body:       0.9375rem; /* @kind font */ /* 15px — the reading size */
+  --text-lead:       1.125rem; /* @kind font */ /* 18px — questions, intros */
+  --text-title:      1.375rem; /* @kind font */ /* 22px — panel and page titles */
+  --text-heading:    2rem; /* @kind font */ /* 32px — section heads */
+  --text-display:    3.5rem; /* @kind font */ /* 56px — the big statement */
+
+  --leading-tight: 1.08; /* @kind font */ /* display and headings */
+  --leading-snug: 1.35; /* @kind font */
+  --leading-normal: 1.55; /* @kind font */
+  --leading-relaxed: 1.7; /* @kind font */
+
+  --tracking-display: -0.03em; /* @kind font */ /* big and bold wants to be tight */
+  --tracking-title: -0.016em; /* @kind font */
+  --tracking-body: -0.004em; /* @kind font */
+  --tracking-mono: 0.01em; /* @kind font */
+  --tracking-label: 0.08em; /* @kind font */ /* sans caps labels */
+
+  /* ── Space — 4px base ───────────────────────────────────────────────────── */
+  --space-px:   1px;
+  --space-1:  0.25rem;   /*  4 */
+  --space-2:  0.5rem;    /*  8 */
+  --space-3:  0.75rem;   /* 12 */
+  --space-4:  1rem;      /* 16 */
+  --space-5:  1.25rem;   /* 20 */
+  --space-6:  1.5rem;    /* 24 */
+  --space-8:  2rem;      /* 32 */
+  --space-10: 2.5rem;    /* 40 */
+  --space-12: 3rem;      /* 48 */
+  --space-16: 4rem;      /* 64 */
+  --space-24: 6rem;      /* 96 */
+
+  /* ── Measure ────────────────────────────────────────────────────────────── */
+  --measure-read: 42rem; /* @kind spacing */ /* the answer column */
+  --measure-form: 30rem; /* @kind spacing */
+  --measure-page: 84rem; /* @kind spacing */
+
+  /* ── Rail ─────────────────────────────────────────────────────────────────
+     The rail is white now — a slim icon column against the field, a hairline
+     away from the content. Closed (glyphs only) is the default posture. */
+  --rail-open:   13.5rem; /* @kind spacing */ /* 216px — labelled */
+  --rail-closed:  3.5rem; /* @kind spacing */ /*  56px — glyphs only, the default */
+
+  /* ── App marks — the stages ───────────────────────────────────────────────
+     Three stages name the work — find, engage, learn — and the symbol alone
+     names the agent. Each stage owns ONE hue appearing three ways: wash on the
+     tile, charcoal on the symbol's face, saturated on its inlaid edge. Washes,
+     not saturated tiles, so eleven marks in a grid stop reading as eleven
+     coloured regions; and the edge rather than a grey wall, so depth is made of
+     a hue the palette already owns instead of one invented to imitate a shadow.
+     The edge is what survives at 24px and what lets a mark sit on chrome with
+     only its face inverted — no second artwork. (Revised 2026-08-20.) */
+  --app-find: 232 243 255; /* @kind color */ /* tile · = --accent-wash */
+  --app-find-edge: 0 132 255; /* @kind color */ /* edge · = --accent */
+  --app-engage: 254 244 224; /* @kind color */ /* tile · = --signal-drift-wash */
+  --app-engage-edge: 246 161 0; /* @kind color */ /* edge · = --signal-drift */
+  --app-learn: 233 244 228; /* @kind color */ /* tile · = --signal-locked-wash */
+  --app-learn-edge: 42 136 0; /* @kind color */ /* edge · = --signal-locked */
+  --app-face: 18 18 18; /* @kind color */ /* the symbol's top face — = --ink; --canvas on chrome */
+
+  /* ── Radius — pill geometry ───────────────────────────────────────────────
+     Soft everywhere. Controls are pills; containers are deeply rounded cards.
+     The old machined 9px ceiling is retired: 24px is the container radius and
+     --radius-full is the control radius. Square survives nowhere. */
+  --radius-xs:  6px; /* @kind radius */ /* swatches, tiny chips, skeletons */
+  --radius-sm:  10px; /* @kind radius */ /* rows, menu items, key caps */
+  --radius-md:  16px; /* @kind radius */ /* menus, bubbles, small cards */
+  --radius-lg:  24px; /* @kind radius */ /* cards, panels, dialogs, the composer */
+  --radius-full: 999px; /* @kind radius */ /* every button, chip, input, pill */
+  --radius-app: 1.125rem; /* @kind radius */ /* 18px on the 4rem app mark */
+
+  /* ── Elevation — soft and diffuse ─────────────────────────────────────────
+       flat    — seated: wells, tables.
+       raised  — a card you could pick up.
+       lifted  — the floating layer: menus, toasts, the raised composer.
+       overlay — above a scrim: dialogs.
+     A shadow is depth, never a border substitute. */
+  --shadow-flat:   inset 0 0 0 1px rgb(var(--rule-hairline));
+  --shadow-raised: 0 1px 2px rgb(var(--ink) / 0.04), 0 4px 16px rgb(var(--ink) / 0.05);
+  --shadow-lifted: 0 4px 16px rgb(var(--ink) / 0.07), 0 16px 40px -8px rgb(var(--ink) / 0.12);
+  --shadow-overlay:0 4px 16px rgb(var(--ink) / 0.08), 0 32px 72px -16px rgb(18 18 18 / 0.28);
+
+  /* ── Material — overlays only ─────────────────────────────────────────────
+     Glass survives in one place: the floating layer (menus, dialogs, toasts,
+     tooltips, the palette). One question decides — does content pass beneath
+     it? Everything structural is solid. Never glass on glass. */
+  --blur-thin: 12px; /* @kind other */ /* tooltips, chips */
+  --blur-regular: 20px; /* @kind other */ /* menus, toasts */
+  --blur-thick: 30px; /* @kind other */ /* dialogs, the drawer */
+  --glass-saturate: 180%; /* @kind other */
+  --glass-light: 0.84; /* @kind other */ /* tint alpha over --surface */
+  --glass-dark: 0.94; /* @kind other */ /* tint alpha over --chrome */
+
+  /* The field behind everything is plain white now; the token remains so the
+     accessibility blocks and existing callers keep working. */
+  --ground: linear-gradient(rgb(var(--canvas)), rgb(var(--canvas))); /* @kind other */
+  --ground-deep: 244 243 241; /* @kind color */ /* retained for compatibility */
+
+  /* ── Motion — critically damped ───────────────────────────────────────────
+     Unchanged doctrine: things arrive and stop. Overshoot only when the user's
+     own gesture carried momentum into it. */
+  --ease-settle: cubic-bezier(0.16, 0.84, 0.28, 1); /* @kind other */
+  --ease-depart: cubic-bezier(0.55, 0, 0.85, 0.35); /* @kind other */
+  --ease-phase: cubic-bezier(0.65, 0, 0.35, 1); /* @kind other */
+
+  --dur-tick: 90ms; /* @kind other */
+  --dur-tap: 140ms; /* @kind other */
+  --dur-shift: 220ms; /* @kind other */
+  --dur-reveal: 320ms; /* @kind other */
+  --dur-stage: 460ms; /* @kind other */
+  --dur-beat: 2400ms; /* @kind other */
+  --dur-step: 36ms; /* @kind other */
+
+  /* ── Springs ────────────────────────────────────────────────────────────── */
+  --spring-settle-damping: 1; /* @kind other */
+  --spring-settle-response: 0.4; /* @kind other */
+  --spring-carry-damping: 0.8; /* @kind other */
+  --spring-carry-response: 0.3; /* @kind other */
+
+  /* ── Z layers ───────────────────────────────────────────────────────────── */
+  --z-base: 0; /* @kind other */
+  --z-sticky: 10; /* @kind other */
+  --z-drawer: 30; /* @kind other */
+  --z-overlay: 40; /* @kind other */
+  --z-dialog: 50; /* @kind other */
+  --z-toast: 60; /* @kind other */
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────────
+   Durations collapse to a value low enough to be imperceptible but non-zero,
+   so transitionend handlers still fire. The ambient beat stops entirely.
+   Springs are handled in springs.ts, which reads this preference itself. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-tick: 1ms; /* @kind other */
+    --dur-tap: 1ms; /* @kind other */
+    --dur-shift: 1ms; /* @kind other */
+    --dur-reveal: 1ms; /* @kind other */
+    --dur-stage: 1ms; /* @kind other */
+    --dur-step: 0ms; /* @kind other */
+    --dur-beat: 0ms; /* @kind other */
+  }
+}
+
+/* ── Reduced transparency ───────────────────────────────────────────────────
+   Every glass surface becomes the solid version of itself; no component
+   carries its own branch. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-light: 1; /* @kind other */
+    --glass-dark: 1; /* @kind other */
+    --blur-thin: 0px; /* @kind other */
+    --blur-regular: 0px; /* @kind other */
+    --blur-thick: 0px; /* @kind other */
+  }
+}
+
+/* ── Increased contrast ─────────────────────────────────────────────────────
+   Solid surfaces, and the hairline is promoted to the defined rule so every
+   edge is stated rather than implied. */
+@media (prefers-contrast: more) {
+  :root {
+    --glass-light: 1; /* @kind other */
+    --glass-dark: 1; /* @kind other */
+    --blur-thin: 0px; /* @kind other */
+    --blur-regular: 0px; /* @kind other */
+    --blur-thick: 0px; /* @kind other */
+    --rule-hairline: 221 219 214; /* @kind color */ /* = --rule */
+  }
+}
+
+/* ── Forced colours ───────────────────────────────────────────────────────── */
+@media (forced-colors: active) {
+  :root {
+    --glass-light: 1; /* @kind other */
+    --glass-dark: 1; /* @kind other */
+    --blur-thin: 0px; /* @kind other */
+    --blur-regular: 0px; /* @kind other */
+    --blur-thick: 0px; /* @kind other */
+  }
+}

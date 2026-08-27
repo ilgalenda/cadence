@@ -87,7 +87,7 @@ backend/agents/*/data/learnings/
 backend/agents/*/data/transcripts/
 backend/agents/*/data/_sandbox/
 backend/agents/*/knowledge/_user/
-backend/agents/*/knowledge/timebeat-*.md
+backend/agents/*/knowledge/company-*.md
 # User profiles (real roster) — regenerate locally via seed_users.py --rewrite-profiles
 backend/agents/users.json
 agents/users.json
@@ -141,3 +141,7 @@ temp/
 *.tmp
 *.bak
 *.orig
+
+# The genericisation map names the employer in order to remove it, so it is the
+# one file in tools/ that cannot be published.
+tools/genericise.map.json

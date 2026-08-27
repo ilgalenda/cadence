@@ -1,0 +1,224 @@
+<!-- @dsCard group="Foundations" name="Material & depth" subtitle="Glass on the floating layer only; soft diffuse elevation" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Material &amp; depth — Cadence Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../primitives.css">
+<link rel="stylesheet" href="preview.css">
+<style>
+  /* A busy ground, so the glass has something to be glass *over*. Text and rules
+     rather than a photograph, because that is what actually sits under these
+     surfaces in the product. */
+  .pv-ground {
+    position: relative; overflow: hidden;
+    border-radius: var(--radius-lg);
+    background: rgb(var(--surface));
+    box-shadow: var(--shadow-flat);
+    padding: var(--space-5);
+    min-height: 15rem;
+  }
+  .pv-ground__text { color: rgb(var(--ink-secondary)); font-size: var(--text-small); line-height: var(--leading-relaxed); }
+  .pv-ground__text strong { color: rgb(var(--ink)); }
+
+  .pv-pane {
+    position: absolute; right: var(--space-5); top: var(--space-5);
+    width: 15rem; padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    background: rgb(var(--surface) / var(--glass-light));
+    backdrop-filter: blur(var(--blur-thick)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--blur-thick)) saturate(var(--glass-saturate));
+    box-shadow: var(--shadow-lifted);
+    /* The bright top edge: light catching the leading face of the material. */
+    border-top: 1px solid rgb(255 255 255 / 0.55);
+  }
+
+  .pv-weights { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+  .pv-weight { position: relative; height: 8rem; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-flat); }
+  .pv-weight__bg { position: absolute; inset: 0; padding: var(--space-3); font-family: var(--font-mono); font-size: var(--text-micro); color: rgb(var(--ink-muted)); line-height: 1.35; }
+  .pv-weight__pane {
+    position: absolute; inset: var(--space-4) var(--space-3);
+    display: flex; align-items: center; justify-content: center;
+    border-radius: var(--radius-md);
+    background: rgb(var(--surface) / var(--glass-light));
+    box-shadow: var(--shadow-lifted);
+    border-top: 1px solid rgb(255 255 255 / 0.55);
+    font-family: var(--font-mono); font-size: var(--text-micro); color: rgb(var(--ink));
+  }
+  .pv-weight--thin .pv-weight__pane { backdrop-filter: blur(var(--blur-thin)) saturate(var(--glass-saturate)); -webkit-backdrop-filter: blur(var(--blur-thin)) saturate(var(--glass-saturate)); }
+  .pv-weight--regular .pv-weight__pane { backdrop-filter: blur(var(--blur-regular)) saturate(var(--glass-saturate)); -webkit-backdrop-filter: blur(var(--blur-regular)) saturate(var(--glass-saturate)); }
+  .pv-weight--thick .pv-weight__pane { backdrop-filter: blur(var(--blur-thick)) saturate(var(--glass-saturate)); -webkit-backdrop-filter: blur(var(--blur-thick)) saturate(var(--glass-saturate)); }
+
+  .pv-lift { display: flex; gap: var(--space-6); flex-wrap: wrap; }
+  .pv-lift__step { text-align: center; }
+  .pv-lift__box { width: 7rem; height: 4.5rem; border-radius: var(--radius-lg); background: rgb(var(--surface)); }
+
+  .pv-verdict { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+  .pv-verdict ul { margin: var(--space-2) 0 0; padding-left: var(--space-5); color: rgb(var(--ink-secondary)); font-size: var(--text-small); line-height: var(--leading-relaxed); }
+</style>
+</head>
+<body class="ds-root">
+
+<header class="pv-head">
+  <p class="ds-eyebrow">Foundations · 04</p>
+  <h1>Material &amp; depth</h1>
+  <p>
+    <strong>Glass lives on the floating layer only.</strong> Menus, dialogs, toasts, tooltips, the
+    palette, the floating drawer — surfaces that content passes beneath. Everything structural —
+    the field, the rail, cards, wells, tables — is solid. The test for a new surface is one
+    question: <strong>does content pass beneath it?</strong> Blur is not decoration and it is not
+    free: a handful of elements in the whole platform blur, and the lists that render hundreds of
+    rows deliberately do not. <strong>Rebuilt 2026-08-19:</strong> the translucent rail and sheet
+    are retired with the frame doctrine.
+  </p>
+</header>
+
+<section class="pv-section">
+  <h2>The floating layer</h2>
+  <p class="ds-caption" style="margin-bottom: var(--space-4); max-width: var(--measure-read);">
+    Menus, dialogs (and the palette, which is a dialog), toasts, tooltips and the floating drawer.
+    Nothing else. The ground below is the product's own content, because that is what these
+    surfaces actually cover — not a photograph, which would flatter the effect and mislead.
+  </p>
+  <div class="pv-ground">
+    <div class="pv-ground__text">
+      <p><strong>Northgate — timing refresh.</strong> Grandmaster clock ensemble across two sites, with
+      holdover measured at 1.4µs over 24 hours. The customer's existing GPS-only arrangement fails
+      the MiFID II reporting requirement during a spoofing event, which is the opening.</p>
+      <p>PTP² Mesh removes the single point of failure. Boundary clocks at each hop; SyncE beneath
+      it for frequency. The quoted figure of 100ns end to end assumes the fibre path is symmetric —
+      confirm before it goes in writing.</p>
+      <p>Next: send the finance datasheet and the Galileo OSNMA note, then reconvene with the
+      network team for a scenario walk-through.</p>
+    </div>
+    <div class="pv-pane">
+      <p class="ds-eyebrow" style="margin:0 0 var(--space-2)">Glass · thick</p>
+      <p class="ds-small" style="margin:0; color: rgb(var(--ink))">
+        A dialog or the drawer. The text under it stays legible because the tint carries most of
+        the work and the blur only softens what is left.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Weights</h2>
+  <p class="ds-caption" style="margin-bottom: var(--space-4); max-width: var(--measure-read);">
+    Blur scales with the surface: a large pane reads as thicker glass than a small one. Three
+    steps, chosen by what the surface is, not by taste.
+  </p>
+  <div class="pv-weights">
+    <div class="pv-weight pv-weight--thin">
+      <div class="pv-weight__bg">100ns · 1.4µs · locked · drift · 09:41:22 · PTP² · SyncE · OSNMA · holdover · GMC · 1.4µs · locked</div>
+      <div class="pv-weight__pane">thin · 12px</div>
+    </div>
+    <div class="pv-weight pv-weight--regular">
+      <div class="pv-weight__bg">100ns · 1.4µs · locked · drift · 09:41:22 · PTP² · SyncE · OSNMA · holdover · GMC · 1.4µs · locked</div>
+      <div class="pv-weight__pane">regular · 20px</div>
+    </div>
+    <div class="pv-weight pv-weight--thick">
+      <div class="pv-weight__bg">100ns · 1.4µs · locked · drift · 09:41:22 · PTP² · SyncE · OSNMA · holdover · GMC · 1.4µs · locked</div>
+      <div class="pv-weight__pane">thick · 30px</div>
+    </div>
+  </div>
+  <p class="pv-note" style="margin-top: var(--space-4);">
+    <strong>tooltip, chip → thin. menu, toast → regular. dialog, drawer → thick.</strong>
+    Nothing structural blurs; the field and the rail are solid white.
+  </p>
+  <p class="pv-note" style="margin-top: var(--space-3);">
+    <strong>Never glass on glass.</strong> One floating pane over solid content is the whole
+    budget. Two translucent surfaces stacked lose the legibility both were tuned for — the tint,
+    not the blur, is what keeps text readable, and stacking defeats it.
+  </p>
+</section>
+
+<section class="pv-section">
+  <h2>Elevation</h2>
+  <p class="ds-caption" style="margin-bottom: var(--space-4); max-width: var(--measure-read);">
+    Four steps, each stating how far a surface is from the plane. A shadow is never a border
+    substitute — the <code>0 0 0 1px</code> rings that used to stand in for one belong to
+    <code>--rule</code>.
+  </p>
+  <div class="pv-lift">
+    <div class="pv-lift__step">
+      <div class="pv-lift__box" style="box-shadow: var(--shadow-flat);"></div>
+      <span class="pv-spec" style="display:block; margin-top: var(--space-2);">flat · seated</span>
+    </div>
+    <div class="pv-lift__step">
+      <div class="pv-lift__box" style="box-shadow: var(--shadow-raised);"></div>
+      <span class="pv-spec" style="display:block; margin-top: var(--space-2);">raised · attached</span>
+    </div>
+    <div class="pv-lift__step">
+      <div class="pv-lift__box" style="box-shadow: var(--shadow-lifted);"></div>
+      <span class="pv-spec" style="display:block; margin-top: var(--space-2);">lifted · floating</span>
+    </div>
+    <div class="pv-lift__step">
+      <div class="pv-lift__box" style="box-shadow: var(--shadow-overlay);"></div>
+      <span class="pv-spec" style="display:block; margin-top: var(--space-2);">overlay · blocking</span>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Which tier</h2>
+  <div class="pv-verdict">
+    <div>
+      <p class="ds-small" style="font-weight: var(--weight-medium); color: rgb(var(--ink));">Glass</p>
+      <ul>
+        <li><code>.ds-menu</code></li>
+        <li><code>.ds-dialog</code> — and <code>.ds-palette</code>, which is one</li>
+        <li><code>.ds-toast</code></li>
+        <li><code>.ds-tip__body</code></li>
+        <li>the drawer, in its floating placement only</li>
+        <li><code>.ds-table thead</code> — the one true scroll-under inside the field</li>
+      </ul>
+    </div>
+    <div>
+      <p class="ds-small" style="font-weight: var(--weight-medium); color: rgb(var(--ink));">Solid</p>
+      <ul>
+        <li>the field and the rail</li>
+        <li>cards, panels, wells, table bodies, rows</li>
+        <li>every list that renders at length — 200+ blurring rows is a defect, not a style</li>
+        <li>the composer</li>
+        <li>anything holding text a person is reading</li>
+      </ul>
+    </div>
+  </div>
+  <p class="pv-note" style="margin-top: var(--space-4);">
+    <strong>Rebuilt 2026-08-19.</strong> The 2026-08-17 revision made the rail and sheet glass over
+    a gradient ground; both are retired with the frame doctrine. The drawer remains the one
+    component that is <em>both</em>, depending on placement — seated it is solid, floating it is
+    glass.
+  </p>
+</section>
+
+<section class="pv-section">
+  <h2>Translucency is a preference</h2>
+  <p class="pv-note">
+    Honoured structurally in <code>tokens.css</code>, the way reduced motion is, so no component
+    carries its own branch. <code>prefers-reduced-transparency</code> takes the tint to fully
+    opaque and the blur to zero; <code>prefers-contrast: more</code> does the same and promotes the
+    hairline to the defined rule, so every edge is stated rather than implied. Legibility over
+    material, always — translucency is the first thing the system gives up and it is never
+    load-bearing.
+  </p>
+</section>
+
+<section class="pv-section">
+  <h2>The prefix is not optional</h2>
+  <p class="pv-note">
+    The app declares no browserslist and nothing prefixes at build time, so
+    <code>-webkit-backdrop-filter</code> is written by hand beside every
+    <code>backdrop-filter</code>. Without it the material silently disappears on older Safari and
+    the surface falls back to a flat tint — which is legible, but is not what this card describes.
+  </p>
+</section>
+
+<script src="tip.js"></script>
+</body>
+</html>

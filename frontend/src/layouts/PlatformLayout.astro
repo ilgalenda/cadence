@@ -1,0 +1,224 @@
+---
+/**
+ * The platform shell — one rail for the whole product.
+ *
+ * Replaced AgentLayout and DashboardLayout, both now deleted. Those mirrored the
+ * code's shape: a dashboard listing modules, then a shell per module. This mirrors
+ * the job — **Work**, **Owl**, **Learn** — so the rail is the same wherever you
+ * are and moving between them is not leaving one product for another.
+ *
+ * White field, slim white rail, one hairline between them, per the design
+ * system's shell card ("the studio", 2026-08-19 — the charcoal frame and inset
+ * glass sheet are retired). The rail is built from `platform.ts`, so it can
+ * never advertise a surface that does not exist; anything not yet built is
+ * shown as such rather than hidden, because a rail that quietly omits things
+ * teaches you not to trust it.
+ */
+import '../styles/global.css';
+import Footer from '../components/Footer.astro';
+import Rail from '../components/Rail.astro';
+import Breadcrumb from '../components/Breadcrumb.astro';
+
+interface Props {
+  title?: string;
+  /** Grant this page needs. The shell enforces it; pages never re-check. */
+  requires?: string;
+  /** A middle crumb the page fills at runtime — the Owl workspace's project. */
+  crumbMiddleId?: string;
+  /** The sheet ends in a footer unless the page owns its own bottom edge. */
+  showFooter?: boolean;
+  /**
+   * The page owns its scrolling, rather than the sheet scrolling around it.
+   * Needed when a surface has to keep something pinned below the scroller — the
+   * Owl workspace's composer sits beside its thread, and a page slotted into the
+   * scroller cannot produce a sibling of it.
+   */
+  fill?: boolean;
+}
+const { title, requires, crumbMiddleId, showFooter = true, fill = false } = Astro.props;
+const here = Astro.url.pathname;
+
+/**
+ * The rail's own defaults must survive for the pages that pass nothing. Astro
+ * treats a forwarded-but-empty slot as provided content, which would suppress
+ * Rail's fallback — and take the "New conversation" button and the knowledge
+ * search off every page except the one that overrode them. So the forwarding
+ * branch is only rendered when a page actually supplied something.
+ */
+const railTop = Astro.slots.has('rail-top');
+const railBefore = Astro.slots.has('rail-before-groups');
+const railAfter = Astro.slots.has('rail-after-groups');
+const railCustom = railTop || railBefore || railAfter;
+---
+<!DOCTYPE html>
+<html lang="en-GB" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/images/cadence-mark.svg" />
+  <title>{title ? `${title} — Cadence` : 'Cadence'}</title>
+</head>
+<body class="ds-root shell" data-requires={requires}>
+
+  <!--
+    The rail's rendered width, decided before the first paint.
+
+    `is-closed` is the person's preference; `is-compact` is what the rail actually
+    is, which is the preference OR a viewport too narrow to afford labels. Every
+    geometry rule keys off `is-compact` alone, so the closed instrument is defined
+    once instead of being hand-copied into a media query — the copy had already
+    drifted, leaving the narrow rail with no tooltips at all.
+
+    Inline and here rather than in the module below, because the module applies the
+    preference only after `await bootShell()`: a person who keeps the rail closed
+    watched it sit open for the length of an auth round trip and then snap shut.
+  -->
+  <script is:inline>
+    (() => {
+      const shell = document.body;
+      const narrow = window.matchMedia('(max-width: 60rem)');
+      const settle = () => {
+        const closed = shell.classList.contains('is-closed');
+        shell.classList.toggle('is-compact', closed || narrow.matches);
+      };
+      // Closed is the studio's default posture: unset means closed, and only an
+      // explicit '0' — someone who opened the rail and meant it — keeps it open.
+      shell.classList.toggle('is-closed', localStorage.getItem('cadence.rail.closed') !== '0');
+      settle();
+      narrow.addEventListener('change', settle);
+      // The toggle lives in the sheet header, which has not rendered yet; the
+      // module script flips `is-closed` and asks for the width to be re-derived.
+      document.addEventListener('rail:preference', settle);
+    })();
+  </script>
+
+  {railCustom ? (
+    <Rail here={here}>
+      {railTop && <slot name="rail-top" slot="top" />}
+      {railBefore && <slot name="rail-before-groups" slot="before-groups" />}
+      {railAfter && <slot name="rail-after-groups" slot="after-groups" />}
+    </Rail>
+  ) : (
+    <Rail here={here} />
+  )}
+
+  <!--
+    The agents this person keeps in the rail.
+
+    Here rather than in the width script above, which runs before the rail exists,
+    and rather than in the module below, which runs after `await bootShell()` — a
+    pinned row that arrives a beat late reads as the page changing its mind. This
+    sits directly after the rail's markup, so the rows are there and nothing has
+    painted yet.
+  -->
+  <script is:inline>
+    try {
+      const pinned = JSON.parse(localStorage.getItem('cadence.agents.pinned') || '[]');
+      if (Array.isArray(pinned)) {
+        for (const slug of pinned.slice(0, 3)) {
+          const row = document.querySelector('#rail .ds-row[data-agent="' + slug + '"]');
+          if (row) row.hidden = false;
+        }
+      }
+    } catch (e) { /* a corrupt preference is not worth a broken rail */ }
+  </script>
+
+  <div class="shell__field">
+    <!-- The field's head. The card puts the rail toggle here, so closing the rail
+         is done from the surface you are on rather than from the rail itself. -->
+    <header class="ws-head">
+      <button class="ds-icon-btn" id="rail-toggle" type="button" aria-pressed="false" aria-label="Close the rail">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1.5" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M5.5 2.5v10" stroke="currentColor" stroke-width="1.2"/></svg>
+      </button>
+      <Breadcrumb title={title} middleId={crumbMiddleId} />
+      <!-- Anything acting on the surface itself sits right, past a spacer. -->
+      <div class="ws-head__spacer"></div>
+      <slot name="head-actions" />
+    </header>
+    <main class={`shell__main${fill ? ' shell__main--fill' : ' ds-scroll'}`}><slot /></main>
+    {showFooter && <Footer />}
+  </div>
+
+  <style>
+    html, body { height: 100%; }
+    .shell {
+      display: grid;
+      grid-template-columns: var(--rail-open) 1fr;
+      height: 100vh; margin: 0; overflow: hidden;
+      /* The white field. There is no frame and no inset sheet — the rail and the
+         field are the same white, and the rail's right hairline is the whole
+         structure between them. */
+      background: rgb(var(--canvas));
+    }
+
+    /* The field: the page runs edge to edge. Depth comes from wells and cards
+       inside it, never from a container pretending to be a page. */
+    .shell__field {
+      display: flex; flex-direction: column; min-width: 0;
+      overflow: hidden;
+    }
+    /* The field's scroller, and a flex column so a page can fill it.
+       Without the column, a page's own `flex: 1` is inert — it would be a block
+       child of a block box — and any page asking to be centred in the field is
+       silently laid out at its content height instead. Every page built on this
+       layout inherited that; `/owl` escaped it only by not using the layout. */
+    .shell__main {
+      flex: 1; min-height: 0;
+      display: flex; flex-direction: column;
+      overflow-y: auto;
+    }
+    /* The page scrolls its own content instead. Used where something has to stay
+       pinned below the scroller rather than travelling with it. */
+    .shell__main--fill { overflow: hidden; }
+
+    .ws-head {
+      display: flex; align-items: center; gap: var(--space-3);
+      height: 2.75rem; padding: 0 var(--space-3) 0 var(--space-4);
+      border-bottom: 1px solid rgb(var(--rule-hairline)); flex-shrink: 0;
+    }
+    .ws-head__spacer { flex: 1; }
+
+    /* Narrow: the rail collapses to its closed form rather than vanishing, so the
+       platform stays navigable instead of losing its menu entirely. The column
+       itself is driven by `is-compact` (set before paint, see the inline script),
+       so the width and the rail's inner geometry can never disagree. */
+    .shell.is-compact { grid-template-columns: var(--rail-closed) 1fr; }
+  </style>
+
+  <script>
+    import { bootShell, canReach } from '../lib/session';
+    import { enableTips } from '../design-system/tip';
+
+    // Tooltips are placed from script and delegated from the document, so this
+    // runs once for the whole shell and covers nodes built later.
+    enableTips();
+
+    (async () => {
+      const user = await bootShell({ adminLinkId: 'admin-link' });
+      if (!user) return;
+
+      // Access is enforced here, once, so no page repeats the check.
+      const required = document.body.dataset.requires;
+      if (required && !canReach(user, required)) window.location.href = '/';
+
+      // Closing the rail is a per-person preference, so it is remembered. The
+      // inline script above has already applied it and owns the rendered width;
+      // this wires the control and keeps the button's own state truthful.
+      const shell = document.querySelector('.shell')!;
+      const toggle = document.getElementById('rail-toggle')!;
+      const describe = (closed: boolean) => {
+        toggle.setAttribute('aria-pressed', String(closed));
+        toggle.setAttribute('aria-label', closed ? 'Open the rail' : 'Close the rail');
+      };
+      describe(shell.classList.contains('is-closed'));
+      toggle.addEventListener('click', () => {
+        const closed = !shell.classList.contains('is-closed');
+        localStorage.setItem('cadence.rail.closed', closed ? '1' : '0');
+        shell.classList.toggle('is-closed', closed);
+        document.dispatchEvent(new Event('rail:preference'));
+        describe(closed);
+      });
+    })();
+  </script>
+</body>
+</html>

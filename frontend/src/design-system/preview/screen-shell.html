@@ -1,0 +1,141 @@
+<!-- @dsCard group="Screens" name="The shell" subtitle="White field, slim rail, hairline separation — the one valid construction" viewport="1280x900" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The shell — Cadence Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../primitives.css">
+<link rel="stylesheet" href="preview.css">
+<style>
+.demo{height:19rem;border-radius:var(--radius-lg);overflow:hidden;background:rgb(var(--canvas));box-shadow:var(--shadow-flat)}
+.demo--rail{display:grid;grid-template-columns:11rem 1fr}
+.demo--icons{display:grid;grid-template-columns:3.5rem 1fr}
+.frame{display:flex;flex-direction:column;min-height:0;border-right:1px solid rgb(var(--rule-hairline))}
+.frame__top{padding:var(--space-3)}
+.frame__nav{flex:1;padding:var(--space-2)}
+.frame__foot{padding:var(--space-3);border-top:1px solid rgb(var(--rule-hairline))}
+.frame--icons .frame__top,.frame--icons .frame__foot{display:flex;justify-content:center}
+.frame--icons .frame__nav{display:flex;flex-direction:column;align-items:center;gap:var(--space-1)}
+.sheet{display:flex;flex-direction:column;min-width:0;background:rgb(var(--canvas))}
+.sheet__head{height:2.5rem;display:flex;align-items:center;padding:0 var(--space-4)}
+.sheet__body{flex:1;padding:var(--space-5)}
+.mark{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-1) var(--space-2)}
+.mark__name{font-size:var(--text-small);font-weight:var(--weight-medium);color:rgb(var(--ink))}
+.spacer{flex:1}
+.bad{position:relative}
+.bad::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(135deg,transparent 0 10px,rgb(var(--signal-fault) / 0.16) 10px 20px);border-radius:var(--radius-lg);pointer-events:none}
+</style>
+</head>
+<body class="ds-root">
+
+<header class="pv-head">
+  <p class="ds-eyebrow">Screens · 01</p>
+  <h1>The shell</h1>
+  <p>
+    Every full surface is the same construction: a <strong>white field</strong> with a
+    <strong>slim white rail</strong> beside it, separated by a single hairline. The rail carries
+    navigation; the field carries the work. There is no frame, no inset sheet and no dark region —
+    charcoal appears only as objects (the primary pill, the bulk bar, a toast).
+    <strong>Rebuilt 2026-08-19:</strong> this replaces the charcoal frame-and-sheet doctrine.
+  </p>
+</header>
+
+<section class="pv-section">
+  <h2>Rail open — labelled</h2>
+  <div class="demo demo--rail">
+    <aside class="frame">
+      <div class="frame__top">
+        <span class="mark">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.6" y="6.5" width="2.6" height="7" rx="1.3" fill="rgb(var(--ink))"></rect><rect x="6.9" y="3.5" width="2.6" height="13" rx="1.3" fill="rgb(var(--ink))"></rect><rect x="11.2" y="1.5" width="2.6" height="17" rx="1.3" fill="rgb(var(--accent))"></rect><rect x="15.5" y="5" width="2.6" height="10" rx="1.3" fill="rgb(var(--ink))"></rect></svg>
+          <span class="mark__name">Cadence</span>
+        </span>
+      </div>
+      <nav class="frame__nav">
+        <div class="ds-row is-active"><span class="ds-row__label">Overview</span></div>
+        <div class="ds-row"><span class="ds-row__label">Prospects</span><span class="ds-mono">12</span></div>
+        <div class="ds-row"><span class="ds-row__label">Campaigns</span></div>
+      </nav>
+      <div class="frame__foot">
+        <span class="ds-avatar ds-avatar--sm ds-avatar--ink">I</span>
+      </div>
+    </aside>
+    <main class="sheet">
+      <div class="sheet__head"><span class="ds-mono">the field · white, edge to edge</span></div>
+      <div class="sheet__body">
+        <p class="ds-title" style="margin:0 0 var(--space-2)">Content lives here</p>
+        <p class="ds-small" style="margin:0">The rail is a hairline away, in the same white. Depth comes from wells and cards, not from a frame.</p>
+      </div>
+    </main>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Rail closed — glyphs only, the default posture</h2>
+  <div class="demo demo--icons">
+    <aside class="frame frame--icons">
+      <div class="frame__top">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.6" y="6.5" width="2.6" height="7" rx="1.3" fill="rgb(var(--ink))"></rect><rect x="6.9" y="3.5" width="2.6" height="13" rx="1.3" fill="rgb(var(--ink))"></rect><rect x="11.2" y="1.5" width="2.6" height="17" rx="1.3" fill="rgb(var(--accent))"></rect><rect x="15.5" y="5" width="2.6" height="10" rx="1.3" fill="rgb(var(--ink))"></rect></svg>
+      </div>
+      <nav class="frame__nav">
+        <button class="ds-icon-btn" aria-label="New"><svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg></button>
+        <button class="ds-icon-btn" aria-label="Search"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"></circle><path d="M8.5 8.5l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg></button>
+        <button class="ds-icon-btn" aria-label="Calls"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 8V6m3 4V4m3 8V2m3 9V5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg></button>
+      </nav>
+      <div class="frame__foot">
+        <span class="ds-avatar ds-avatar--sm ds-avatar--ink">I</span>
+      </div>
+    </aside>
+    <main class="sheet">
+      <div class="sheet__body">
+        <p class="ds-eyebrow" style="margin:0 0 var(--space-2)">Workspace</p>
+        <p class="ds-heading" style="margin:0">Good to see you, Sam.</p>
+      </div>
+    </main>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Rules</h2>
+  <div class="pv-stack" style="max-width:var(--measure-read);gap:var(--space-3)">
+    <div class="ds-banner ds-banner--locked">
+      <span class="ds-banner__label">Always</span>
+      One hairline between rail and field. The two are the same white; the line is the whole
+      structure, so it is never doubled with a shadow or a tint.
+    </div>
+    <div class="ds-banner ds-banner--locked">
+      <span class="ds-banner__label">Always</span>
+      The Cadence mark appears once per surface, at the top of the rail. Never twice, never in
+      the field.
+    </div>
+    <div class="ds-banner ds-banner--fault">
+      <span class="ds-banner__label">Never</span>
+      A dark region. Charcoal is an object — a pill, a bar, a toast. If a whole pane is
+      charcoal, it is wrong.
+    </div>
+    <div class="ds-banner ds-banner--fault">
+      <span class="ds-banner__label">Never</span>
+      A boxed sheet. The field runs edge to edge; containers inside it are cards and wells,
+      not a page-within-a-page.
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Not this</h2>
+  <div class="demo demo--rail bad" style="height:11rem">
+    <aside class="frame ds-chrome" style="border-right:0">
+      <div class="frame__top"><span class="mark"><span class="mark__name" style="color:rgb(var(--chrome-ink))">Cadence</span></span></div>
+    </aside>
+    <main style="background:rgb(var(--surface));display:flex;align-items:center;padding:var(--space-5)">
+      <p class="ds-small" style="margin:0">A charcoal rail is the retired doctrine. The frame is gone; do not bring it back.</p>
+    </main>
+  </div>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,350 @@
+---
+/**
+ * Composer — the outreach touches, for you to review and send yourself.
+ *
+ * Writes from a research brief, so this page starts by choosing one. That is not a
+ * hoop: touches written from a brief are grounded in what is actually happening at
+ * the account, and touches written from a company name are the generic outreach
+ * everyone already ignores.
+ *
+ * **Nothing here sends anything, and as of Phase 4a the email need not be pasted.**
+ * Every composition is filed for review; approving it puts the email touch in your
+ * Gmail as an addressed draft. LinkedIn and call touches have no mailbox to land in
+ * and stay text to copy. Cadence cannot send — the grant does not permit it.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import AgentViewStyles from '../../../components/AgentViewStyles.astro';
+---
+<PlatformLayout title="Composer" requires="lead">
+  <div class="agent-page">
+    <div class="agent-page__column">
+      <header class="agent-page__head ds-arrive">
+        <p class="ds-eyebrow">Agent</p>
+        <h1 class="ds-heading ds-page__title">Composer</h1>
+        <p class="ds-lead ds-page__intro">
+          First-touch outreach in Owl’s voice and your own writing style — email, LinkedIn, a call
+          opener, or all three. Written from a research brief, filed for you to review. Nothing is sent.
+        </p>
+      </header>
+
+      <div class="form ds-arrive" style="--arrive: var(--dur-step)">
+        <div class="form__cell">
+          <label class="ds-label" for="brief">Write from</label>
+          <select class="ds-select" id="brief">
+            <option value="">— choose a research brief —</option>
+          </select>
+          <p class="ds-help" id="brief-help">
+            No briefs kept yet. <a href="/work/agents/research">Research an account</a> first — the
+            touches are only as grounded as the brief behind them.
+          </p>
+        </div>
+
+        <div class="form__cell">
+          <span class="ds-label">Channels</span>
+          <div class="channels" id="channels">
+            <button class="ds-tag ds-tag--accent" type="button" data-channel="email" aria-pressed="true">Email</button>
+            <button class="ds-tag" type="button" data-channel="linkedin" aria-pressed="false">LinkedIn</button>
+            <button class="ds-tag" type="button" data-channel="call" aria-pressed="false">Call</button>
+          </div>
+        </div>
+
+        <div class="form__cell" id="recipient-cell">
+          <label class="ds-label" for="recipient">Send to <span class="form__optional">their email, for the draft</span></label>
+          <input class="ds-field" id="recipient" type="email" placeholder="lena@northgate.com" autocomplete="off" />
+          <p class="ds-help">
+            Prefilled when the brief carries an enriched address. Without one the touches are
+            still written and filed — just not draftable.
+          </p>
+        </div>
+
+        <div class="form__cell form__cell--wide">
+          <label class="ds-label" for="notes">Anything to work in <span class="form__optional">optional</span></label>
+          <input class="ds-field" id="notes" placeholder="Reference the tender, keep it under 80 words" autocomplete="off" />
+        </div>
+
+        <div class="form__actions">
+          <button class="ds-btn ds-btn--accent" type="button" id="run" disabled>Write the touches</button>
+          <span class="ds-mark ds-mark--live" id="running" hidden>writing</span>
+          <span class="ds-error" id="error"></span>
+        </div>
+      </div>
+
+      <section class="result ds-arrive" id="result" hidden>
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow">Drafted</h2>
+          <div class="result__actions">
+            <button class="ds-btn ds-btn--ghost ds-btn--sm" type="button" id="reject">Discard</button>
+            <button class="ds-btn ds-btn--primary ds-btn--sm" type="button" id="approve">Approve</button>
+          </div>
+        </div>
+        <div id="touches"></div>
+      </section>
+
+      <section class="waiting ds-arrive" id="waiting" hidden>
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow">Awaiting your review</h2>
+          <span class="ds-mono" id="waiting-count"></span>
+        </div>
+        <ul class="waiting__list ds-stagger" id="waiting-list"></ul>
+      </section>
+    </div>
+  </div>
+
+  <AgentViewStyles />
+
+  <style is:global>
+    /* Screen-level layout only. The page frame is the shared `.agent-page`
+       column; everything tonal and typographic comes from the design system. */
+    .form { max-width: var(--measure-form); }
+    .form__cell { margin-bottom: var(--space-5); }
+    .form__cell--wide { width: 100%; }
+    .form__optional { color: rgb(var(--ink-muted)); font-weight: var(--weight-regular); }
+    .form__actions { display: flex; align-items: center; gap: var(--space-4); }
+
+    .result { margin-top: var(--space-12); }
+    .result__actions { display: flex; gap: var(--space-3); flex-shrink: 0; }
+
+    .waiting { margin-top: var(--space-16); }
+    .waiting__list { list-style: none; margin: 0; padding: 0; }
+    .waiting__row { display: flex; align-items: baseline; gap: var(--space-4);
+      padding: var(--space-3); }
+    /* Hairline between rows only — never under the last one. */
+    .waiting__row + .waiting__row { border-top: 1px solid rgb(var(--rule-hairline)); }
+    .waiting__what { flex: 1; min-width: 0; color: rgb(var(--ink)); }
+  </style>
+
+  <script>
+    import { toast } from '../../../lib/overlays';
+    import { paintTouches, type Touches } from '../../../lib/touchesView';
+
+    const byId = (id: string) => document.getElementById(id)!;
+
+    /** Kept briefs, so a chosen one can be sent whole to Composer. */
+    const briefs = new Map<string, any>();
+    let channels = ['email'];
+    let reviewId: string | null = null;
+
+    function fail(message: string): void {
+      byId('error').textContent = message;
+    }
+
+    // ── Channels ────────────────────────────────────────────────────────────
+
+    byId('channels').addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-channel]');
+      if (!button) return;
+      const channel = button.dataset.channel!;
+
+      channels = channels.includes(channel)
+        ? channels.filter((c) => c !== channel)
+        : [...channels, channel];
+
+      button.setAttribute('aria-pressed', String(channels.includes(channel)));
+      button.className = channels.includes(channel) ? 'ds-tag ds-tag--accent' : 'ds-tag';
+      fail(channels.length ? '' : 'Choose at least one channel to write.');
+    });
+
+    // ── Briefs ──────────────────────────────────────────────────────────────
+
+    async function loadBriefs(): Promise<void> {
+      try {
+        const res = await fetch('/api/sales/research/briefs');
+        if (!res.ok) throw new Error(String(res.status));
+        const records = await res.json();
+
+        const select = byId('brief') as HTMLSelectElement;
+        for (const record of records) {
+          const option = document.createElement('option');
+          option.value = record.id;
+          option.textContent = [record.company, record.person].filter(Boolean).join(' · ');
+          select.append(option);
+        }
+        byId('brief-help').hidden = records.length > 0;
+      } catch {
+        fail('Could not load your briefs — is the backend running?');
+      }
+    }
+
+    (byId('brief') as HTMLSelectElement).addEventListener('change', async (event) => {
+      const id = (event.target as HTMLSelectElement).value;
+      (byId('run') as HTMLButtonElement).disabled = !id;
+      if (!id || briefs.has(id)) return;
+
+      try {
+        const res = await fetch(`/api/sales/research/briefs/${encodeURIComponent(id)}`);
+        if (!res.ok) throw new Error(String(res.status));
+        const brief = await res.json();
+        briefs.set(id, brief);
+        // The point of paying Lusha for an address is not retyping it.
+        const known = (brief.person ?? {})._email || (brief.person ?? {}).email || '';
+        if (known) (byId('recipient') as HTMLInputElement).value = known;
+      } catch {
+        fail('Could not open that brief.');
+        (byId('run') as HTMLButtonElement).disabled = true;
+      }
+    });
+
+    // ── Writing ─────────────────────────────────────────────────────────────
+
+    byId('run').addEventListener('click', async () => {
+      const id = (byId('brief') as HTMLSelectElement).value;
+      const brief = briefs.get(id);
+      if (!brief) { fail('Choose a brief to write from.'); return; }
+      if (!channels.length) { fail('Choose at least one channel to write.'); return; }
+
+      const button = byId('run') as HTMLButtonElement;
+      fail('');
+      button.disabled = true;
+      byId('running').hidden = false;
+
+      try {
+        const res = await fetch('/api/sales/composer/compose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            brief,
+            channels,
+            notes: (byId('notes') as HTMLInputElement).value.trim(),
+          }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const out = await res.json();
+
+        if (out.error) {
+          fail(`Nothing usable came back (${out.error}).`);
+          byId('result').hidden = true;
+          return;
+        }
+
+        reviewId = out.review_id;
+        paintTouches(byId('touches'), out.touches as Touches, out.missing ?? []);
+        byId('result').hidden = false;
+        byId('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        await loadWaiting();
+      } catch {
+        fail('Could not write the touches — is the backend running?');
+      } finally {
+        button.disabled = false;
+        byId('running').hidden = true;
+      }
+    });
+
+    // ── The gate ────────────────────────────────────────────────────────────
+
+    async function decide(approve: boolean): Promise<void> {
+      if (!reviewId) return;
+      try {
+        const res = await fetch('/api/sales/composer/decide', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ review_id: reviewId, approve }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const decided = await res.json();
+        reviewId = null;
+        byId('result').hidden = true;
+        if (approve) reportDraft(decided.outcome ?? {});
+        await loadWaiting();
+      } catch {
+        fail('Could not record that decision.');
+      }
+    }
+
+    /**
+     * What became of the Gmail draft, said in the error line rather than swallowed.
+     *
+     * An approval that silently produced no draft is the failure worth guarding
+     * against: someone would believe outreach was queued when nothing is.
+     */
+    function reportDraft(outcome: Record<string, any>): void {
+      if (outcome.gmail_draft_id) {
+        toast('Approved — drafted in your Gmail, unsent.');
+        return;
+      }
+      if (outcome.gmail_error) {
+        fail(`Approved, but no Gmail draft was created: ${outcome.gmail_error}`);
+        return;
+      }
+      // A LinkedIn- or call-only composition has nothing to draft, which is not a fault.
+      toast(outcome.gmail_skipped ? 'Approved — no email touch, so nothing to draft.' : 'Approved.');
+    }
+
+    byId('approve').addEventListener('click', () => decide(true));
+    byId('reject').addEventListener('click', () => decide(false));
+
+    async function loadWaiting(): Promise<void> {
+      try {
+        const res = await fetch('/api/sales/composer/pending');
+        if (!res.ok) throw new Error(String(res.status));
+        const items = await res.json();
+
+        byId('waiting').hidden = items.length === 0;
+        byId('waiting-count').textContent = `${items.length}`;
+
+        const list = byId('waiting-list');
+        list.replaceChildren();
+        for (const item of items) {
+          const row = document.createElement('li');
+          row.className = 'waiting__row';
+
+          const what = document.createElement('span');
+          what.className = 'waiting__what';
+          const payload = item.payload ?? {};
+          what.textContent = [payload.company, payload.person].filter(Boolean).join(' · ');
+
+          const which = document.createElement('span');
+          which.className = 'ds-mono';
+          which.textContent = (payload.channels ?? []).join(' · ');
+
+          const open = document.createElement('button');
+          open.type = 'button';
+          open.className = 'ds-btn ds-btn--secondary ds-btn--sm';
+          open.textContent = 'Open';
+          open.addEventListener('click', () => {
+            reviewId = item.id;
+            paintTouches(byId('touches'), payload.touches ?? {}, []);
+            byId('result').hidden = false;
+            byId('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+
+          row.append(what, which, open);
+          list.append(row);
+        }
+      } catch {
+        // The queue is a convenience here; the compose flow still works without it.
+      }
+    }
+
+    /**
+     * Arriving from Campaign selection with a mix already decided.
+     *
+     * The plan's whole point is that the chosen channels are what gets written, so
+     * a mix handed over here has to actually land on the chips — a param that looked
+     * meaningful and was dropped is the defect `?call_id=` was.
+     */
+    function applyArrivingMix(): void {
+      const arriving = new URLSearchParams(window.location.search).get('channels');
+      if (!arriving) return;
+
+      const wanted = new Set(
+        arriving.split(',').map((c) => c.trim().toLowerCase()).filter(Boolean),
+      );
+      const chips = byId('channels').querySelectorAll<HTMLButtonElement>('[data-channel]');
+      const known = [...chips].map((chip) => chip.dataset.channel!);
+      const resolved = known.filter((channel) => wanted.has(channel));
+      // An unrecognisable mix leaves the default alone rather than selecting nothing.
+      if (!resolved.length) return;
+
+      channels = resolved;
+      for (const chip of chips) {
+        const on = channels.includes(chip.dataset.channel!);
+        chip.setAttribute('aria-pressed', String(on));
+        chip.className = on ? 'ds-tag ds-tag--accent' : 'ds-tag';
+      }
+    }
+
+    applyArrivingMix();
+    loadBriefs();
+    loadWaiting();
+  </script>
+</PlatformLayout>

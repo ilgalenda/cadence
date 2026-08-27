@@ -1,0 +1,494 @@
+<!-- @dsCard group="Screens" name="X-ray results" subtitle="An agent page: ask in the column, a grouped people table, an index of what was kept" viewport="1440x900" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>X-ray results — Cadence Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../primitives.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: rgb(var(--canvas)); }
+
+  /* ── The shell ──────────────────────────────────────────────────────────────
+     Per `screen-shell.html`: white field, slim rail, one hairline. The rail is
+     stubbed here — this card is about what sits inside the sheet. */
+  .ws { display: grid; grid-template-columns: var(--rail-open) 1fr; min-height: 100vh; }
+  .ws-rail { display: flex; flex-direction: column; gap: var(--space-5); padding: var(--space-3); border-right: 1px solid rgb(var(--rule-hairline)); }
+  .ws-brand { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2) var(--space-3); }
+  .ws-brand__name { font-size: var(--text-body); font-weight: var(--weight-medium); letter-spacing: var(--tracking-title); }
+  .ws-main { background: rgb(var(--surface)); min-width: 0; }
+  .ws-head { display: flex; align-items: center; gap: var(--space-3); height: 2.75rem; padding: 0 var(--space-4); border-bottom: 1px solid rgb(var(--rule-hairline)); }
+  .ws-crumb { font-size: var(--text-small); color: rgb(var(--ink-muted)); }
+  .ws-crumb strong { color: rgb(var(--ink)); font-weight: var(--weight-medium); }
+
+  /* ── The page ───────────────────────────────────────────────────────────────
+     **This is the agent-page composition, not a bespoke workspace.** The earlier
+     version of this card drew a pinned ask bar over its own scroller with a
+     `.ds-drawer` beside it — three constructions no other Cadence surface uses,
+     and the page that shipped from it was the only agent page with no title.
+     Eleven agent pages share what is drawn below: `.agent-page__column`, an
+     eyebrow-title-lead head, the ask *in* the column, then result and index
+     sections under `.agent-page__sect` heads. Match that, always.
+
+     `--wide` because a people table is genuinely wide; `--top` because a result
+     list grows downwards and a vertically-centred column would drift underfoot
+     as it filled. */
+  .agent-page { padding: var(--space-12) var(--space-8) var(--space-16); }
+  .agent-page__column { width: 100%; max-width: var(--measure-page); }
+  .agent-page__head { margin-bottom: var(--space-16); }
+  .agent-page__head .ds-heading { margin: var(--space-3) 0; }
+  .agent-page__head .ds-lead { color: rgb(var(--ink-secondary)); max-width: var(--measure-read); margin: 0; }
+  .agent-page__sect {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: var(--space-4); padding-bottom: var(--space-2);
+    border-bottom: 1px solid rgb(var(--rule-hairline)); margin-bottom: var(--space-5);
+  }
+  .agent-page__sect .ds-mono { color: rgb(var(--ink-muted)); font-size: var(--text-micro); }
+
+  /* ── The ask ────────────────────────────────────────────────────────────────
+     Spans the column; the *field* is what is capped. Capping the whole form at
+     the reading measure inside a wide column puts the controls in the left half
+     of a sheet the results fill, and the two then share no edge. */
+  .xr__row { display: flex; align-items: center; gap: var(--space-3); }
+  .xr__field { flex: 1; min-width: 0; max-width: var(--measure-form); }
+  .xr__actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-4); }
+  .xr__minor { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); }
+  .xr__cost { margin: var(--space-4) 0 0; max-width: var(--measure-read); color: rgb(var(--ink-muted)); }
+  .xr__link { background: none; border: 0; padding: 0; font: inherit; font-size: var(--text-caption); color: rgb(var(--accent-ink)); cursor: pointer; }
+
+  /* Both disclosures open in place on the ask. They used to live in a drawer,
+     closed by default behind an unlabelled icon — where neither control moved so
+     much as vanished. */
+  .xr__panel, .xr__personas { margin-top: var(--space-4); max-width: var(--measure-read); }
+  .xr__tune { display: grid; grid-template-columns: auto 1fr; gap: var(--space-3); align-items: center; margin-bottom: var(--space-3); }
+  .xr__personalist { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
+
+  .xr__banner { margin-top: var(--space-6); }
+  .xr__result { margin-top: var(--space-12); }
+  .xr__saved { margin-top: var(--space-16); }
+  .xr__savedlist { list-style: none; margin: 0; padding: 0; }
+  .xr__savedlist li + li { border-top: 1px solid rgb(var(--rule-hairline)); }
+  .xr__empty { max-width: var(--measure-read); margin: var(--space-12) auto 0; }
+
+  /* ── The people table ───────────────────────────────────────────────────────
+     `components-data.html` is the spec; this is that table with two additions
+     the real data needs. **Groups are tbodies of one table, never a table each**
+     — a table per group sizes its own columns, so "Ready to approach" would not
+     line up under "Found, needs an email", and a table exists to be compared
+     down. And the argument for a person is a **disclosure row**, because it is
+     one to two sentences and `.ds-table__sub` is a 26ch ellipsised line. */
+  .pl__bulk { margin-bottom: var(--space-4); }
+  .pl__colwide { width: 100%; }
+  .pl__grouprow > td { padding: var(--space-10) 0 0; border-bottom: 0; }
+  .pl__band:first-of-type .pl__grouprow > td { padding-top: var(--space-4); }
+  .pl__grouprow:hover { background: none; }
+  .pl__grouphead { display: flex; align-items: baseline; gap: var(--space-3); padding: 0; background: none; border: 0; font: inherit; color: inherit; cursor: pointer; }
+  .pl__groupnote { font-size: var(--text-caption); color: rgb(var(--ink-muted)); }
+  /* Two affordances, kept apart: the twisty opens the argument, the name opens
+     the profile. One control could not do both, and the group is called "Ready
+     to approach" — so the profile has to be reachable. */
+  .pl__who { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+  .pl__whoname { min-width: 0; }
+  .pl__twisty { flex-shrink: 0; display: flex; padding: 0; background: none; border: 0; color: rgb(var(--ink-muted)); cursor: pointer; }
+  .pl__profile { color: inherit; text-decoration: none; border-bottom: 1px solid rgb(var(--rule)); }
+  .pl__auto { margin: 0 0 var(--space-3); }
+  .pl__row.is-open > td { border-bottom: 0; }
+  .pl__whyrow > td { padding-top: 0; }
+  .pl__whyrow.is-selected { background: rgb(var(--accent-wash)); }
+  .pl__whybody { max-width: var(--measure-read); padding-bottom: var(--space-2); }
+  .pl__why { margin: 0; font-size: var(--text-small); color: rgb(var(--ink-secondary)); }
+  .pl__found { margin: var(--space-2) 0 0; font-family: var(--font-mono); font-size: var(--text-micro); letter-spacing: var(--tracking-mono); color: rgb(var(--ink-muted)); overflow-wrap: anywhere; }
+  /* The flex box is a span *inside* the cell. `display: flex` on a `<td>` takes
+     it out of table layout and the row's hairline then breaks under it. */
+  .pl__actcell { white-space: nowrap; }
+  .pl__acts { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+  th.ds-table__num { text-align: right; }
+  .pl__skeleton { display: block; height: var(--text-body); border-radius: var(--radius-xs); }
+
+  .pv-note { max-width: var(--measure-read); font-size: var(--text-small); color: rgb(var(--ink-muted)); }
+  .pv-state { margin-top: var(--space-16); padding-top: var(--space-8); border-top: 1px solid rgb(var(--rule)); }
+  .pv-state__label { font-family: var(--font-mono); font-size: var(--text-micro); text-transform: uppercase; letter-spacing: var(--tracking-label); color: rgb(var(--ink-muted)); margin-bottom: var(--space-4); }
+</style>
+</head>
+<body>
+<div class="ws">
+  <aside class="ws-rail">
+    <div class="ws-brand"><span class="ws-brand__name">Cadence</span></div>
+    <button class="ds-btn ds-btn--primary ds-btn--sm">New conversation</button>
+    <!-- Navigation only. A page's own record index is a section in the page —
+         X-ray's saved shortlists were in this rail, where they vanished with it. -->
+    <div class="ds-row ds-row--record"><span class="ds-row__label">Home</span></div>
+    <div class="ds-row ds-row--record is-active"><span class="ds-row__label">Work</span></div>
+    <div class="ds-row ds-row--record"><span class="ds-row__label">Learn</span></div>
+  </aside>
+
+  <main class="ws-main">
+    <div class="ws-head">
+      <span class="ws-crumb">Home / Agents / <strong>X-ray</strong></span>
+    </div>
+
+    <div class="agent-page">
+      <div class="agent-page__column">
+
+        <header class="agent-page__head">
+          <p class="ds-eyebrow">X-ray</p>
+          <h1 class="ds-heading">Who to approach</h1>
+          <p class="ds-lead">
+            Name a company and X-ray finds the people who could own timing there, with the
+            argument for approaching each one.
+          </p>
+        </header>
+
+        <!-- ── The ask ─────────────────────────────────────────────────────── -->
+        <form class="xr__ask">
+          <div class="xr__row">
+            <div class="ds-segment" role="tablist" aria-label="What to X-ray">
+              <button class="ds-segment__item is-active" type="button" role="tab" aria-selected="true">GTM</button>
+              <button class="ds-segment__item" type="button" role="tab" aria-selected="false">Score Lead</button>
+            </div>
+            <input class="ds-field xr__field" value="Northgate Nordics" aria-label="Target company">
+          </div>
+          <div class="xr__actions">
+            <button class="ds-btn ds-btn--accent" type="submit">Run X-ray</button>
+          </div>
+          <div class="xr__minor">
+            <button class="xr__link" type="button" aria-expanded="false">Read as · capital markets · MiFID II clock sync</button>
+            <button class="xr__link" type="button" aria-expanded="false">Personas · 24 · all considered</button>
+            <a class="xr__link" href="#">looking for a buying signal?</a>
+          </div>
+          <p class="ds-caption xr__cost">
+            Discovery reads the public web. Emails are revealed only for the people you
+            select, and phone numbers only when you ask for one.
+          </p>
+        </form>
+
+        <!-- ── The result ──────────────────────────────────────────────────── -->
+        <section class="xr__result">
+          <div class="agent-page__sect">
+            <h2 class="ds-eyebrow">People found · Northgate Nordics</h2>
+            <span class="ds-mono">web discovery · 11 found · 20.4s</span>
+          </div>
+
+          <div class="pl__bulk">
+            <div class="ds-bulk">
+              <span class="ds-bulk__count">2 of 11 selected</span>
+              <span class="ds-bulk__spacer"></span>
+              <button class="ds-btn ds-btn--secondary ds-btn--sm">Reveal emails</button>
+              <button class="ds-btn ds-btn--primary ds-btn--sm">Save shortlist</button>
+            </div>
+          </div>
+
+          <table class="ds-table">
+            <thead>
+              <tr>
+                <th class="ds-table__pick"><input type="checkbox" class="ds-check" aria-label="Select everyone found"></th>
+                <th class="pl__colwide">Person</th>
+                <th title="How sure the model is that this is the right person — its own word, not a verification.">Confidence</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th class="ds-table__num" title="Ranked from reachability and the model's own confidence. Mechanical, not a judgement.">Fit</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody class="pl__band">
+              <tr class="pl__grouprow">
+                <td colspan="7">
+                  <div class="agent-page__sect">
+                    <button class="pl__grouphead" type="button" aria-expanded="true">
+                      <span class="ds-twisty is-open"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5.5 3 9.5 7l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                      <span class="ds-eyebrow">Ready to approach</span>
+                    </button>
+                    <span class="ds-mono">3</span>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Selected, and its argument disclosed: one person, two rows, so
+                   the wash carries across both and the hairline between them goes. -->
+              <tr class="pl__row is-selected is-open">
+                <td class="ds-table__pick"><input type="checkbox" class="ds-check" checked aria-label="Select"></td>
+                <td class="pl__colwide">
+                  <div class="pl__who">
+                    <button class="pl__twisty" type="button" aria-expanded="true" aria-label="Why this person">
+                      <span class="ds-twisty is-open"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5.5 3 9.5 7l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </button>
+                    <span class="pl__whoname">
+                      <span class="ds-table__primary"><a class="pl__profile" href="#" title="Open the LinkedIn profile this search found">Annika Lindqvist</a></span>
+                      <span class="ds-table__sub" title="Head of Market Infrastructure · Northgate Nordics">Head of Market Infrastructure</span>
+                    </span>
+                  </div>
+                </td>
+                <td><span class="ds-mark ds-mark--locked">high</span></td>
+                <td class="ds-table__id"><a href="mailto:a.lindqvist@northgate.com">a.lindqvist@northgate.com</a></td>
+                <td class="ds-table__id"><button class="ds-btn ds-btn--ghost ds-btn--sm" title="Buy this number — a separate charge from the email">Reveal</button></td>
+                <td class="ds-table__num">33</td>
+                <td class="pl__actcell"><span class="pl__acts">
+                  <a class="ds-btn ds-btn--secondary ds-btn--sm" href="#">Research</a>
+                </span></td>
+              </tr>
+              <tr class="pl__whyrow is-selected">
+                <td></td>
+                <td colspan="6">
+                  <div class="pl__whybody">
+                    <p class="pl__why">Owns the clock-sync estate across the matching engine and the
+                    market-data distribution layer, and spoke at ITSF 2025 about traceable time in
+                    regulated venues — which is the MiFID II RTS 25 argument almost verbatim.</p>
+                    <!-- `source_query` and `company_domain`, both returned by every search and
+                         both rendered nowhere until now. A match_reason is the model's claim;
+                         this is the trail that produced it, so a row can be checked. -->
+                    <p class="pl__found">found by site:linkedin.com/in "Northgate" (architect OR "head of infrastructure" OR timing)  ·  northgate.com</p>
+                  </div>
+                </td>
+              </tr>
+
+              <tr class="pl__row is-selected">
+                <td class="ds-table__pick"><input type="checkbox" class="ds-check" checked aria-label="Select"></td>
+                <td class="pl__colwide">
+                  <div class="pl__who"><button class="pl__twisty" type="button" aria-expanded="false" aria-label="Why this person">
+                    <span class="ds-twisty"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5.5 3 9.5 7l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                    <span class="pl__whoname">
+                      <span class="ds-table__primary"><a class="pl__profile" href="#">Johan Berg</a></span>
+                      <span class="ds-table__sub">Network Architect</span>
+                    </span>
+                  </div>
+                </td>
+                <td><span class="ds-mark ds-mark--locked">high</span></td>
+                <td class="ds-table__id"><a href="mailto:johan.berg@northgate.com">johan.berg@northgate.com</a></td>
+                <td class="ds-table__id"><span class="ds-table__id--empty">+46 8 405 60 00</span></td>
+                <td class="ds-table__num">33</td>
+                <td class="pl__actcell"><span class="pl__acts">
+                  <a class="ds-btn ds-btn--secondary ds-btn--sm" href="#">Research</a>
+                </span></td>
+              </tr>
+
+              <tr class="pl__row">
+                <td class="ds-table__pick"><input type="checkbox" class="ds-check" aria-label="Select"></td>
+                <td class="pl__colwide">
+                  <div class="pl__who"><button class="pl__twisty" type="button" aria-expanded="false" aria-label="Why this person">
+                    <span class="ds-twisty"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5.5 3 9.5 7l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                    <span class="pl__whoname">
+                      <span class="ds-table__primary"><a class="pl__profile" href="#">Marta Or</a></span>
+                      <span class="ds-table__sub">Director, Trading Technology</span>
+                    </span>
+                  </div>
+                </td>
+                <td><span class="ds-mark ds-mark--drift">medium</span></td>
+                <td class="ds-table__id"><a href="mailto:marta.or@northgate.com">marta.or@northgate.com</a></td>
+                <td class="ds-table__id"><button class="ds-btn ds-btn--ghost ds-btn--sm">Reveal</button></td>
+                <td class="ds-table__num">32</td>
+                <td class="pl__actcell"><span class="pl__acts">
+                  <a class="ds-btn ds-btn--secondary ds-btn--sm" href="#">Research</a>
+                </span></td>
+              </tr>
+            </tbody>
+
+            <tbody class="pl__band">
+              <tr class="pl__grouprow">
+                <td colspan="7">
+                  <div class="agent-page__sect">
+                    <button class="pl__grouphead" type="button" aria-expanded="true">
+                      <span class="ds-twisty is-open"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5.5 3 9.5 7l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                      <span class="ds-eyebrow">Found, needs an email</span>
+                    </button>
+                    <span class="ds-mono">2</span>
+                  </div>
+                </td>
+              </tr>
+              <tr class="pl__row">
+                <td class="ds-table__pick"><input type="checkbox" class="ds-check" aria-label="Select"></td>
+                <td class="pl__colwide">
+                  <div class="pl__who"><button class="pl__twisty" type="button" aria-expanded="false" aria-label="Why this person">
+                    <span class="ds-twisty"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5.5 3 9.5 7l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>
+                    <span class="pl__whoname">
+                      <span class="ds-table__primary"><a class="pl__profile" href="#">Erik Halvorsen</a></span>
+                      <span class="ds-table__sub">Senior Engineer, Clocking</span>
+                    </span>
+                  </div>
+                </td>
+                <td><span class="ds-mark ds-mark--idle">low</span></td>
+                <td class="ds-table__id"><span class="ds-table__id--empty" title="The provider had no address for this person.">none on file</span></td>
+                <td class="ds-table__id"><button class="ds-btn ds-btn--ghost ds-btn--sm">Reveal</button></td>
+                <td class="ds-table__num">21</td>
+                <td class="pl__actcell"><span class="pl__acts">
+                  <a class="ds-btn ds-btn--secondary ds-btn--sm" href="#">Research</a>
+                </span></td>
+              </tr>
+            </tbody>
+
+            <!-- Nobody approaches these, so the group starts shut. Its heading
+                 stays: it is how the group is reopened and how it says how many
+                 are behind it, and it needs no warning banner because the note
+                 on the heading is the whole explanation. -->
+            <tbody class="pl__band">
+              <tr class="pl__grouprow">
+                <td colspan="7">
+                  <div class="agent-page__sect">
+                    <button class="pl__grouphead" type="button" aria-expanded="false">
+                      <span class="ds-twisty"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M5.5 3 9.5 7l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                      <span class="ds-eyebrow">Context only</span>
+                      <span class="pl__groupnote">the profile was inferred, not confirmed</span>
+                    </button>
+                    <span class="ds-mono">6</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- ── The index of what was kept ──────────────────────────────────── -->
+        <section class="xr__saved">
+          <div class="agent-page__sect">
+            <h2 class="ds-eyebrow">Saved shortlists</h2>
+            <span class="ds-mono">3 kept</span>
+          </div>
+          <ul class="xr__savedlist">
+            <li><div class="ds-row ds-row--record">
+              <span class="ds-row__label">Northgate — infrastructure</span>
+              <span class="ds-mono ds-caption">4 people</span>
+              <span class="ds-row__actions"><button class="ds-icon-btn ds-icon-btn--sm" aria-label="Shortlist actions"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><circle cx="2" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="10" cy="6" r="1" fill="currentColor"/></svg></button></span>
+            </div></li>
+            <li><div class="ds-row ds-row--record">
+              <span class="ds-row__label">NGX Group timing owners</span>
+              <span class="ds-mono ds-caption">6 people</span>
+              <span class="ds-row__actions"><button class="ds-icon-btn ds-icon-btn--sm" aria-label="Shortlist actions"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><circle cx="2" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="10" cy="6" r="1" fill="currentColor"/></svg></button></span>
+            </div></li>
+          </ul>
+        </section>
+
+        <!-- ══ The states the first version of this card never drew ══════════
+             Every one of them is on screen more often than the settled result
+             above, and all five had to be invented in code because the design
+             stopped at the happy path. They are drawn here now. -->
+
+        <div class="pv-state">
+          <p class="pv-state__label">Ask · the two disclosures, open</p>
+          <p class="pv-note">Grounding decides who the search looks for, so it is on the ask and
+          not behind anything. Before a run it says <em>derived from the name</em>; after a run with
+          nothing derived it says <em>nothing derived</em>, which is a quality warning — the model
+          did not recognise the company and discovery ran ungrounded.</p>
+          <div class="xr__panel" style="margin-top: var(--space-6);">
+            <div class="xr__tune">
+              <label class="ds-label" for="d-industry">Vertical</label>
+              <input class="ds-field" id="d-industry" value="capital markets">
+              <label class="ds-label" for="d-fit">Timing pain</label>
+              <input class="ds-field" id="d-fit" value="MiFID II clock sync">
+            </div>
+            <p class="ds-help">Derived from the name. Correct it and the model is not asked again.</p>
+            <button class="ds-btn ds-btn--secondary" style="margin-top: var(--space-4);">Re-run with these</button>
+          </div>
+          <div class="xr__personas">
+            <div class="xr__personalist">
+              <label class="ds-choice"><input type="checkbox" class="ds-check" checked><span class="ds-choice__text">Network Architect</span></label>
+              <label class="ds-choice"><input type="checkbox" class="ds-check"><span class="ds-choice__text">Head of Market Infrastructure</span></label>
+              <label class="ds-choice"><input type="checkbox" class="ds-check"><span class="ds-choice__text">Solutions Architect</span></label>
+              <label class="ds-choice"><input type="checkbox" class="ds-check"><span class="ds-choice__text">Clock Systems Engineer</span></label>
+            </div>
+            <input class="ds-field" style="margin-top: var(--space-3); max-width: var(--measure-form);" placeholder="Add a persona, then press Enter">
+          </div>
+        </div>
+
+        <div class="pv-state">
+          <p class="pv-state__label">Searching · the state you look at longest</p>
+          <p class="pv-note">A search takes twenty seconds to two minutes and there is no
+          denominator, so the readout says <em>how long</em>, never how far. The skeleton carries the
+          real column header: without it the columns resolve differently and the page jumps when
+          the answer lands, which is the whole thing a skeleton is for.</p>
+          <div class="xr__actions">
+            <button class="ds-btn ds-btn--accent" disabled>Run X-ray</button>
+            <span class="ds-mark ds-mark--live">searching</span>
+          </div>
+          <div class="xr__result">
+            <div class="agent-page__sect">
+              <h2 class="ds-eyebrow">People found</h2>
+              <span class="ds-mono">searching · 24s</span>
+            </div>
+            <table class="ds-table">
+              <thead><tr>
+                <th class="ds-table__pick"></th><th class="pl__colwide">Person</th>
+                <th>Signal</th><th>Contact</th><th class="ds-table__num">Fit</th><th></th>
+              </tr></thead>
+              <tbody>
+                <tr><td class="ds-table__pick"></td><td class="pl__colwide"><span class="ds-skeleton pl__skeleton" style="width: 70%;"></span></td><td><span class="ds-skeleton pl__skeleton" style="width: 4rem;"></span></td><td><span class="ds-skeleton pl__skeleton" style="width: 90%;"></span></td><td class="ds-table__num"><span class="ds-skeleton pl__skeleton" style="width: 1.5rem; margin-left: auto;"></span></td><td></td></tr>
+                <tr><td class="ds-table__pick"></td><td class="pl__colwide"><span class="ds-skeleton pl__skeleton" style="width: 70%;"></span></td><td><span class="ds-skeleton pl__skeleton" style="width: 4rem;"></span></td><td><span class="ds-skeleton pl__skeleton" style="width: 90%;"></span></td><td class="ds-table__num"><span class="ds-skeleton pl__skeleton" style="width: 1.5rem; margin-left: auto;"></span></td><td></td></tr>
+                <tr><td class="ds-table__pick"></td><td class="pl__colwide"><span class="ds-skeleton pl__skeleton" style="width: 70%;"></span></td><td><span class="ds-skeleton pl__skeleton" style="width: 4rem;"></span></td><td><span class="ds-skeleton pl__skeleton" style="width: 90%;"></span></td><td class="ds-table__num"><span class="ds-skeleton pl__skeleton" style="width: 1.5rem; margin-left: auto;"></span></td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pv-state">
+          <p class="pv-state__label">Revealing · the automatic email pass</p>
+          <p class="pv-note">An email is bought for everyone found with a confirmed profile as soon
+          as the people arrive (Sam, 2026-08-24). It is <strong>one</strong> bulk request, so there
+          is no denominator and no meter — a count is true, "7 of 12" would be invented progress.
+          Inferred profiles are skipped and read <em>not bought</em> rather than <em>pending</em>,
+          because nothing is coming for them unless somebody asks.</p>
+          <p class="pl__auto"><span class="ds-mark ds-mark--live">revealing 6 emails</span></p>
+        </div>
+
+        <div class="pv-state">
+          <p class="pv-state__label">Incomplete, and failed</p>
+          <p class="pv-note">The backend ships <code>truncated</code> and <code>provider_errors</code>
+          precisely so a partial answer cannot pass for a whole one, and
+          <code>test_xray_honesty.py</code> pins them. A surface that does not render them is lying
+          about its coverage — so they are a banner between the ask and the result, not a line in a
+          panel behind a toggle.</p>
+          <div class="ds-banner ds-banner--drift xr__banner">
+            <span class="ds-banner__label">Incomplete</span>
+            <span>the model’s answer was cut short, so this may be partial · zoominfo: api_error: 502</span>
+          </div>
+          <div class="ds-banner ds-banner--fault xr__banner">
+            <span class="ds-banner__label">Could not search</span>
+            <span>web_search: api_error: overloaded</span>
+          </div>
+        </div>
+
+        <div class="pv-state">
+          <p class="pv-state__label">Empty · the first thing anyone sees</p>
+          <div class="ds-empty xr__empty">
+            <p class="ds-empty__title">Nothing searched yet</p>
+            <p class="ds-empty__body">Every person comes back with the argument for approaching
+            them, how reachable they are, and how well they fit — so a shortlist can be narrowed
+            before a single email is bought.</p>
+          </div>
+        </div>
+
+        <div class="pv-state">
+          <p class="pv-state__label">Score Lead · a verdict read back where the input was</p>
+          <p class="pv-note">A scored lead brings its own grounding from the verdict, so the
+          grounding control says where it came from instead of offering an edit that would not be
+          used.</p>
+          <div class="xr__row" style="margin-top: var(--space-6);">
+            <div class="ds-segment" role="tablist">
+              <button class="ds-segment__item" type="button" role="tab" aria-selected="false">GTM</button>
+              <button class="ds-segment__item is-active" type="button" role="tab" aria-selected="true">Score Lead</button>
+            </div>
+            <div class="xr__field" style="display: flex; flex-direction: column; gap: var(--space-px);">
+              <span style="font-weight: var(--weight-medium);">Northgate Nordics</span>
+              <span class="ds-caption">Head of Trading Technology · MiFID II clock sync</span>
+            </div>
+          </div>
+          <div class="xr__actions">
+            <button class="ds-btn ds-btn--accent">X-ray this lead</button>
+          </div>
+          <div class="xr__minor">
+            <span class="ds-mark ds-mark--canon">scored 82 · handed over from Lead scoring</span>
+            <button class="xr__link" type="button" disabled>Read as · from the scored lead</button>
+            <button class="xr__link" type="button">Personas · 24 · all considered</button>
+            <button class="xr__link" type="button">use a different lead</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

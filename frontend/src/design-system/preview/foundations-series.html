@@ -1,0 +1,178 @@
+<!-- @dsCard group="Foundations" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Series colour — Cadence Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../primitives.css">
+<link rel="stylesheet" href="preview.css">
+<style>
+  .sr { display: grid; grid-template-columns: 2.5rem 1fr auto; align-items: center; gap: var(--space-4); padding: var(--space-3) 0; border-bottom: 1px solid rgb(var(--rule-hairline)); }
+  .sr__chip { height: 2.5rem; border-radius: var(--radius-sm); }
+  .sr__num { font-family: var(--font-mono); font-size: var(--text-micro); color: rgb(var(--ink-muted)); }
+  .bars { display: flex; align-items: flex-end; gap: var(--space-2); height: 8rem; }
+  .bars > span { flex: 1; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+  .onchrome { background: rgb(var(--chrome)); border-radius: var(--radius-lg); padding: var(--space-6); }
+</style>
+</head>
+<body class="ds-root">
+
+<header class="pv-head">
+  <p class="ds-eyebrow">Foundations · 05</p>
+  <h1>Series colour</h1>
+  <p>
+    For charts, where colour encodes <strong>identity</strong> — which series — rather than a
+    condition. This is the one place in the system colour does not report state, so it is a
+    separate palette with its own rules. Six slots, assigned in fixed order and
+    <strong>never cycled</strong>: the order is the colour-blindness safety mechanism, so it
+    never changes.
+  </p>
+</header>
+
+<section class="pv-section">
+  <h2>The slots</h2>
+  <div>
+    <div class="sr">
+      <span class="sr__num">01</span>
+      <span class="sr__chip" style="background: rgb(var(--series-1));"></span>
+      <span class="pv-spec">#0084FF · brand blue · 3.66:1 white · 4.76:1 chrome</span>
+    </div>
+    <div class="sr">
+      <span class="sr__num">02</span>
+      <span class="sr__chip" style="background: rgb(var(--series-2));"></span>
+      <span class="pv-spec">#C42D81 · 5.20:1 · 3.35:1</span>
+    </div>
+    <div class="sr">
+      <span class="sr__num">03</span>
+      <span class="sr__chip" style="background: rgb(var(--series-3));"></span>
+      <span class="pv-spec">#8F4BD1 · 5.13:1 · 3.40:1</span>
+    </div>
+    <div class="sr">
+      <span class="sr__num">04</span>
+      <span class="sr__chip" style="background: rgb(var(--series-4));"></span>
+      <span class="pv-spec">#009DBD · 3.20:1 · 5.44:1</span>
+    </div>
+    <div class="sr">
+      <span class="sr__num">05</span>
+      <span class="sr__chip" style="background: rgb(var(--series-5));"></span>
+      <span class="pv-spec">#007E60 · 5.06:1 · 3.44:1</span>
+    </div>
+    <div class="sr">
+      <span class="sr__num">06</span>
+      <span class="sr__chip" style="background: rgb(var(--series-6));"></span>
+      <span class="pv-spec">#B85EB6 · 3.95:1 · 4.41:1</span>
+    </div>
+    <div class="sr">
+      <span class="sr__num">···</span>
+      <span class="sr__chip" style="background: rgb(var(--series-other));"></span>
+      <span class="pv-spec">--series-other · everything past slot 6, and anything folded in</span>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Derived, not chosen</h2>
+  <p class="pv-note">
+    Brand blue takes slot 1 because the guidelines name it the data-visualisation accent. The
+    rest were stepped in OKLCH and the <em>order</em> searched to maximise the worst adjacent
+    separation. Every slot clears every check in <strong>both</strong> modes unaided — no
+    labels needed to rescue contrast — so one set serves white sheets and charcoal chrome:
+    lightness band ✓, chroma floor ✓, contrast ≥ 3:1 on both ✓, colour-blind separation
+    ΔE 12.4 worst adjacent, normal-vision floor ΔE 15.0.
+  </p>
+  <p class="pv-note" style="margin-top: var(--space-4);">
+    <strong>Revised 2026-08-17 — the "on both" claim now has a caveat.</strong> The rail became
+    charcoal glass over the ground, which lightened it from rgb(26) to rgb(39). Re-measured against
+    that: slots 2, 3 and 5 land at <strong>2.88:1, 2.92:1 and 2.96:1</strong> — a hair under the
+    3:1 floor. On the sheet all six still clear it, tightest slot 4 at 3.06:1.
+  </p>
+  <p class="pv-note" style="margin-top: var(--space-3);">
+    <strong>So: charts render on the white field, never on charcoal.</strong> That was already the
+    practice and the reason these figures were quoted against the sheet in the first place — it is
+    now a rule rather than a habit. If a chart is ever needed on chrome, the palette must be
+    re-derived against the glass rail; do not simply place it there and hope.
+  </p>
+</section>
+
+<section class="pv-section">
+  <h2>Why it runs cool</h2>
+  <p class="ds-caption" style="max-width: var(--measure-read); margin-bottom: var(--space-4);">
+    Green, amber, red and gold are absent by design. They are reserved as
+    <span class="ds-mark ds-mark--locked">locked</span>
+    <span class="ds-mark ds-mark--drift">drift</span>
+    <span class="ds-mark ds-mark--fault">fault</span>
+    <span class="ds-mark ds-mark--canon">canon</span>
+    — and a status colour must never impersonate a series. Every series hue therefore sits at
+    least 34° of hue away from all four.
+  </p>
+</section>
+
+<section class="pv-section">
+  <h2>On both surfaces</h2>
+  <div class="pv-grid" style="grid-template-columns: 1fr 1fr;">
+    <div class="pv-frame" style="padding: var(--space-6);">
+      <p class="ds-eyebrow" style="margin-bottom: var(--space-4);">On the field</p>
+      <div class="bars">
+        <span style="background: rgb(var(--series-1)); height: 82%;"></span>
+        <span style="background: rgb(var(--series-2)); height: 64%;"></span>
+        <span style="background: rgb(var(--series-3)); height: 96%;"></span>
+        <span style="background: rgb(var(--series-4)); height: 45%;"></span>
+        <span style="background: rgb(var(--series-5)); height: 71%;"></span>
+        <span style="background: rgb(var(--series-6)); height: 38%;"></span>
+      </div>
+    </div>
+    <div class="onchrome ds-chrome">
+      <p class="ds-eyebrow" style="margin-bottom: var(--space-4);">On charcoal — a dark featured band only</p>
+      <div class="bars">
+        <span style="background: rgb(var(--series-1)); height: 82%;"></span>
+        <span style="background: rgb(var(--series-2)); height: 64%;"></span>
+        <span style="background: rgb(var(--series-3)); height: 96%;"></span>
+        <span style="background: rgb(var(--series-4)); height: 45%;"></span>
+        <span style="background: rgb(var(--series-5)); height: 71%;"></span>
+        <span style="background: rgb(var(--series-6)); height: 38%;"></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>The cap — and it is a hard one</h2>
+  <div class="pv-stack" style="max-width: var(--measure-read); gap: var(--space-5);">
+    <div class="ds-banner ds-banner--locked">
+      <span class="ds-banner__label">Six slots</span>
+      Bars, lines and stacked segments. Only neighbouring marks touch, so adjacency safety is
+      what matters and all six are separable.
+    </div>
+    <div class="ds-banner ds-banner--drift">
+      <span class="ds-banner__label">Three slots</span>
+      Scatter, bubble, node-link graph, map — any form where any two marks can end up side by
+      side. Only the first three separate, and even those need a second channel such as a
+      direct label. This is a property of colour vision, not of the palette: no re-ordering or
+      re-stepping raises it.
+    </div>
+    <div class="ds-banner ds-banner--fault">
+      <span class="ds-banner__label">Never</span>
+      Generate a seventh hue, or cycle back to slot 1. A seventh series folds into
+      <code class="pv-spec">--series-other</code>, becomes a small multiple, or takes a
+      different encoding entirely.
+    </div>
+    <div class="ds-banner ds-banner--fault">
+      <span class="ds-banner__label">Never</span>
+      Colour a series by its value. Bar length already shows magnitude; spending the identity
+      channel to repeat it wastes both.
+    </div>
+    <div class="ds-banner ds-banner--fault">
+      <span class="ds-banner__label">Never</span>
+      Let a filter repaint the survivors. Colour follows the entity, never its rank — a series
+      keeps its slot when its neighbours disappear.
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

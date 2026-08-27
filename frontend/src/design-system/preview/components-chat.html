@@ -1,0 +1,205 @@
+<!-- @dsCard group="Components" name="Transcript" subtitle="Bubble question, prose answer, a quiet machine readout between" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transcript — Cadence Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../primitives.css">
+<link rel="stylesheet" href="preview.css">
+</head>
+<body class="ds-root">
+
+<header class="pv-head">
+  <p class="ds-eyebrow">Components · 02</p>
+  <h1>Transcript</h1>
+  <p>
+    A conversation, typeset. The person's question is a <strong>soft grey bubble</strong> on the
+    right; the answer is <strong>plain prose on the field</strong>, full measure — the answer is
+    the content, so it is never boxed. Between the two sits the <strong>readout</strong>: a quiet
+    wrapping row of ticks stating what the machine did — model, elapsed, every tool it ran.
+    There are no "You"/"Owl" bylines: with two voices, the shapes are enough.
+  </p>
+</header>
+
+<section class="pv-section">
+  <h2>An exchange</h2>
+  <div class="pv-frame" style="padding: var(--space-6) var(--space-8);">
+    <div class="ds-log">
+
+      <article class="ds-x">
+        <p class="ds-x__stamp">14:32</p>
+        <p class="ds-x__q">Which of our case studies would land best with a tier-one bank worried about MiFID II timestamping?</p>
+        <div class="ds-x__spine">
+          <span class="ds-tick ds-tick--model">sonnet</span>
+          <span class="ds-tick">2.1s</span>
+          <a class="ds-tick ds-tick--canon" href="#">2 canon</a>
+        </div>
+        <div class="ds-x__body">
+          <div class="ds-answer">
+            <p>
+              The exchange deployment. Same regulatory driver, same question about proving
+              compliance rather than claiming it — and it moves the conversation from "can you
+              timestamp accurately" to "can you evidence it under audit", which is where the
+              buying pressure actually sits.
+            </p>
+            <p>Two things to lead with:</p>
+            <ul>
+              <li><strong>UTC verification</strong> — traceability they can hand to a regulator.</li>
+              <li><strong>Holdover behaviour</strong> — what happens when GNSS drops.<a href="#" class="ds-cite">2</a></li>
+            </ul>
+            <blockquote>
+              "We looked at three vendors and none of them could tell us what happens when the
+              antenna fails."
+            </blockquote>
+            <p>
+              Avoid opening with the broadcast case study. The accuracy numbers are better, but
+              compliance framing is what a bank is buying.
+            </p>
+            <div class="ds-sources" style="margin-top: var(--space-5);">
+              <a class="ds-source" href="#"><span class="ds-source__n">1</span><span class="ds-source__name">Exchange deployment case study</span></a>
+              <a class="ds-source" href="#"><span class="ds-source__n">2</span><span class="ds-source__name">Discovery call · 14 May</span></a>
+            </div>
+          </div>
+        </div>
+        <div class="ds-x__acts">
+          <span class="ds-tip"><button class="ds-icon-btn" aria-label="Copy answer"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="2.5" width="6.5" height="6.5" rx="1" stroke="currentColor" stroke-width="1.1"/><path d="M5 11.5h5.5a1 1 0 001-1V5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg></button><span class="ds-tip__body">copy</span></span>
+          <span class="ds-tip"><button class="ds-icon-btn" aria-label="Retry with a deeper model"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M11.5 7a4.5 4.5 0 11-1.6-3.45M11.5 2v2.5H9" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="ds-tip__body">retry deeper</span></span>
+          <span class="ds-tip"><button class="ds-icon-btn" aria-label="Pin to project"><svg width="14" height="14" viewBox="0 0 15 15" fill="none"><path d="M7.5 2v6M4.5 8h6l-3 5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="ds-tip__body">pin · ⌘P</span></span>
+        </div>
+      </article>
+
+      <article class="ds-x">
+        <p class="ds-x__stamp">14:36</p>
+        <p class="ds-x__q">Find me the infrastructure leads at Northgate Nordics.</p>
+        <div class="ds-x__spine">
+          <span class="ds-tick ds-tick--model">sonnet</span>
+          <span class="ds-tick ds-tick--done">xray · 11 found</span>
+          <span class="ds-tick">4.2s</span>
+        </div>
+        <div class="ds-x__body">
+          <div class="ds-answer">
+            <p>
+              Eleven people match, four of them strongly. The shortlist is on the X-ray page so
+              you can pick who to enrich — emails come back automatically, phone numbers only if
+              you ask for them.
+            </p>
+            <p><a href="screen-xray.html">Open the shortlist →</a></p>
+          </div>
+        </div>
+        <div class="ds-x__acts">
+          <span class="ds-tip"><button class="ds-icon-btn" aria-label="Copy answer"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2.5" y="2.5" width="6.5" height="6.5" rx="1" stroke="currentColor" stroke-width="1.1"/><path d="M5 11.5h5.5a1 1 0 001-1V5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg></button><span class="ds-tip__body">copy</span></span>
+        </div>
+      </article>
+
+      <article class="ds-x">
+        <p class="ds-x__stamp ds-arrive">14:41</p>
+        <p class="ds-x__q ds-arrive">Draft the follow-up to Erik, and keep it short.</p>
+        <div class="ds-x__spine ds-arrive" style="--arrive:80ms">
+          <span class="ds-tick ds-tick--model">sonnet</span>
+          <span class="ds-tick ds-tick--done">brief · call 14 May</span>
+          <span class="ds-tick ds-tick--live">drafting</span>
+        </div>
+        <div class="ds-x__body ds-arrive" style="--arrive:160ms">
+          <div class="ds-answer">
+            <p>Erik — thanks for the time on Tuesday. You asked what happens when the antenna fails, so<span class="ds-caret"></span></p>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+  <p class="pv-note" style="margin-top: var(--space-6);">
+    The third entry is Owl mid-answer. The answer is never boxed, nothing pulses in the prose,
+    and the text does not reflow when it settles — only the caret moves, and the readout says
+    what is actually happening. An entry <strong>arrives</strong> in the order the machine made
+    it: the question, then the readout, then the prose, each coming up 4px into place over
+    320ms. Nothing slides in from the side and nothing keeps moving once it has landed.
+    Hover an entry to raise its actions.
+  </p>
+</section>
+
+<section class="pv-section">
+  <h2>Readout ticks</h2>
+  <p class="pv-note" style="margin-bottom: var(--space-5);">
+    One fact each: a dot in the state's colour, then a mono identifier. The dot is the state;
+    the words are the detail. A running tick is the only thing in a transcript that moves.
+  </p>
+  <div class="pv-frame" style="padding: var(--space-6) var(--space-8);">
+    <div style="display: grid; grid-template-columns: 10rem 1fr; column-gap: 0;">
+      <div style="display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); padding-right: var(--space-3);">
+        <span class="ds-tick ds-tick--model">sonnet</span>
+        <span class="ds-tick">4.2s</span>
+        <span class="ds-tick ds-tick--live">running</span>
+        <span class="ds-tick ds-tick--done">xray · 11 found</span>
+        <span class="ds-tick ds-tick--fault">enrichment failed</span>
+        <a class="ds-tick ds-tick--canon" href="#">2 canon</a>
+      </div>
+      <div style="border-left: 1px solid rgb(var(--rule-hairline)); padding-left: var(--space-6); display: flex; flex-direction: column; gap: var(--space-3);">
+        <p class="pv-spec" style="margin: 0;">model tier — hollow dot, it is a setting rather than an event</p>
+        <p class="pv-spec" style="margin: 0;">elapsed — plain, no colour; time is not a status</p>
+        <p class="pv-spec" style="margin: 0;">in progress — accent, beating at the ambient rate</p>
+        <p class="pv-spec" style="margin: 0;">completed tool call — locked green, with what it returned</p>
+        <p class="pv-spec" style="margin: 0;">failure — fault red; the reason comes into the prose column too</p>
+        <p class="pv-spec" style="margin: 0;">canonical sources used — gold, and gold means only this</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Waiting</h2>
+  <div class="pv-frame" style="padding: var(--space-6) var(--space-8);">
+    <div class="ds-log">
+      <article class="ds-x">
+        <p class="ds-x__stamp">14:44</p>
+        <p class="ds-x__q">What changed in PTP² Mesh since the last release?</p>
+        <div class="ds-x__spine">
+          <span class="ds-tick ds-tick--model">sonnet</span>
+          <span class="ds-tick ds-tick--live">reading library</span>
+        </div>
+        <div class="ds-x__body">
+          <div class="ds-answer"><p><span class="ds-caret"></span></p></div>
+        </div>
+      </article>
+    </div>
+  </div>
+  <p class="pv-note" style="margin-top: var(--space-6);">
+    Before the first token there is a caret and nothing else — sitting exactly where the first
+    word lands, so the answer arrives in place instead of replacing a placeholder. The readout
+    rewrites itself as the work moves on (<span class="ds-mono">reading library</span> →
+    <span class="ds-mono">drafting</span>), which is a readout, not an animation.
+  </p>
+</section>
+
+<section class="pv-section">
+  <h2>Composer</h2>
+  <div style="max-width: var(--measure-read);">
+    <div class="ds-composer">
+      <textarea class="ds-composer__input" rows="1" placeholder="Ask Owl, or name an agent to run…"></textarea>
+      <div class="ds-composer__bar">
+        <button class="ds-icon-btn" aria-label="Attach">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M10 4L5.5 8.5a1.8 1.8 0 002.5 2.5L12 7a3.2 3.2 0 00-4.5-4.5L3.5 6.5a4.6 4.6 0 006.5 6.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+        </button>
+        <div class="ds-segment">
+          <button class="ds-segment__item is-active">Fast</button>
+          <button class="ds-segment__item">Deep</button>
+        </div>
+        <span class="ds-composer__gap"></span>
+        <button class="ds-icon-btn ds-icon-btn--fill" aria-label="Send">
+          <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M6 11V1M1.5 5.5 6 1l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+    <p class="ds-mono" style="margin-top: var(--space-2);">Enter sends · Shift+Enter for a new line · everything the question needs is inside the tray</p>
+  </div>
+</section>
+
+<script src="grow.js"></script>
+<script src="tip.js"></script>
+</body>
+</html>

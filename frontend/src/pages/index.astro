@@ -1,106 +1,116 @@
 ---
+/**
+ * Sign-in. Two panels: the sky field and the form.
+ *
+ * The left panel is the platform's one colour field — `--field-sky`, the light
+ * of brand blue, which carries charcoal ink at full body sizes (the blue field
+ * is display-text-only, and this panel has a paragraph). It replaced a charcoal
+ * region: the studio retired dark regions outright, and a sign-in hero is
+ * exactly the featured surface a field exists for. The right panel is the white
+ * field with the form on it — pill inputs, the charcoal pill to commit.
+ */
 import LoginLayout from '../layouts/LoginLayout.astro';
 ---
 <LoginLayout title="Login">
   <div class="h-full grid grid-cols-1 md:grid-cols-[minmax(0,_1fr)_minmax(0,_1.1fr)]">
 
-    <!-- Ink panel -->
-    <section class="hidden md:flex flex-col justify-between bg-surface-ink text-ink-inverse p-12 relative overflow-hidden">
+    <!-- The sky field — the one colour moment on this view. -->
+    <section class="field hidden md:flex flex-col justify-between p-12 relative overflow-hidden">
       <div class="flex items-center gap-3">
         <img
-          src="/images/timebeat-logo.png"
-          alt="Timebeat"
-          class="h-6 w-auto object-contain brightness-0 invert opacity-90"
+          src="/images/cadence-mark.svg"
+          alt="Acme"
+          class="h-6 w-auto object-contain"
           onerror="this.style.display='none'"
         />
-        <span class="font-mono text-[11px] uppercase tracking-label opacity-60">Timebeat</span>
       </div>
 
       <div class="space-y-6 max-w-md">
-        <p class="font-mono text-xs text-accent">// internal operations console</p>
-        <h2 class="text-3xl font-semibold leading-tight tracking-tightest">
+        <p class="ds-eyebrow field__eyebrow">Internal operations console</p>
+        <h2 class="ds-heading">
           A quiet workspace<br />for the work that matters.
         </h2>
-        <p class="text-sm text-ink-inverse/70 leading-relaxed">
-          Cadence is a set of purpose-built agents — for calls, for leads, for what comes next — running on top of Timebeat's knowledge.
+        <p class="ds-body field__copy">
+          Cadence is a set of purpose-built agents — for calls, for leads, for what comes next — running on top of Acme's knowledge.
         </p>
       </div>
 
-      <div class="font-mono text-[11px] text-ink-inverse/40 flex items-center justify-between">
-        <span>V.1.1.0</span>
-        <span class="flex items-center gap-2">
-          <span class="w-1.5 h-1.5 rounded-full bg-signal-success animate-signal-pulse"></span>
-          operational
-        </span>
+      <div class="flex items-center justify-between">
+        <span class="ds-mono field__meta">v1.1.0</span>
+        <span class="ds-mark ds-mark--locked">operational</span>
       </div>
     </section>
 
-    <!-- Paper panel -->
+    <!-- The form, on the white field. -->
     <section class="flex items-center justify-center p-8 md:p-12">
       <div class="w-full max-w-sm">
         <div class="md:hidden flex items-center gap-3 mb-10">
           <img
-            src="/images/timebeat-logo.png"
-            alt="Timebeat"
+            src="/images/cadence-mark.svg"
+            alt="Acme"
             class="h-6 w-auto object-contain"
             onerror="this.style.display='none'"
           />
-          <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Timebeat</span>
         </div>
 
-        <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Sign in</p>
-        <h1 class="text-2xl font-semibold tracking-tightest mb-10">Enter Cadence.</h1>
+        <p class="ds-eyebrow mb-3">Sign in</p>
+        <h1 class="ds-heading mb-10">Enter Cadence.</h1>
 
-        <form id="login-form" class="space-y-8">
+        <form id="login-form" class="space-y-6">
           <div>
-            <label for="username" class="block font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Username</label>
+            <label for="username" class="ds-label">Username</label>
             <input
               id="username"
               type="text"
               autofocus
               autocomplete="username"
               spellcheck="false"
-              class="w-full bg-transparent border-0 border-b border-rule-strong/30 focus:border-accent focus:outline-none focus:ring-0 py-2 text-base text-ink-primary placeholder-ink-muted transition-colors duration-150 ease-decelerate"
-              placeholder="ivan"
+              class="ds-field"
+              placeholder="sam"
             />
           </div>
 
           <div>
-            <label for="password" class="block font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Password</label>
+            <label for="password" class="ds-label">Password</label>
             <input
               id="password"
               type="password"
               autocomplete="current-password"
-              class="w-full bg-transparent border-0 border-b border-rule-strong/30 focus:border-accent focus:outline-none focus:ring-0 py-2 text-base text-ink-primary placeholder-ink-muted transition-colors duration-150 ease-decelerate"
+              class="ds-field"
               placeholder="••••••••"
             />
           </div>
 
-          <p id="error" class="hidden font-mono text-xs text-signal-danger"></p>
+          <p id="error" class="ds-error hidden"></p>
 
-          <button
-            type="submit"
-            id="submit-btn"
-            class="group w-full bg-surface-ink text-ink-inverse px-5 py-3 rounded-sm text-sm font-medium disabled:opacity-50 transition-all duration-150 ease-decelerate flex items-center justify-between hover:bg-accent"
-          >
+          <button type="submit" id="submit-btn" class="ds-btn ds-btn--primary ds-btn--lg w-full justify-between">
             <span>Enter</span>
-            <span class="font-mono">→</span>
+            <span aria-hidden="true">→</span>
           </button>
         </form>
 
-        <p class="font-mono text-[11px] text-ink-muted mt-16">
-          Timebeat · Cadence · {new Date().getFullYear()}
+        <p class="ds-mono mt-16">
+          Acme · Cadence · {new Date().getFullYear()}
         </p>
       </div>
     </section>
   </div>
+
+  <style>
+    /* The field and its inks — the pairing the tokens file states is the only
+       legal one for sky. Everything else on this page is system classes. */
+    .field { background: rgb(var(--field-sky)); color: rgb(var(--field-sky-ink)); }
+    .field__eyebrow { color: rgb(var(--field-sky-ink) / 0.65); }
+    .field__copy { color: rgb(var(--field-sky-ink) / 0.75); max-width: 36ch; }
+    .field__meta { color: rgb(var(--field-sky-ink) / 0.55); }
+  </style>
 
   <script>
     (async () => {
       try {
         const res = await fetch('/api/auth/status');
         const data = await res.json();
-        if (data.authed) window.location.href = '/dashboard';
+        if (data.authed) window.location.href = '/home';
       } catch {}
     })();
 
@@ -121,15 +131,15 @@ import LoginLayout from '../layouts/LoginLayout.astro';
           body: JSON.stringify({ username: username.value.trim(), password: pw.value }),
         });
         if (res.ok) {
-          window.location.href = '/dashboard';
+          window.location.href = '/home';
           return;
         }
         const data = await res.json().catch(() => ({}));
-        err.textContent = `// ${data.detail || 'incorrect credentials'}`;
+        err.textContent = data.detail || 'Incorrect credentials.';
         err.classList.remove('hidden');
         pw.select();
       } catch {
-        err.textContent = '// could not reach server';
+        err.textContent = 'Could not reach the server.';
         err.classList.remove('hidden');
       } finally {
         btn.disabled = false;

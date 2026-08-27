@@ -1,0 +1,355 @@
+/* ============================================================================
+   Cadence Design System — components
+   ----------------------------------------------------------------------------
+   The second layer: everything primitives.css does not cover. Same rules —
+   tokens only, tone over borders, pills for controls, charcoal for authority,
+   blue only for live, glass only on the floating layer.
+   ========================================================================== */
+
+/* ── Choice controls ─────────────────────────────────────────────────────────
+   Charcoal fill states the choice; the glyph is knocked out to white. */
+
+.ds-check, .ds-radio {
+  appearance: none;
+  width: 1.125rem; height: 1.125rem; flex-shrink: 0;
+  margin: 0;
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--ink) / 0.35);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  display: inline-grid; place-content: center;
+  transition: background-color var(--dur-tap) var(--ease-phase), border-color var(--dur-tap) var(--ease-phase);
+}
+.ds-radio { border-radius: var(--radius-full); }
+.ds-check::before {
+  content: ''; width: 0.5rem; height: 0.3rem;
+  border-left: 2px solid rgb(var(--surface)); border-bottom: 2px solid rgb(var(--surface));
+  transform: rotate(-45deg) translateY(-1px) scale(0);
+  transition: transform var(--dur-tap) var(--ease-settle);
+}
+.ds-radio::before {
+  content: ''; width: 0.375rem; height: 0.375rem; border-radius: var(--radius-full);
+  background: rgb(var(--surface)); transform: scale(0);
+  transition: transform var(--dur-tap) var(--ease-settle);
+}
+.ds-check:checked, .ds-radio:checked { background: rgb(var(--ink)); border-color: rgb(var(--ink)); }
+.ds-check:checked::before { transform: rotate(-45deg) translateY(-1px) scale(1); }
+.ds-radio:checked::before { transform: scale(1); }
+.ds-check:indeterminate { background: rgb(var(--ink)); border-color: rgb(var(--ink)); }
+.ds-check:indeterminate::before { width: 0.5rem; height: 0; border-left: 0; border-bottom: 2px solid rgb(var(--surface)); transform: none; }
+.ds-check:disabled, .ds-radio:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.ds-choice { display: flex; align-items: flex-start; gap: var(--space-3); cursor: pointer; }
+.ds-choice__text { display: block; min-width: 0; font-size: var(--text-small); line-height: var(--leading-snug); }
+.ds-choice__hint { display: block; font-size: var(--text-caption); line-height: var(--leading-normal); color: rgb(var(--ink-muted)); margin-top: var(--space-1); }
+.ds-check, .ds-radio, .ds-switch { margin-top: 1px; }
+
+/* A switch is the only control that travels. Damped, no bounce. */
+.ds-switch {
+  appearance: none; position: relative;
+  width: 2.25rem; height: 1.25rem; flex-shrink: 0; margin: 0;
+  background: rgb(var(--rule));
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background-color var(--dur-tap) var(--ease-phase);
+}
+.ds-switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 1rem; height: 1rem; border-radius: var(--radius-full);
+  background: rgb(var(--surface));
+  transition: transform var(--dur-tap) var(--ease-settle);
+}
+.ds-switch:checked { background: rgb(var(--ink)); }
+.ds-switch:checked::after { transform: translateX(1rem); }
+.ds-switch:disabled { opacity: 0.4; cursor: not-allowed; }
+.ds-chrome .ds-switch { background: rgb(var(--chrome-rule)); }
+.ds-chrome .ds-switch:checked { background: rgb(var(--chrome-ink)); }
+.ds-chrome .ds-switch:checked::after { background: rgb(var(--chrome)); }
+
+/* ── Select — a grey pill, chevron drawn in ─────────────────────────────── */
+
+.ds-select {
+  appearance: none;
+  width: 100%; height: 2.5rem;
+  padding: 0 var(--space-8) 0 var(--space-4);
+  background: rgb(var(--surface-sunken)) no-repeat right var(--space-3) center;
+  background-image: linear-gradient(45deg, transparent 49%, rgb(var(--ink-secondary)) 50%), linear-gradient(-45deg, transparent 49%, rgb(var(--ink-secondary)) 50%);
+  background-size: 5px 5px, 5px 5px;
+  background-position: right 18px center, right var(--space-3) center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans); font-size: var(--text-small);
+  color: rgb(var(--ink));
+  cursor: pointer;
+}
+.ds-select:focus { outline: none; background-color: rgb(var(--surface)); border-color: rgb(var(--ink) / 0.35); box-shadow: var(--shadow-raised); }
+
+/* ── Segmented control ──────────────────────────────────────────────────────
+   For switching a view, never for committing an action. A pill track; the
+   selected segment is a white pill lifted out of it. */
+
+.ds-segment {
+  display: inline-flex;
+  padding: 3px;
+  background: rgb(var(--surface-sunken));
+  border: 0;
+  border-radius: var(--radius-full);
+}
+.ds-segment__item {
+  padding: var(--space-1) var(--space-4);
+  border: 0; background: transparent; border-radius: var(--radius-full);
+  font-family: var(--font-sans); font-size: var(--text-caption); font-weight: var(--weight-medium);
+  color: rgb(var(--ink-secondary));
+  cursor: pointer;
+  transition: background-color var(--dur-tick) var(--ease-phase), color var(--dur-tick) var(--ease-phase), box-shadow var(--dur-tick) var(--ease-phase);
+}
+.ds-segment__item:hover { color: rgb(var(--ink)); }
+.ds-segment__item.is-active { background: rgb(var(--surface)); color: rgb(var(--ink)); box-shadow: var(--shadow-raised); }
+
+/* ── Table ──────────────────────────────────────────────────────────────────
+   A quiet readout: hairline rows, a small muted header, no vertical rules,
+   no zebra. The header sticks and takes the thin material — the one place
+   inside the sheet where content genuinely scrolls beneath a surface. */
+
+.ds-table { width: 100%; border-collapse: collapse; font-size: var(--text-small); table-layout: auto; }
+.ds-table thead th {
+  position: sticky; top: 0; z-index: var(--z-sticky);
+  padding: var(--space-2) var(--space-3);
+  background: rgb(var(--canvas) / var(--glass-light));
+  backdrop-filter: blur(var(--blur-thin)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--blur-thin)) saturate(var(--glass-saturate));
+  border-bottom: 1px solid rgb(var(--rule));
+  font-family: var(--font-sans); font-size: var(--text-caption); font-weight: var(--weight-medium);
+  letter-spacing: 0; text-transform: none;
+  color: rgb(var(--ink-muted));
+  text-align: left; white-space: nowrap;
+}
+.ds-table tbody td {
+  padding: var(--space-3);
+  border-bottom: 1px solid rgb(var(--rule-hairline));
+  vertical-align: middle;
+}
+.ds-table tbody tr { transition: background-color var(--dur-tick) var(--ease-phase); }
+.ds-table tbody tr:hover { background: rgb(var(--ink) / 0.03); }
+.ds-table tbody tr.is-selected { background: rgb(var(--accent-wash)); }
+.ds-table__num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; color: rgb(var(--ink-secondary)); }
+.ds-table__primary { font-weight: var(--weight-medium); color: rgb(var(--ink)); }
+.ds-table__sub { display: block; max-width: 26ch; font-size: var(--text-caption); color: rgb(var(--ink-muted)); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-table__pick { width: 1rem; padding-right: 0; }
+.ds-table__id { font-family: var(--font-mono); font-size: var(--text-micro); letter-spacing: var(--tracking-mono); color: rgb(var(--ink-secondary)); white-space: nowrap; }
+.ds-table__id a { color: inherit; text-decoration: none; border-bottom: 1px solid rgb(var(--rule)); }
+.ds-table__id a:hover { color: rgb(var(--ink)); border-bottom-color: rgb(var(--ink)); }
+.ds-table__id--empty { color: rgb(var(--ink-muted)); }
+.ds-table th:last-child, .ds-table td:last-child { padding-right: var(--space-4); }
+
+/* Tables inside an answer — plain <table> in generated prose. */
+.ds-answer table { width: 100%; border-collapse: collapse; font-size: var(--text-small); }
+.ds-answer th {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid rgb(var(--rule));
+  font-family: var(--font-sans); font-size: var(--text-caption); font-weight: var(--weight-medium);
+  color: rgb(var(--ink-muted)); text-align: left;
+}
+.ds-answer td { padding: var(--space-3); border-bottom: 1px solid rgb(var(--rule-hairline)); }
+.ds-answer thead + tbody tr:last-child td { border-bottom: 0; }
+.ds-answer hr { height: 1px; border: 0; background: rgb(var(--rule-hairline)); margin: var(--space-6) 0; }
+
+/* Bulk bar — the system acting on a selection. Charcoal pill: authority. */
+.ds-bulk {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
+  background: rgb(var(--chrome));
+  color: rgb(var(--chrome-ink));
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lifted);
+  font-size: var(--text-small);
+}
+.ds-bulk__count { font-family: var(--font-mono); font-size: var(--text-micro); color: rgb(var(--chrome-ink-muted)); }
+.ds-bulk__spacer { flex: 1; }
+
+/* ── Meter ────────────────────────────────────────────────────────────────── */
+
+.ds-meter { height: 4px; background: rgb(var(--surface-sunken)); border-radius: var(--radius-full); overflow: hidden; }
+.ds-meter__fill { height: 100%; background: rgb(var(--ink)); border-radius: inherit; transition: width var(--dur-shift) var(--ease-settle); }
+.ds-meter--live .ds-meter__fill { background: rgb(var(--accent)); }
+.ds-meter--locked .ds-meter__fill { background: rgb(var(--signal-locked)); }
+.ds-chrome .ds-meter { background: rgb(var(--chrome-rule)); }
+.ds-chrome .ds-meter__fill { background: rgb(var(--chrome-ink)); }
+.ds-chrome .ds-meter--live .ds-meter__fill { background: rgb(var(--accent-on-chrome)); }
+
+/* ── Avatar ─────────────────────────────────────────────────────────────────
+   Initials, never a generated illustration. Circular. */
+
+.ds-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 1.75rem; height: 1.75rem;
+  border-radius: var(--radius-full);
+  background: rgb(var(--surface-sunken));
+  color: rgb(var(--ink-secondary));
+  font-size: var(--text-caption); font-weight: var(--weight-medium);
+  letter-spacing: 0;
+}
+.ds-avatar--ink { background: rgb(var(--ink)); color: rgb(var(--ink-on-ink)); }
+.ds-avatar--lg { width: 2.25rem; height: 2.25rem; font-size: var(--text-small); }
+.ds-avatar--sm { width: 1.375rem; height: 1.375rem; font-size: var(--text-micro); }
+
+/* ── Banner ─────────────────────────────────────────────────────────────────
+   An inline notice about the surface it sits on: a soft wash card, a small
+   bold label, prose beneath. */
+
+.ds-banner { padding: var(--space-4) var(--space-5); border-radius: var(--radius-md); background: rgb(var(--surface-sunken)); font-size: var(--text-small); color: rgb(var(--ink-secondary)); line-height: var(--leading-normal); }
+.ds-banner__label { display: block; font-family: var(--font-sans); font-size: var(--text-caption); font-weight: var(--weight-medium); margin-bottom: var(--space-1); color: rgb(var(--ink)); }
+.ds-banner--drift  { background: rgb(var(--signal-drift-wash)); }
+.ds-banner--drift .ds-banner__label { color: rgb(var(--signal-drift)); }
+.ds-banner--fault  { background: rgb(var(--signal-fault-wash)); }
+.ds-banner--fault .ds-banner__label { color: rgb(var(--signal-fault)); }
+.ds-banner--locked { background: rgb(var(--signal-locked-wash)); }
+.ds-banner--locked .ds-banner__label { color: rgb(var(--signal-locked)); }
+
+/* ── Tooltip — the thinnest floating material. Charcoal pill, states a fact.
+
+   Placed from script (`tip.ts`), not by `bottom: 100%`. An absolutely-positioned
+   bubble cannot leave a scrolling ancestor, and every rail and header on the
+   platform is one: a trigger sitting within the pill's own height of the top
+   edge had its label silently clipped, which is most of the tooltips we ship.
+   `position: fixed` answers to the viewport instead, so the script can flip the
+   pill below a trigger with no headroom and clamp it inside the window. */
+
+.ds-tip { display: inline-flex; }
+.ds-tip__body {
+  position: fixed; top: 0; left: 0; z-index: var(--z-toast);
+  padding: var(--space-1) var(--space-3);
+  background: rgb(var(--chrome) / var(--glass-dark));
+  backdrop-filter: blur(var(--blur-thin)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--blur-thin)) saturate(var(--glass-saturate));
+  color: rgb(var(--chrome-ink));
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans); font-size: var(--text-caption);
+  white-space: nowrap; pointer-events: none;
+  opacity: 0; transform: translateY(2px);
+  transition: opacity var(--dur-tick) var(--ease-phase), transform var(--dur-tick) var(--ease-settle);
+}
+.ds-tip__body.is-on { opacity: 1; transform: none; }
+
+/* ── Drawer ─────────────────────────────────────────────────────────────────
+   Work that runs beside the conversation. Seated in a flex row it is solid;
+   floating over content it is glass, thick, lifted. The caller states which. */
+
+.ds-drawer {
+  display: flex; flex-direction: column; min-height: 0;
+  width: 22rem; flex-shrink: 0;
+  background: rgb(var(--surface));
+  border-left: 1px solid rgb(var(--rule-hairline));
+  animation: ds-drawer-in var(--dur-reveal) var(--ease-settle);
+}
+.ds-drawer--floating {
+  background: rgb(var(--surface) / var(--glass-light));
+  backdrop-filter: blur(var(--blur-thick)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--blur-thick)) saturate(var(--glass-saturate));
+  border-left: 1px solid rgb(255 255 255 / 0.55);
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  box-shadow: var(--shadow-lifted);
+}
+@keyframes ds-drawer-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+.ds-drawer__head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid rgb(var(--rule-hairline)); }
+.ds-drawer__body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4); }
+.ds-drawer__foot { padding: var(--space-3) var(--space-4); border-top: 1px solid rgb(var(--rule-hairline)); }
+
+/* ── Sources ────────────────────────────────────────────────────────────────
+   Owl cites. A source is a soft chip; a claim can always be traced. */
+
+.ds-sources { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ds-source {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  max-width: 18rem; padding: var(--space-1) var(--space-3);
+  background: rgb(var(--surface-sunken));
+  border: 0;
+  border-radius: var(--radius-full);
+  font-size: var(--text-caption); color: rgb(var(--ink-secondary));
+  text-decoration: none;
+  transition: background-color var(--dur-tick) var(--ease-phase), color var(--dur-tick) var(--ease-phase);
+}
+.ds-source:hover { background: rgb(var(--ink) / 0.09); color: rgb(var(--ink)); }
+.ds-source__n { font-family: var(--font-mono); font-size: var(--text-micro); color: rgb(var(--ink-muted)); }
+.ds-source__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ds-cite { font-family: var(--font-mono); font-size: var(--text-micro); color: rgb(var(--ink-muted)); vertical-align: super; text-decoration: none; padding-inline: 1px; }
+.ds-cite:hover { color: rgb(var(--accent-ink)); }
+
+/* ── Command palette — built on the dialog ────────────────────────────────── */
+
+.ds-palette { width: min(34rem, calc(100vw - var(--space-8))); padding: 0; overflow: hidden; }
+.ds-palette__field { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-5); border-bottom: 1px solid rgb(var(--rule-hairline)); }
+.ds-palette__input { flex: 1; min-width: 0; border: 0; background: transparent; font-family: var(--font-sans); font-size: var(--text-lead); color: rgb(var(--ink)); }
+.ds-palette__input:focus { outline: none; }
+.ds-palette__input::placeholder { color: rgb(var(--ink-muted)); }
+.ds-palette__list { max-height: 20rem; overflow-y: auto; padding: var(--space-2); }
+.ds-palette__group { padding: var(--space-3) var(--space-2) var(--space-1); }
+.ds-palette__foot { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-2) var(--space-5); border-top: 1px solid rgb(var(--rule-hairline)); }
+
+/* ── Jump — return to the live edge. Charcoal pill. ───────────────────────── */
+
+.ds-jump {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  height: 2rem; padding: 0 var(--space-4);
+  background: rgb(var(--chrome)); color: rgb(var(--chrome-ink));
+  border: 0; border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lifted);
+  font-family: var(--font-sans); font-size: var(--text-caption); font-weight: var(--weight-medium);
+  cursor: pointer;
+  animation: ds-rise var(--dur-shift) var(--ease-settle);
+}
+
+/* ── Run sequence ───────────────────────────────────────────────────────────
+   A path walking its agents. One drawn spine, each step hung off it; a step
+   that finished collapses to its result and stays reopenable; a step that
+   cannot run says why. The only colour is the accent on the live step. */
+
+.ds-run { position: relative; padding-left: var(--space-8); }
+.ds-run::before {
+  content: '';
+  position: absolute; left: 7px; top: var(--space-2); bottom: var(--space-10);
+  width: 1px; background: rgb(var(--rule));
+}
+
+.ds-step { position: relative; padding: 0 0 var(--space-8); }
+.ds-step::before {
+  content: '';
+  position: absolute; left: calc(-1 * var(--space-8) + 3px); top: 5px;
+  width: 9px; height: 9px; border-radius: var(--radius-full);
+  background: rgb(var(--surface));
+  box-shadow: 0 0 0 1px rgb(var(--rule));
+}
+
+.ds-step__head {
+  display: flex; align-items: baseline; gap: var(--space-3);
+  width: 100%; padding: 0; border: 0; background: none;
+  font: inherit; color: inherit; text-align: left;
+}
+.ds-step__name {
+  font-family: var(--font-sans); font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: rgb(var(--ink-muted));
+}
+.ds-step__summary {
+  flex: 1; min-width: 0;
+  font-size: var(--text-small); color: rgb(var(--ink-secondary));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ds-step__body { padding-top: var(--space-4); }
+
+.ds-step--done::before { background: rgb(var(--ink)); box-shadow: 0 0 0 1px rgb(var(--ink)); }
+.ds-step--done .ds-step__head { cursor: pointer; }
+.ds-step--done .ds-step__head:hover .ds-step__summary { color: rgb(var(--ink)); }
+
+.ds-step--active::before { background: rgb(var(--accent)); box-shadow: 0 0 0 1px rgb(var(--accent)); }
+.ds-step--active .ds-step__name { color: rgb(var(--ink)); }
+
+.ds-step--waiting .ds-step__summary { color: rgb(var(--ink-muted)); }
+
+.ds-step--unbuilt::before { background: rgb(var(--surface)); box-shadow: 0 0 0 1px rgb(var(--rule-hairline)); }
+.ds-step--unbuilt .ds-step__name {
+  color: rgb(var(--ink-muted));
+  text-decoration: line-through; text-decoration-thickness: 1px;
+}
+.ds-step--unbuilt .ds-step__summary { color: rgb(var(--ink-muted)); }

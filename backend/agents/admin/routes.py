@@ -3,14 +3,20 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
 
 from auth import load_users, public_user, require_admin
 from agents.shared import vault as vault_mod
-from paths import calls_data, lead_data
+from paths import calls_data, calls_user_kb, sales_data
 
 CALLS_DATA = calls_data() / "sessions.json"
-CAMPAIGNS  = lead_data() / "campaigns.json"
+
+#: A **frozen archive.** The campaign builder that wrote this file was retired in
+#: Stage 3.3, so nothing appends to it any more; what is here is history. It is
+#: still read because those campaigns happened and the record of who worked what is
+#: worth keeping visible. The counts it feeds will not grow — that is the file, not
+#: a bug in the panel.
+CAMPAIGNS  = sales_data() / "campaigns.json"
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
@@ -236,3 +242,82 @@ def admin_users():
 
     out.sort(key=lambda x: x.get("name", x.get("username", "")).lower())
     return out
+
+
+# ---------------------------------------------------------------------------
+# Knowledge files
+#
+# The static markdown Owl reads alongside the vault. Moved here from
+# `agents/calls` in Stage 4: managing these files is administration, the whole
+# router is already `require_admin`, and `/admin` was the only surface calling
+# them. They were never a calls concern — they lived there because that is where
+# the directory happened to sit.
+# ---------------------------------------------------------------------------
+
+#: Files that may never be deleted through the API. Two are hand-maintained sources
+#: of truth; the third is regenerated from analysed calls and deleting it would
+#: silently drop a user's own accumulated learnings.
+PROTECTED_KNOWLEDGE_FILES = {
+    "company-overview.md",
+    "learnings-auto.md",
+    "campaign-knowledge-base.md",
+}
+
+_KNOWLEDGE_SUFFIXES = {".md", ".txt"}
+
+
+def _knowledge_dir() -> Path:
+    return calls_user_kb().parent
+
+
+def _file_row(path: Path, *, protected: bool, auto_generated: bool) -> dict:
+    stat = path.stat()
+    return {
+        "name": path.name,
+        "size_kb": round(stat.st_size / 1024, 1),
+        "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%d %b %Y"),
+        "protected": protected,
+        "auto_generated": auto_generated,
+    }
+
+
+@router.get("/knowledge")
+def list_knowledge(admin: dict = Depends(require_admin)):
+    """The shared knowledge files, plus this admin's own generated learnings."""
+    directory = _knowledge_dir()
+    files = [
+        _file_row(path, protected=path.name in PROTECTED_KNOWLEDGE_FILES, auto_generated=False)
+        for path in sorted(directory.iterdir())
+        if path.is_file() and path.suffix.lower() in _KNOWLEDGE_SUFFIXES
+    ] if directory.exists() else []
+
+    own = calls_user_kb() / admin["username"] / "learnings-auto.md"
+    if own.is_file():
+        files.append(_file_row(own, protected=True, auto_generated=True))
+    return files
+
+
+@router.post("/knowledge/upload")
+async def upload_knowledge(file: UploadFile = File(...)):
+    """Add a knowledge file. Markdown and plain text only — Owl reads it as prose."""
+    name = Path(file.filename or "").name
+    if not name or not name.lower().endswith(tuple(_KNOWLEDGE_SUFFIXES)):
+        raise HTTPException(status_code=400, detail="Only .md and .txt files are supported.")
+
+    directory = _knowledge_dir()
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / name).write_bytes(await file.read())
+    return {"message": f"Uploaded {name}", "name": name}
+
+
+@router.delete("/knowledge/{filename}")
+def delete_knowledge(filename: str):
+    name = Path(filename).name
+    if name in PROTECTED_KNOWLEDGE_FILES:
+        raise HTTPException(status_code=403, detail="That knowledge file is protected.")
+
+    path = _knowledge_dir() / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="File not found.")
+    path.unlink()
+    return {"ok": True}

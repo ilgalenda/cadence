@@ -1,0 +1,165 @@
+---
+/**
+ * Call analysis — a transcript read into signals, objections and next steps.
+ *
+ * Brought in from `agents/calls/analyze.astro` and rebuilt on the design system
+ * and the platform shell.
+ *
+ * **Paste is the only way in as of Stage 4.** The MP4 dropzone and local Whisper
+ * transcription went with `/api/transcribe`, and the Meet-extension hand-off with
+ * `agents/meet`: canon drops ASR because Granola does it better, and neither path
+ * had ever produced a stored transcript. The segmented source switch went with
+ * them — there is one source now, so a switch would offer a choice of one.
+ *
+ * The results themselves are the shared `AnalysisResult` component, unchanged —
+ * three other surfaces render it, and it moves with them when the Learn section
+ * is built. Rebuilding it here would fork it.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import AnalysisResult from '../../../components/AnalysisResult.astro';
+---
+<PlatformLayout title="Call analysis" requires="calls">
+  <div class="agent-page">
+    <div class="agent-page__column">
+      <header class="agent-page__head ds-arrive">
+        <p class="ds-eyebrow">Call analysis</p>
+        <h1 class="ds-heading ds-page__title">What happened on the call?</h1>
+        <p class="ds-lead ds-page__intro">
+          Paste the transcript — Granola or any other tool can produce it. Owl reads it for buying signals, objections
+          and follow-up points, recommends a product where the call warrants one, and builds a quiz
+          from what was said. Every analysis is kept.
+        </p>
+      </header>
+
+      <section class="source ds-arrive" style="--arrive: var(--dur-step)">
+        <div class="source__head">
+          <label class="ds-label" for="transcript">Transcript</label>
+          <label class="ds-btn ds-btn--ghost ds-btn--sm">
+            Upload .txt or .md
+            <input id="transcript-file" type="file" accept=".txt,.md" hidden />
+          </label>
+        </div>
+        <textarea class="ds-field ds-textarea ds-textarea--resizable transcript" id="transcript"
+          placeholder="Paste the call transcript here…"></textarea>
+        <p class="ds-help">Speaker labels help, but plain text works.</p>
+      </section>
+
+      <div class="run ds-arrive" style="--arrive: calc(var(--dur-step) * 2)">
+        <div class="run__field">
+          <label class="ds-label" for="title">Call title <span class="run__optional">optional</span></label>
+          <input class="ds-field" id="title" placeholder="Northgate — discovery call" autocomplete="off" />
+        </div>
+        <div class="run__actions">
+          <button class="ds-btn ds-btn--accent" id="analyse" type="button">Analyse call</button>
+          <span class="ds-mark ds-mark--live run__state" id="state" hidden></span>
+        </div>
+      </div>
+
+      <div class="result">
+        <AnalysisResult showClear={true} />
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* Screen-level layout only. The page frame is the shared `.agent-page`
+       column; everything tonal and typographic comes from the design system.
+       A transcript is sentences, so the well keeps the sans reading face —
+       mono is for identifiers. */
+    .source { max-width: var(--measure-read); }
+    .source__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+    .transcript { width: 100%; min-height: 12rem; }
+
+    .run {
+      display: flex; align-items: flex-end; gap: var(--space-6); flex-wrap: wrap;
+      margin-top: var(--space-8); padding-bottom: var(--space-6);
+    }
+    .run__field { flex: 1; min-width: 16rem; max-width: var(--measure-form); }
+    .run__optional { font-weight: var(--weight-regular); color: rgb(var(--ink-muted)); }
+    .run__actions { display: flex; align-items: center; gap: var(--space-4); }
+
+    .result { margin-top: var(--space-8); }
+  </style>
+
+  <script>
+    import { notify } from '../../../lib/overlays';
+    import { el } from '../../../lib/dom';
+
+    const transcript = el<HTMLTextAreaElement>('transcript');
+    const titleField = el<HTMLInputElement>('title');
+    const analyseBtn = el<HTMLButtonElement>('analyse');
+    const state      = el('state');
+    const resultBox  = el('analysis-result');
+
+    // ── Source ──────────────────────────────────────────────────────────────
+
+    el('transcript-file').addEventListener('change', (e) => {
+      const input = e.target as HTMLInputElement;
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { transcript.value = String(reader.result ?? ''); };
+      reader.readAsText(file);
+      input.value = '';
+    });
+
+    // ── Running ─────────────────────────────────────────────────────────────
+
+    function setState(message: string): void {
+      state.textContent = message;
+      state.hidden = false;
+      analyseBtn.disabled = true;
+    }
+
+    function clearState(): void {
+      state.hidden = true;
+      analyseBtn.disabled = false;
+    }
+
+    /** The reason a request failed, in the backend's own words where it gave one. */
+    async function reasonFor(res: Response, fallback: string): Promise<string> {
+      const body = await res.text();
+      try {
+        const parsed = JSON.parse(body);
+        return parsed.detail || parsed.message || fallback;
+      } catch {
+        return body.trim() || `${fallback} (HTTP ${res.status})`;
+      }
+    }
+
+    async function analyse(text: string): Promise<void> {
+      const title = titleField.value.trim() || 'Call analysis';
+      setState('reading the call');
+      resultBox.hidden = true;
+
+      try {
+        const res = await fetch('/api/sales/calls/analyse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, title }),
+        });
+        if (!res.ok) throw new Error(await reasonFor(res, 'Analysis failed'));
+
+        const analysis = await res.json();
+        analysis._title = title;
+        // The analysis is injected by the shared component, so it arrives like
+        // any other run result.
+        (window as any).renderAnalysisResult(analysis);
+        resultBox.classList.add('ds-arrive');
+      } catch (err: any) {
+        notify({ title: 'Analysis failed', body: err?.message || 'The call was not read.' });
+      } finally {
+        clearState();
+      }
+    }
+
+    analyseBtn.addEventListener('click', () => {
+      const text = transcript.value.trim();
+      if (!text) {
+        notify({ title: 'Nothing to analyse', body: 'Paste a transcript first.' });
+        return;
+      }
+      analyse(text);
+    });
+  </script>
+</PlatformLayout>

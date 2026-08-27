@@ -38,7 +38,7 @@ _DEFAULT_PROFILES = [
         "name": "Admin User",
         "role": "Administrator",
         "access": "admin",
-        "agents": ["calls", "lead", "high-intent", "duty", "onboarding", "forecast"],
+        "agents": ["calls", "lead", "duty", "onboarding", "forecast"],
     },
     {
         "username": "user1",

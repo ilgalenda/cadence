@@ -1,0 +1,187 @@
+---
+/**
+ * Integrations — the external accounts Cadence acts through.
+ *
+ * Rebuilt here in Stage 3.3 from `pages/agents/lead/integrations.astro`, which
+ * died with the campaign builder. Same job, on the platform shell and in design
+ * system classes rather than the legacy Tailwind names.
+ *
+ * **Three states, not two.** Configured is about the operator; connected is about
+ * the person; and as of Phase 4a there is a third — *connected before Gmail existed*.
+ * The grant gained a `gmail.compose` scope, so a connection made earlier is connected
+ * and still unable to draft. Reporting a flat "connected" would have the page telling
+ * the truth while the feature failed. The status pill and its detail line are always
+ * set together, so they can never disagree.
+ */
+import PlatformLayout from '../../layouts/PlatformLayout.astro';
+---
+<PlatformLayout title="Integrations" requires="lead">
+  <div class="ds-page page">
+    <div class="page__inner">
+
+    <header class="ds-page__head ds-arrive">
+      <p class="ds-eyebrow">Workspace</p>
+      <h1 class="ds-heading ds-page__title">Integrations</h1>
+      <p class="ds-lead ds-page__intro">
+        External accounts Cadence acts through. Each person connects their own —
+        credentials stay isolated, and nothing is shared across the team.
+      </p>
+    </header>
+
+    <!-- One provider, one card. The pill states the condition; the detail line
+         beside it carries the account and what the grant currently allows. -->
+    <section class="ds-card provider ds-arrive" style="--arrive: var(--dur-step)">
+      <div class="provider__what">
+        <p class="ds-eyebrow">Mail and calendar</p>
+        <h2 class="ds-title provider__name">Google</h2>
+        <p class="ds-small provider__does">
+          One grant, two things. <strong>Gmail</strong> lets Composer and Recap put addressed
+          drafts in your mailbox for you to send — they cannot send, by design. <strong>Calendar</strong>
+          is authorised for scheduling, which is not built yet.
+        </p>
+        <p class="provider__status">
+          <span class="ds-mark ds-mark--idle" id="state-mark">checking</span>
+          <span class="ds-caption" id="state"></span>
+        </p>
+      </div>
+      <div class="provider__ctrls" id="ctrls"></div>
+    </section>
+
+    <p class="ds-caption page-note ds-arrive" style="--arrive: calc(var(--dur-step) * 2)">
+      Cadence can create drafts and cannot send: the scope it asks for does not permit
+      sending, so that is enforced by Google rather than by our restraint. It cannot read
+      your mail either.
+    </p>
+    </div>
+  </div>
+
+  <style>
+    /* Screen-level layout only; tone and type come from the design system. */
+
+    /* One provider is a sparse state, so the column is chosen, not inherited:
+       the reading measure, centred on both axes the way /home centres its
+       composer. Auto block margins collapse to zero once the page grows, so
+       nothing is pushed out of reach when more providers arrive. */
+    .page { flex: 1; width: 100%; display: flex; flex-direction: column; }
+    .page__inner {
+      width: 100%; max-width: var(--measure-read);
+      margin-inline: auto; margin-block: auto;
+    }
+
+    .provider {
+      display: grid; grid-template-columns: 1fr auto; gap: var(--space-8); align-items: start;
+    }
+    .provider__what { min-width: 0; }
+    .provider__name { margin: var(--space-2) 0; }
+    .provider__does { max-width: var(--measure-read); line-height: var(--leading-relaxed); }
+    .provider__status {
+      display: flex; align-items: center; gap: var(--space-3);
+      margin: var(--space-4) 0 0;
+    }
+    .provider__ctrls { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
+    /* Hints are created by the script at runtime, so they carry no scope hash
+       and must be addressed globally. */
+    .provider__ctrls :global(.provider__hint) { text-align: right; max-width: 20rem; }
+
+    .page-note { margin-top: var(--space-6); max-width: var(--measure-read); }
+
+    @media (max-width: 60rem) {
+      .provider { grid-template-columns: 1fr; }
+      .provider__ctrls { align-items: flex-start; }
+      .provider__ctrls :global(.provider__hint) { text-align: left; }
+    }
+  </style>
+
+  <script>
+    const byId = (id: string) => document.getElementById(id)!;
+
+    /** A hint rather than a control, for the states the person cannot act on. */
+    function hint(text: string): HTMLElement {
+      const para = document.createElement('p');
+      para.className = 'ds-small provider__hint';
+      para.textContent = text;
+      return para;
+    }
+
+    /**
+     * The condition as the system says it: a mark for the state, sans detail
+     * beside it. One writer for both, so the pill and the prose cannot drift.
+     */
+    function setState(kind: 'idle' | 'drift' | 'locked' | 'fault', word: string, detail = ''): void {
+      const mark = byId('state-mark');
+      mark.className = `ds-mark ds-mark--${kind}`;
+      mark.textContent = word;
+      byId('state').textContent = detail;
+    }
+
+    async function load(): Promise<void> {
+      const ctrls = byId('ctrls');
+      setState('idle', 'checking');
+      ctrls.replaceChildren();
+
+      try {
+        const res = await fetch('/api/integrations/google/status');
+        if (!res.ok) throw new Error(String(res.status));
+        const status = await res.json();
+
+        // Not configured is the operator's problem, not the person's — so it says
+        // whose it is rather than offering a button that cannot work.
+        if (!status.configured) {
+          setState('idle', 'not configured');
+          ctrls.append(hint(
+            'Google OAuth is not set up on this deployment. GOOGLE_CLIENT_ID and '
+            + 'GOOGLE_CLIENT_SECRET need setting on the backend.',
+          ));
+          return;
+        }
+
+        /** The consent link, labelled for what pressing it will achieve. */
+        const connectButton = (label: string): HTMLElement => {
+          const connect = document.createElement('a');
+          connect.className = 'ds-btn ds-btn--accent ds-btn--sm';
+          connect.href = '/api/integrations/google/connect';
+          connect.textContent = label;
+          return connect;
+        };
+
+        if (!status.connected) {
+          setState('idle', 'not connected');
+          ctrls.append(connectButton('Connect Google'));
+          return;
+        }
+
+        // Connected, but from before the Gmail scope existed. Saying only
+        // "connected" here is what would make drafting fail with no explanation.
+        if (!status.can_draft_email) {
+          setState('drift', 'reconnect', `connected as ${status.email}`);
+          ctrls.append(connectButton('Reconnect for Gmail'));
+          ctrls.append(hint(
+            'This connection predates Gmail drafting. Reconnecting adds it and keeps '
+            + 'everything already granted.',
+          ));
+          return;
+        }
+
+        setState('locked', 'connected', `${status.email} · drafting enabled`);
+        const disconnect = document.createElement('button');
+        disconnect.className = 'ds-btn ds-btn--secondary ds-btn--sm';
+        disconnect.type = 'button';
+        disconnect.textContent = 'Disconnect';
+        disconnect.addEventListener('click', async () => {
+          disconnect.disabled = true;
+          try {
+            await fetch('/api/integrations/google/disconnect', { method: 'POST' });
+            await load();
+          } finally {
+            disconnect.disabled = false;
+          }
+        });
+        ctrls.append(disconnect);
+      } catch {
+        setState('fault', 'unreachable', 'could not check — is the backend running?');
+      }
+    }
+
+    load();
+  </script>
+</PlatformLayout>

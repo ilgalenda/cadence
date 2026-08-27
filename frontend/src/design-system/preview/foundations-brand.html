@@ -1,0 +1,126 @@
+<!-- @dsCard group="Foundations" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brand — Cadence Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../primitives.css">
+<link rel="stylesheet" href="preview.css">
+<style>
+  .bz { display: flex; align-items: center; justify-content: center; padding: var(--space-10); border-radius: var(--radius-lg); }
+  .bz--canvas { background: rgb(var(--surface)); border: 1px solid rgb(var(--rule-hairline)); }
+  .bz--chrome { background: rgb(var(--chrome)); }
+  .lockup { display: flex; align-items: center; gap: var(--space-3); }
+  .lockup__word { font-size: 1.75rem; font-weight: var(--weight-regular); letter-spacing: -0.03em; line-height: 1; }
+  .lockup--stacked { flex-direction: column; gap: var(--space-3); }
+</style>
+</head>
+<body class="ds-root">
+
+<header class="pv-head">
+  <p class="ds-eyebrow">Foundations · 04</p>
+  <h1>Brand marks</h1>
+  <p>
+    Two marks, and they are not interchangeable. <strong>Cadence</strong> is the platform: four
+    bars at uneven heights, one of them blue — the beat the whole system is named for, and the
+    same figure as the thinking indicator. <strong>Owl</strong> is the assistant inside it: a
+    solid head with the eyes and beak knocked out to whatever surface it sits on. The platform
+    signs the product; the owl signs an answer.
+  </p>
+</header>
+
+<section class="pv-section">
+  <h2>Cadence — the platform mark</h2>
+  <div class="pv-grid" style="grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));">
+    <div class="bz bz--canvas">
+      <span class="lockup">
+        <svg width="34" height="34" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.6" y="6.5" width="2.6" height="7" rx="1.3" fill="rgb(var(--ink))"/><rect x="6.9" y="3.5" width="2.6" height="13" rx="1.3" fill="rgb(var(--ink))"/><rect x="11.2" y="1.5" width="2.6" height="17" rx="1.3" fill="rgb(var(--accent))"/><rect x="15.5" y="5" width="2.6" height="10" rx="1.3" fill="rgb(var(--ink))"/></svg>
+        <span class="lockup__word">Cadence</span>
+      </span>
+    </div>
+    <div class="bz bz--chrome">
+      <span class="lockup" style="color: rgb(var(--chrome-ink));">
+        <svg width="34" height="34" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.6" y="6.5" width="2.6" height="7" rx="1.3" fill="rgb(var(--chrome-ink))"/><rect x="6.9" y="3.5" width="2.6" height="13" rx="1.3" fill="rgb(var(--chrome-ink))"/><rect x="11.2" y="1.5" width="2.6" height="17" rx="1.3" fill="rgb(var(--accent-on-chrome))"/><rect x="15.5" y="5" width="2.6" height="10" rx="1.3" fill="rgb(var(--chrome-ink))"/></svg>
+        <span class="lockup__word">Cadence</span>
+      </span>
+    </div>
+  </div>
+  <p class="pv-note" style="margin-top: var(--space-6);">On charcoal the blue bar switches to <code class="pv-spec">--accent-on-chrome</code>. Brand blue at 3.2:1 is legal as a shape on white but too dark to hold against the frame.</p>
+</section>
+
+<section class="pv-section">
+  <h2>Sizes &amp; lockups</h2>
+  <div class="pv-frame" style="padding: var(--space-8);">
+    <div class="pv-row" style="gap: var(--space-10); align-items: flex-end;">
+      <span style="display: flex; flex-direction: column; align-items: center; gap: var(--space-3);">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.6" y="6.5" width="2.6" height="7" rx="1.3" fill="rgb(var(--ink))"/><rect x="6.9" y="3.5" width="2.6" height="13" rx="1.3" fill="rgb(var(--ink))"/><rect x="11.2" y="1.5" width="2.6" height="17" rx="1.3" fill="rgb(var(--accent))"/><rect x="15.5" y="5" width="2.6" height="10" rx="1.3" fill="rgb(var(--ink))"/></svg>
+        <span class="pv-spec">16 · favicon</span>
+      </span>
+      <span style="display: flex; flex-direction: column; align-items: center; gap: var(--space-3);">
+        <svg width="24" height="24" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.6" y="6.5" width="2.6" height="7" rx="1.3" fill="rgb(var(--ink))"/><rect x="6.9" y="3.5" width="2.6" height="13" rx="1.3" fill="rgb(var(--ink))"/><rect x="11.2" y="1.5" width="2.6" height="17" rx="1.3" fill="rgb(var(--accent))"/><rect x="15.5" y="5" width="2.6" height="10" rx="1.3" fill="rgb(var(--ink))"/></svg>
+        <span class="pv-spec">24 · app rail</span>
+      </span>
+      <span style="display: flex; flex-direction: column; align-items: center; gap: var(--space-3);">
+        <svg width="40" height="40" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.6" y="6.5" width="2.6" height="7" rx="1.3" fill="rgb(var(--ink))"/><rect x="6.9" y="3.5" width="2.6" height="13" rx="1.3" fill="rgb(var(--ink))"/><rect x="11.2" y="1.5" width="2.6" height="17" rx="1.3" fill="rgb(var(--accent))"/><rect x="15.5" y="5" width="2.6" height="10" rx="1.3" fill="rgb(var(--ink))"/></svg>
+        <span class="pv-spec">40 · sign-in</span>
+      </span>
+      <span class="lockup lockup--stacked" style="margin-left: var(--space-8);">
+        <svg width="40" height="40" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.6" y="6.5" width="2.6" height="7" rx="1.3" fill="rgb(var(--ink))"/><rect x="6.9" y="3.5" width="2.6" height="13" rx="1.3" fill="rgb(var(--ink))"/><rect x="11.2" y="1.5" width="2.6" height="17" rx="1.3" fill="rgb(var(--accent))"/><rect x="15.5" y="5" width="2.6" height="10" rx="1.3" fill="rgb(var(--ink))"/></svg>
+        <span class="lockup__word" style="font-size: 1.25rem;">Cadence</span>
+        <span class="pv-spec">stacked · sign-in, print</span>
+      </span>
+    </div>
+  </div>
+  <p class="pv-note" style="margin-top: var(--space-6);">Clear space is the height of the shortest bar on every side. The wordmark is Roboto Regular at −0.03em; never Light, never all caps, never letter-spaced open.</p>
+</section>
+
+<section class="pv-section">
+  <h2>Owl — the assistant mark</h2>
+  <div class="pv-grid" style="grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));">
+    <div class="bz bz--canvas">
+      <span class="lockup">
+        <svg width="34" height="34" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.2 7.2 5.2 2.4 9.6 5.3ZM15.8 7.2 14.8 2.4 10.4 5.3Z" fill="rgb(var(--ink))"/><path d="M4 10.2a6 6 0 0 1 12 0v1.4a6 6 0 0 1-12 0Z" fill="rgb(var(--ink))"/><circle cx="7.5" cy="9.9" r="2.5" fill="rgb(var(--surface))"/><circle cx="12.5" cy="9.9" r="2.5" fill="rgb(var(--surface))"/><circle cx="7.5" cy="9.9" r="1.15" fill="rgb(var(--accent))"/><circle cx="12.5" cy="9.9" r="1.15" fill="rgb(var(--accent))"/><path d="M10 11.6l1.15 2.1H8.85Z" fill="rgb(var(--surface))"/></svg>
+        <span class="lockup__word">Owl</span>
+      </span>
+    </div>
+    <div class="bz bz--chrome">
+      <span class="lockup" style="color: rgb(var(--chrome-ink));">
+        <svg width="34" height="34" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.2 7.2 5.2 2.4 9.6 5.3ZM15.8 7.2 14.8 2.4 10.4 5.3Z" fill="rgb(var(--chrome-ink))"/><path d="M4 10.2a6 6 0 0 1 12 0v1.4a6 6 0 0 1-12 0Z" fill="rgb(var(--chrome-ink))"/><circle cx="7.5" cy="9.9" r="2.5" fill="rgb(var(--chrome))"/><circle cx="12.5" cy="9.9" r="2.5" fill="rgb(var(--chrome))"/><circle cx="7.5" cy="9.9" r="1.15" fill="rgb(var(--accent-on-chrome))"/><circle cx="12.5" cy="9.9" r="1.15" fill="rgb(var(--accent-on-chrome))"/><path d="M10 11.6l1.15 2.1H8.85Z" fill="rgb(var(--chrome))"/></svg>
+        <span class="lockup__word">Owl</span>
+      </span>
+    </div>
+  </div>
+  <p class="pv-note" style="margin-top: var(--space-6);">The knocked-out shapes take the colour of the surface behind the mark, not white — drop it on a coloured surface and the eyes must still read as holes. Owl never appears beside the Cadence wordmark; it identifies the assistant, not the product.</p>
+</section>
+
+<section class="pv-section">
+  <h2>Where each one goes</h2>
+  <div class="pv-frame">
+    <table class="ds-table">
+      <thead><tr><th>Place</th><th>Mark</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td class="ds-table__primary">Favicon, app icon, sign-in</td><td>Cadence mark</td><td class="ds-small" style="color: rgb(var(--ink-muted));">16–40px, no wordmark below 24px</td></tr>
+        <tr><td class="ds-table__primary">Top of the app rail</td><td>Cadence mark</td><td class="ds-small" style="color: rgb(var(--ink-muted));">The platform, once, top-left</td></tr>
+        <tr><td class="ds-table__primary">Assistant byline, agent runs</td><td>Owl mark or the byline dot</td><td class="ds-small" style="color: rgb(var(--ink-muted));">The dot alone is enough inside a thread</td></tr>
+        <tr><td class="ds-table__primary">Documents, decks, print</td><td>Stacked lockup</td><td class="ds-small" style="color: rgb(var(--ink-muted));">Charcoal on white, or white on charcoal</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Not this</h2>
+  <div class="pv-stack" style="max-width: var(--measure-read); gap: var(--space-5);">
+    <div class="ds-banner ds-banner--fault"><span class="ds-banner__label">Never</span>Re-colour the bars into a gradient, or set more than one bar in blue. One bar is the beat; four blue bars are a chart.</div>
+    <div class="ds-banner ds-banner--fault"><span class="ds-banner__label">Never</span>Put the Owl mark in a circle, a rounded tile or a speech bubble. It is a silhouette and needs the surface behind it.</div>
+    <div class="ds-banner ds-banner--fault"><span class="ds-banner__label">Never</span>Set either wordmark in Kode Mono. The mono face is the machine's readout, not the brand's voice.</div>
+  </div>
+</section>
+
+</body>
+</html>

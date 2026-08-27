@@ -1,6 +1,6 @@
 {
-  "name": "cadence-timebeat",
-  "version": "1.5.1",
+  "name": "cadence",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "start": "npm run build --prefix frontend && npm run backend",

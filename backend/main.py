@@ -16,24 +16,19 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from agents.admin.routes import router as admin_router
-from agents.calls.routes import router as calls_router
-from agents.high_intent.routes import router as high_intent_router
-from agents.lead.routes import router as lead_router
-from agents.meet.routes import router as meet_router
+from agents.learn.routes import router as learn_router
 from agents.owl.routes import router as owl_router
-from agents.duty.routes import router as duty_router
-from agents.onboarding.routes import router as onboarding_router
-from agents.forecast.routes import router as forecast_router
-# >>> cadence:agent-imports — `create_agent.py` inserts new agent router imports above this line.
+from agents.sales.routes import router as sales_router
+from agents.wiki.routes import router as wiki_router
+from integrations.google_routes import router as google_router
 from auth import current_user, is_sandbox, public_user, require_admin, verify_login
 
 # Cadence auth config — set in backend/.env:
 #   SESSION_SECRET=<long random string>
-#   ADMIN_PASSWORD, USER1_PASSWORD, etc. — plaintext, used by seed_users.py to
+#   IVAN_PASSWORD, IAN_PASSWORD, etc. — plaintext, used by seed_users.py to
 #     write the gitignored ${DATA_ROOT}/agents/users_credentials.json.
 # User profiles (name, role, access, agents) live in backend/agents/users.json
-# (regenerate locally via `seed_users.py --rewrite-profiles`); credentials live
-# in users_credentials.json. Neither is committed to this public mirror.
+# and ARE committed; credentials live in users_credentials.json and are NOT.
 SESSION_SECRET = os.getenv("SESSION_SECRET")
 if not SESSION_SECRET:
     raise RuntimeError("SESSION_SECRET is not set. Add it to backend/.env before starting.")
@@ -49,7 +44,7 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 # App
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="Cadence — Timebeat")
+app = FastAPI(title="Cadence")
 
 app.add_middleware(
     CORSMiddleware,
@@ -141,15 +136,13 @@ def sandbox_disable(request: Request, _user: dict = None):
 # ---------------------------------------------------------------------------
 
 app.include_router(admin_router)
-app.include_router(calls_router)
-app.include_router(high_intent_router)
-app.include_router(lead_router)
-app.include_router(meet_router)
 app.include_router(owl_router)
-app.include_router(duty_router)
-app.include_router(onboarding_router)
-app.include_router(forecast_router)
-# >>> cadence:agent-routers — `create_agent.py` inserts new app.include_router(...) calls above this line.
+app.include_router(sales_router)
+app.include_router(learn_router)
+app.include_router(wiki_router)
+
+# Not an agent — a shared connection agents borrow. Gmail joins it at Phase 4.
+app.include_router(google_router)
 
 
 # ---------------------------------------------------------------------------
@@ -173,5 +166,5 @@ if __name__ == "__main__":
         print("   Create a .env file with: ANTHROPIC_API_KEY=sk-ant-...")
         print("   Get your key at: https://console.anthropic.com\n")
 
-    print("🚀  Cadence — Timebeat starting on http://localhost:8000")
+    print("🚀  Cadence starting on http://localhost:8000")
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=DEBUG)

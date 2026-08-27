@@ -1,0 +1,1055 @@
+---
+/**
+ * The Owl workspace — Owl as a product, not a panel.
+ *
+ * On the platform shell. It used to build its own — its own grid, sheet, header,
+ * breadcrumb and rail toggle — which meant every change to the frame had to be
+ * made twice, by hand, and this was the copy most likely to be missed. The ground,
+ * the sheet's glass, the back arrow and the breadcrumb each cost that twice
+ * before the duplication was retired.
+ *
+ * What the workspace genuinely needs beyond the shell is expressed as slots: its
+ * own rail top (conversations, not knowledge), its own rail groups (Projects and
+ * Recent), and the conversation actions in the header. It also owns its own
+ * scrolling, because the composer has to stay pinned below the thread — that is
+ * what `fill` means.
+ *
+ * Screen design: `preview/screen-owl-workspace.html` in the Cadence Design
+ * System project on claude.ai/design.
+ */
+import PlatformLayout from '../../layouts/PlatformLayout.astro';
+---
+<PlatformLayout title="New conversation" crumbMiddleId="crumb-project" showFooter={false} fill>
+    <Fragment slot="rail-top">
+      <button class="ds-btn ds-btn--primary rail__new" id="new-chat" type="button">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span>New conversation</span>
+      </button>
+
+      <!-- Searches conversations and messages, not the knowledge base — so it keeps
+           its own field and its own placeholder rather than borrowing the rail's. -->
+      <div class="ds-search">
+        <svg class="ds-search__icon" width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 8.5l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <input class="ds-search__input" id="search" type="text" placeholder="Search conversations…" autocomplete="off" aria-label="Search conversations and messages" />
+      </div>
+    </Fragment>
+
+    <Fragment slot="rail-before-groups">
+      <!-- Search results replace the tree while a query is active. -->
+      <div class="ws-group" id="results-group" data-closed-hide hidden>
+        <div class="ws-group__head"><span class="ds-eyebrow" id="results-head">Results</span></div>
+        <div id="results-list"></div>
+      </div>
+
+      <!-- Conversation groups are language, and the closed rail drops language:
+           the home screen card marks them `data-closed-hide` and so does this. -->
+      <div id="tree-groups" data-closed-hide>
+        <div class="ws-group">
+          <div class="ws-group__head">
+            <span class="ds-eyebrow">Projects</span>
+            <span class="ds-tip">
+              <button class="ds-icon-btn ds-icon-btn--sm" id="new-project" type="button" aria-label="New project">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+              </button>
+              <span class="ds-tip__body">new project</span>
+            </span>
+          </div>
+          <div id="projects"></div>
+        </div>
+
+        <div class="ws-group">
+          <div class="ws-group__head">
+            <span class="ds-eyebrow">Recent</span>
+            <span class="ds-tip">
+              <button class="ds-icon-btn ds-icon-btn--sm ds-icon-btn--danger" id="delete-all" type="button" aria-label="Delete all conversations">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2.5 3.5h7M4.75 3.5V2.5h2.5v1M3.5 3.5l.4 6h4.2l.4-6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <span class="ds-tip__body">delete all conversations</span>
+            </span>
+          </div>
+          <div id="recent"></div>
+        </div>
+      </div>
+    </Fragment>
+
+    <!-- Reflects reality: shown only when this conversation's project has
+         standing instructions that are actually reaching the prompt. -->
+    <Fragment slot="head-actions">
+      <span class="ds-mark ds-mark--idle" id="context-mark" hidden>project context</span>
+
+      <span class="ds-tip" id="conv-menu-wrap" hidden>
+        <button class="ds-icon-btn" id="conv-menu" type="button" aria-label="Conversation options" aria-haspopup="menu">
+          <svg width="14" height="14" viewBox="0 0 12 12" fill="none"><circle cx="2" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="10" cy="6" r="1" fill="currentColor"/></svg>
+        </button>
+        <span class="ds-tip__body">options</span>
+      </span>
+    </Fragment>
+
+    <div class="ws-thread ds-scroll" id="thread">
+      <div class="ds-log" id="reading"></div>
+    </div>
+
+    <div class="ws-foot">
+      <div class="ws-foot__inner">
+        <div class="ws-jump" id="jump-wrap" hidden>
+          <button class="ds-jump" id="jump" type="button">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M2 7l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            latest
+          </button>
+        </div>
+
+        <form id="composer">
+          <!-- A tray: the question on its own line, and every control it needs
+               inside the same slab beneath it. Nothing floats loose under the
+               composer competing with it. -->
+          <div class="ds-composer">
+            <textarea class="ds-composer__input" id="input" placeholder="Ask Owl anything…" autocomplete="off" aria-label="Message Owl"></textarea>
+            <div class="ds-composer__bar">
+              <span class="ds-composer__gap"></span>
+              <button class="ds-icon-btn ds-icon-btn--fill" id="send" type="submit" aria-label="Send">
+                <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M6 11V1M1.5 5.5 6 1l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <button class="ds-btn ds-btn--secondary ws-send" id="stop" type="button" aria-label="Stop generating" hidden>
+                <span class="ws-stop-glyph"></span>
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <p class="ds-caption ws-hint">
+          Enter sends · <kbd class="ds-kbd">⇧</kbd><kbd class="ds-kbd">↵</kbd> new line · <kbd class="ds-kbd">⌘</kbd><kbd class="ds-kbd">K</kbd> to search
+        </p>
+      </div>
+    </div>
+
+<style>
+  /* The tree and conversation rows are painted by the script below, so their
+     glue is reached through `:global(...)` — scoped selectors never match nodes
+     made at runtime. The rail is white now, so the rows wear the field's own
+     inks. */
+
+  :global(.ws-conv) { display: block; }
+  :global(.ws-conv__body) { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-width: 0; }
+  :global(.ws-conv__text) { flex: 1; min-width: 0; }
+  :global(.ws-conv__title) { font-size: var(--text-small); color: inherit; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  :global(.ws-conv__tag) { margin-top: var(--space-1); }
+  :global(.ws-conv__snippet) { display: block; font-size: var(--text-caption); color: rgb(var(--ink-muted)); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── The page's own surfaces ───────────────────────────────────────────
+     The sheet, its header and the trail belong to the shell. What is left is
+     what only this page has: a thread that scrolls and a composer pinned below
+     it, which is why the layout is asked to stop scrolling on our behalf. */
+  .ws-thread { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-4) var(--space-8) var(--space-8); }
+  .ws-thread > .ds-log { display: flex; flex-direction: column; flex: 1; width: 100%; }
+  /* Centred with auto margins, like /home's greeting block: geometry that
+     degrades to a scroll on short viewports rather than clipping. */
+  .ws-thread :global([data-empty]) { margin-block: auto; }
+  .ws-foot { padding: var(--space-3) var(--space-8) var(--space-4); flex-shrink: 0; }
+  .ws-foot__inner { max-width: var(--measure-read); margin-inline: auto; }
+  /* `display: flex` would otherwise defeat the `hidden` attribute the script
+     toggles, pinning the pill on screen while the view is already following. */
+  .ws-jump { display: flex; justify-content: center; margin-bottom: var(--space-3); }
+  .ws-jump[hidden] { display: none; }
+  .ws-hint { margin: var(--space-3) 0 0; color: rgb(var(--ink-muted)); text-align: center; }
+  .ws-hint .ds-kbd { margin-inline: 1px; }
+
+  .ws-send { width: 2rem; padding: 0; flex-shrink: 0; }
+  .ws-stop-glyph { width: 0.5rem; height: 0.5rem; background: currentColor; }
+
+  @media (max-width: 60rem) {
+    .ws-thread, .ws-foot { padding-inline: var(--space-4); }
+  }
+</style>
+
+<script>
+  import {
+    streamChat, listConversations, getConversation,
+    renameConversation, deleteConversation, deleteAllConversations, buildCorrectionCard,
+    type ChatMessage, type ConversationSummary,
+  } from '../../lib/owlChat';
+  import { createThread, tierOf, type Thread } from '../../lib/owlThread';
+  import {
+    listProjects, listFolders, createProject, updateProject, deleteProject,
+    createFolder, renameFolder, deleteFolder, moveConversation, setPinned,
+    setArchived, searchMessages,
+    type Project, type Folder, type SearchHit,
+  } from '../../lib/owlWorkspace';
+  import { enableGrowingFields } from '../../design-system/grow';
+  import { requireSession } from '../../lib/session';
+  import { toast, dialog, menu } from '../../lib/overlays';
+  import { el } from '../../lib/dom';
+
+  // ─── Element handles ──────────────────────────────────────────────────────
+
+  const railToggle   = el<HTMLButtonElement>('rail-toggle');
+  const searchInput  = el<HTMLInputElement>('search');
+  const projectsEl   = el('projects');
+  const recentEl     = el('recent');
+  const deleteAllBtn = el<HTMLButtonElement>('delete-all');
+  const treeGroups   = el('tree-groups');
+  const resultsGroup = el('results-group');
+  const resultsHead  = el('results-head');
+  const resultsList  = el('results-list');
+  const reading      = el('reading');
+  const thread       = el('thread');
+  const form         = el<HTMLFormElement>('composer');
+  const input        = el<HTMLTextAreaElement>('input');
+  const sendBtn      = el<HTMLButtonElement>('send');
+  const stopBtn      = el<HTMLButtonElement>('stop');
+  const jumpWrap     = el('jump-wrap');
+  const crumbProject = el('crumb-project');
+  const crumbTitle   = el('crumb-here');
+  const contextMark  = el('context-mark');
+  const convMenuWrap = el('conv-menu-wrap');
+  const convMenuBtn  = el<HTMLButtonElement>('conv-menu');
+
+  // ─── State ────────────────────────────────────────────────────────────────
+
+  /** Everything the workspace needs to render itself. Kept in one object so a
+   *  reload is always a full, consistent redraw rather than a patch. */
+  const state = {
+    projects: [] as Project[],
+    folders: new Map<string, Folder[]>(),   // projectId → nested folders
+    conversations: [] as ConversationSummary[],
+    open: new Set<string>(),                // expanded project/folder ids
+    conversationId: null as string | null,
+    projectId: null as string | null,       // the project a NEW conversation joins
+    // An analysed call this conversation is grounded in. `/api/owl/stream` scopes
+    // the vault to that call and exposes its transcript through a tool, so the
+    // whole feature turns on this id reaching the request.
+    callId: null as string | null,
+    streaming: false,
+  };
+
+  const messages: ChatMessage[] = [];
+  let abort: AbortController | null = null;
+
+  const OPEN_KEY = 'owl:openNodes';
+  const loadOpen = () => {
+    try { return new Set<string>(JSON.parse(localStorage.getItem(OPEN_KEY) || '[]')); }
+    catch { return new Set<string>(); }
+  };
+  const saveOpen = () => {
+    try { localStorage.setItem(OPEN_KEY, JSON.stringify([...state.open])); } catch { /* non-fatal */ }
+  };
+
+  // ─── Small DOM helpers ────────────────────────────────────────────────────
+
+  const svg = (paths: string, size = 12) =>
+    `<svg width="${size}" height="${size}" viewBox="0 0 12 12" fill="none">${paths}</svg>`;
+
+  const ICON = {
+    chevron: svg('<path d="M4.2 2.4l3.6 3.6-3.6 3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>', 10),
+    folder: svg('<path d="M1 3.5A1 1 0 012 2.5h2.2l1 1.2H10a1 1 0 011 1v4.3a1 1 0 01-1 1H2a1 1 0 01-1-1z" stroke="currentColor" stroke-width="1.05" stroke-linejoin="round"/>'),
+    more: svg('<circle cx="2" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="10" cy="6" r="1" fill="currentColor"/>', 11),
+    pin: svg('<path d="M6 1.5v4.5M3.8 6h4.4L6 10z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>', 11),
+  };
+
+  // Escapes for BOTH text and quoted-attribute positions. `textContent` alone
+  // escapes `&`, `<` and `>` and leaves quotes intact — and `field()` below
+  // interpolates into `value="…"`, so a title containing a quote broke out of
+  // the attribute. Conversation and project names are user- and model-supplied,
+  // which makes that a live injection route, not a rendering nicety.
+  function esc(s: string): string {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ─── Rail: the tree ───────────────────────────────────────────────────────
+
+  function row(opts: {
+    label: string;
+    depth: number;
+    icon?: string;
+    trailing?: string;
+    active?: boolean;
+    onClick: () => void;
+    onMenu?: (anchor: HTMLElement) => void;
+  }): HTMLElement {
+    const r = document.createElement('div');
+    r.className = `ds-row${opts.depth ? ' ds-row--tree' : ''}${opts.active ? ' is-active' : ''}`;
+    r.style.setProperty('--depth', String(opts.depth));
+    r.tabIndex = 0;
+    r.setAttribute('role', 'button');
+    r.innerHTML = `
+      <span class="ds-row__icon">${opts.icon ?? ''}</span>
+      <span class="ds-row__label">${esc(opts.label)}</span>
+      ${opts.trailing ? `<span class="ds-mono">${esc(opts.trailing)}</span>` : ''}`;
+
+    if (opts.onMenu) {
+      const actions = document.createElement('span');
+      actions.className = 'ds-row__actions';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'ds-icon-btn ds-icon-btn--sm';
+      b.setAttribute('aria-label', `Options for ${opts.label}`);
+      b.innerHTML = ICON.more;
+      b.addEventListener('click', (e) => { e.stopPropagation(); opts.onMenu!(b); });
+      actions.appendChild(b);
+      r.appendChild(actions);
+    }
+
+    r.addEventListener('click', opts.onClick);
+    r.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opts.onClick(); }
+    });
+    return r;
+  }
+
+  function conversationRow(c: ConversationSummary, depth: number): HTMLElement {
+    const r = document.createElement('div');
+    const active = c.id === state.conversationId;
+    r.className = `ds-row ws-conv${depth ? ' ds-row--tree' : ''}${active ? ' is-active' : ''}`;
+    r.style.setProperty('--depth', String(depth));
+    r.tabIndex = 0;
+    r.setAttribute('role', 'button');
+
+    r.innerHTML = `
+      <span class="ws-conv__body">
+        <span class="ws-conv__text">
+          <p class="ws-conv__title">${esc(c.title || 'Conversation')}</p>
+          ${c.archived ? '<span class="ds-tag ws-conv__tag">archived</span>' : ''}
+        </span>
+        ${c.pinned ? `<span class="ds-row__icon" aria-label="Pinned">${ICON.pin}</span>` : ''}
+      </span>`;
+
+    const actions = document.createElement('span');
+    actions.className = 'ds-row__actions';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ds-icon-btn ds-icon-btn--sm';
+    b.setAttribute('aria-label', `Options for ${c.title}`);
+    b.innerHTML = ICON.more;
+    b.addEventListener('click', (e) => { e.stopPropagation(); conversationMenu(b, c); });
+    actions.appendChild(b);
+    r.querySelector('.ws-conv__body')!.appendChild(actions);
+
+    r.addEventListener('click', () => openConversation(c.id));
+    r.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openConversation(c.id); }
+    });
+    return r;
+  }
+
+  function renderTree(): void {
+    projectsEl.innerHTML = '';
+
+    if (state.projects.length === 0) {
+      projectsEl.innerHTML = `<div class="ds-empty ds-empty--inline"><p class="ds-empty__body">no projects yet</p></div>`;
+    }
+
+    for (const project of state.projects) {
+      const isOpen = state.open.has(project.id);
+      const twisty = `<span class="ds-twisty${isOpen ? ' is-open' : ''}">${ICON.chevron}</span>`;
+
+      projectsEl.appendChild(row({
+        label: project.name,
+        depth: 0,
+        icon: twisty,
+        trailing: project.conversation_count ? String(project.conversation_count) : undefined,
+        active: state.projectId === project.id && !state.conversationId,
+        onClick: () => toggleProject(project),
+        onMenu: (anchor) => projectMenu(anchor, project),
+      }));
+
+      if (!isOpen) continue;
+
+      // Folders, depth-first, then the project's own root conversations.
+      const walk = (folders: Folder[], depth: number) => {
+        for (const folder of folders) {
+          const open = state.open.has(folder.id);
+          projectsEl.appendChild(row({
+            label: folder.name,
+            depth,
+            icon: open ? `<span class="ds-twisty is-open">${ICON.chevron}</span>` : ICON.folder,
+            trailing: folder.conversation_count ? String(folder.conversation_count) : undefined,
+            onClick: () => { toggle(folder.id); renderTree(); },
+            onMenu: (anchor) => folderMenu(anchor, folder, project),
+          }));
+          if (!open) continue;
+          walk(folder.children || [], depth + 1);
+          state.conversations
+            .filter((c) => c.folder_id === folder.id)
+            .forEach((c) => projectsEl.appendChild(conversationRow(c, depth + 1)));
+        }
+      };
+      walk(state.folders.get(project.id) || [], 1);
+
+      state.conversations
+        .filter((c) => c.project_id === project.id && !c.folder_id)
+        .forEach((c) => projectsEl.appendChild(conversationRow(c, 1)));
+    }
+
+    // Unfiled conversations.
+    const loose = state.conversations.filter((c) => !c.project_id);
+    recentEl.innerHTML = '';
+    recentEl.className = 'ds-stagger';
+    if (loose.length === 0) {
+      recentEl.innerHTML = `<div class="ds-empty ds-empty--inline"><p class="ds-empty__body">nothing yet</p></div>`;
+    } else {
+      loose.forEach((c) => recentEl.appendChild(conversationRow(c, 0)));
+    }
+  }
+
+  const toggle = (id: string) => {
+    state.open.has(id) ? state.open.delete(id) : state.open.add(id);
+    saveOpen();
+  };
+
+  async function toggleProject(project: Project): Promise<void> {
+    toggle(project.id);
+    state.projectId = state.open.has(project.id) ? project.id : null;
+    if (state.open.has(project.id) && !state.folders.has(project.id)) {
+      try { state.folders.set(project.id, await listFolders(project.id)); }
+      catch { state.folders.set(project.id, []); }
+    }
+    renderTree();
+  }
+
+  // ─── Rail: menus ──────────────────────────────────────────────────────────
+
+  function projectMenu(anchor: HTMLElement, project: Project): void {
+    menu(anchor, [
+      { label: 'New conversation here', run: () => newConversation(project.id) },
+      { label: 'New folder…', run: () => promptNewFolder(project) },
+      'separator',
+      { label: 'Rename…', run: () => promptRenameProject(project) },
+      { label: 'Instructions…', run: () => promptInstructions(project) },
+      'separator',
+      { label: 'Delete project…', danger: true, run: () => confirmDeleteProject(project) },
+    ]);
+  }
+
+  function folderMenu(anchor: HTMLElement, folder: Folder, project: Project): void {
+    menu(anchor, [
+      { label: 'New subfolder…', run: () => promptNewFolder(project, folder.id) },
+      { label: 'Rename…', run: () => promptRenameFolder(folder, project) },
+      'separator',
+      { label: 'Delete folder…', danger: true, run: () => confirmDeleteFolder(folder, project) },
+    ]);
+  }
+
+  function conversationMenu(anchor: HTMLElement, c: ConversationSummary): void {
+    menu(anchor, [
+      { label: c.pinned ? 'Unpin' : 'Pin to top', run: () => togglePin(c) },
+      { label: 'Rename…', run: () => promptRenameConversation(c) },
+      { label: 'Move to…', run: () => promptMove(c) },
+      'separator',
+      c.archived
+        ? { label: 'Unarchive', run: () => setArchive(c, false) }
+        : { label: 'Archive', run: () => setArchive(c, true) },
+      { label: 'Delete…', danger: true, run: () => confirmDeleteConversation(c) },
+    ]);
+  }
+
+  // ─── Rail: actions ────────────────────────────────────────────────────────
+
+  const field = (name: string, label: string, value = '', placeholder = '') => `
+    <label class="ds-label" for="dlg-${name}">${esc(label)}</label>
+    <input class="ds-field" id="dlg-${name}" name="${name}" value="${esc(value)}" placeholder="${esc(placeholder)}" />`;
+
+  // Runs `work`, reporting a failure as a toast and a null return. Callers test
+  // the result for truthiness, so anything passed through here MUST resolve to a
+  // truthy value on success — a `Promise<void>` wrapper resolves `undefined` and
+  // its happy path reads as a failure, silently skipping everything after it.
+  async function guard<T>(work: () => Promise<T>): Promise<T | null> {
+    try { return await work(); }
+    catch (e: any) { toast(e?.message || 'Something went wrong'); return null; }
+  }
+
+  async function promptNewProject(): Promise<void> {
+    const values = await dialog({
+      title: 'New project',
+      body: `${field('name', 'Name', '', 'Northgate — timing refresh')}
+        <div class="mt-4">
+          <label class="ds-label" for="dlg-instructions">Standing instructions <span class="ds-label__optional">optional</span></label>
+          <textarea class="ds-field ds-textarea" id="dlg-instructions" name="instructions" placeholder="How Owl should approach everything in this project."></textarea>
+          <p class="ds-help">Applied to every conversation in this project.</p>
+        </div>`,
+      confirm: 'Create project',
+    });
+    if (!values?.name) return;
+    const created = await guard(() => createProject(values.name, values.instructions || ''));
+    if (!created) return;
+    state.open.add(created.id);
+    saveOpen();
+    await reload();
+    toast(`Project “${created.name}” created.`);
+  }
+
+  async function promptRenameProject(project: Project): Promise<void> {
+    const values = await dialog({
+      title: 'Rename project',
+      body: field('name', 'Name', project.name),
+      confirm: 'Rename',
+    });
+    if (!values?.name || values.name === project.name) return;
+    if (!await guard(() => updateProject(project.id, { name: values.name }))) return;
+    await reload();
+  }
+
+  async function promptInstructions(project: Project): Promise<void> {
+    const values = await dialog({
+      title: `Instructions — ${project.name}`,
+      body: `
+        <label class="ds-label" for="dlg-instructions">Standing instructions</label>
+        <textarea class="ds-field ds-textarea" id="dlg-instructions" name="instructions" placeholder="How Owl should approach everything in this project.">${esc(project.instructions || '')}</textarea>
+        <p class="ds-help">Reaches every conversation in this project. It shapes how Owl answers but never overrides Company Truth.</p>`,
+      confirm: 'Save',
+    });
+    if (values === null) return;
+    if (!await guard(() => updateProject(project.id, { instructions: values.instructions || '' }))) return;
+    await reload();
+    if (state.conversationId) await refreshContextMark();
+    toast('Instructions saved.');
+  }
+
+  async function confirmDeleteProject(project: Project): Promise<void> {
+    const count = project.conversation_count || 0;
+    const values = await dialog({
+      title: `Delete “${project.name}”?`,
+      body: `<p class="ds-small">Its folders go too. ${count
+        ? `Its ${count} conversation${count === 1 ? '' : 's'} will be unfiled, not deleted.`
+        : 'It holds no conversations.'}</p>`,
+      confirm: 'Delete project',
+      danger: true,
+    });
+    if (values === null) return;
+    const result = await guard(() => deleteProject(project.id));
+    if (!result) return;
+    state.open.delete(project.id);
+    saveOpen();
+    if (state.projectId === project.id) state.projectId = null;
+    await reload();
+    toast(result.conversations_unfiled
+      ? `Project deleted · ${result.conversations_unfiled} conversation${result.conversations_unfiled === 1 ? '' : 's'} unfiled.`
+      : 'Project deleted.');
+  }
+
+  async function promptNewFolder(project: Project, parentId: string | null = null): Promise<void> {
+    const values = await dialog({
+      title: parentId ? 'New subfolder' : `New folder in ${project.name}`,
+      body: field('name', 'Name', '', 'Discovery calls'),
+      confirm: 'Create folder',
+    });
+    if (!values?.name) return;
+    const created = await guard(() => createFolder(project.id, values.name, parentId));
+    if (!created) return;
+    state.open.add(project.id);
+    if (parentId) state.open.add(parentId);
+    saveOpen();
+    await reloadFolders(project.id);
+    renderTree();
+  }
+
+  async function promptRenameFolder(folder: Folder, project: Project): Promise<void> {
+    const values = await dialog({
+      title: 'Rename folder',
+      body: field('name', 'Name', folder.name),
+      confirm: 'Rename',
+    });
+    if (!values?.name || values.name === folder.name) return;
+    if (!await guard(() => renameFolder(folder.id, values.name))) return;
+    await reloadFolders(project.id);
+    renderTree();
+  }
+
+  async function confirmDeleteFolder(folder: Folder, project: Project): Promise<void> {
+    const values = await dialog({
+      title: `Delete “${folder.name}”?`,
+      body: `<p class="ds-small">Subfolders go too. Any conversations inside move to the project root — nothing is deleted.</p>`,
+      confirm: 'Delete folder',
+      danger: true,
+    });
+    if (values === null) return;
+    const result = await guard(() => deleteFolder(folder.id));
+    if (!result) return;
+    state.open.delete(folder.id);
+    saveOpen();
+    await Promise.all([reloadFolders(project.id), reloadConversations()]);
+    renderTree();
+    toast(result.conversations_released
+      ? `Folder deleted · ${result.conversations_released} moved to the project root.`
+      : 'Folder deleted.');
+  }
+
+  async function promptMove(c: ConversationSummary): Promise<void> {
+    // Every legal destination, flattened: unfiled, each project root, each folder.
+    const options: Array<{ value: string; label: string }> = [{ value: '', label: 'Unfiled' }];
+    for (const p of state.projects) {
+      options.push({ value: `${p.id}|`, label: p.name });
+      const walk = (folders: Folder[], prefix: string) => {
+        for (const f of folders) {
+          options.push({ value: `${p.id}|${f.id}`, label: `${prefix}${f.name}` });
+          walk(f.children || [], `${prefix}${f.name} / `);
+        }
+      };
+      walk(state.folders.get(p.id) || await loadFolders(p.id), `${p.name} / `);
+    }
+
+    const current = `${c.project_id || ''}${c.project_id ? '|' : ''}${c.folder_id || ''}`;
+    const values = await dialog({
+      title: 'Move conversation',
+      body: `
+        <label class="ds-label" for="dlg-dest">Destination</label>
+        <select class="ds-select" id="dlg-dest" name="dest">
+          ${options.map((o) => `<option value="${esc(o.value)}"${o.value === current ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}
+        </select>`,
+      confirm: 'Move',
+    });
+    if (values === null) return;
+
+    const [projectId, folderId] = (values.dest || '').split('|');
+    if (!await guard(() => moveConversation(c.id, projectId || null, folderId || null))) return;
+    if (projectId) { state.open.add(projectId); if (folderId) state.open.add(folderId); saveOpen(); }
+    await reload();
+    if (c.id === state.conversationId) await refreshContextMark();
+    toast('Moved.');
+  }
+
+  async function togglePin(c: ConversationSummary): Promise<void> {
+    if (!await guard(() => setPinned(c.id, !c.pinned))) return;
+    await reloadConversations();
+    renderTree();
+  }
+
+  async function setArchive(c: ConversationSummary, archived: boolean): Promise<void> {
+    if (!await guard(() => setArchived(c.id, archived))) return;
+    // Archiving clears it from the lists, so the open conversation has to go too.
+    // Unarchiving does not — it is already where you are looking.
+    if (archived && c.id === state.conversationId) newConversation(state.projectId);
+    await reloadConversations();
+    renderTree();
+    toast(archived ? 'Archived. Search still finds it.' : 'Restored.');
+  }
+
+  async function promptRenameConversation(c: ConversationSummary): Promise<void> {
+    const values = await dialog({
+      title: 'Rename conversation',
+      body: field('title', 'Title', c.title),
+      confirm: 'Rename',
+    });
+    if (!values?.title || values.title === c.title) return;
+    if (!await guard(() => renameConversation(c.id, values.title))) return;
+    if (c.id === state.conversationId) crumbTitle.textContent = values.title;
+    await reloadConversations();
+    renderTree();
+  }
+
+  async function confirmDeleteConversation(c: ConversationSummary): Promise<void> {
+    const values = await dialog({
+      title: `Delete “${c.title}”?`,
+      body: `<p class="ds-small">The transcript is destroyed and cannot be recovered. To keep it but clear it from your lists, archive it instead.</p>`,
+      confirm: 'Delete',
+      danger: true,
+    });
+    if (values === null) return;
+    if (!await guard(() => deleteConversation(c.id))) return;
+    if (c.id === state.conversationId) newConversation(state.projectId);
+    await reload();
+    toast('Deleted.');
+  }
+
+  async function confirmDeleteAllConversations(): Promise<void> {
+    // Counted from the server, including archived, so the number in the dialog
+    // is what will actually go — not what happens to be rendered in the rail.
+    const all = await listConversations({ includeArchived: true }).catch(() => null);
+    if (all === null) { toast('Could not count your conversations.'); return; }
+    if (all.length === 0) { toast('There are no conversations to delete.'); return; }
+
+    const filed = all.filter((c) => c.project_id).length;
+    const values = await dialog({
+      title: `Delete ${all.length} conversation${all.length === 1 ? '' : 's'}?`,
+      body: `<p class="ds-small">Every transcript is destroyed and cannot be recovered${
+        filed ? `, including the ${filed} filed in project${filed === 1 ? '' : 's'}` : ''
+      }. To clear your lists but keep the conversations, archive them instead.</p>`,
+      confirm: `Delete ${all.length === 1 ? 'it' : 'them all'}`,
+      danger: true,
+    });
+    if (values === null) return;
+
+    const result = await guard(() => deleteAllConversations());
+    if (!result) return;
+    newConversation();
+    await reload();
+    toast(`${result.deleted} conversation${result.deleted === 1 ? '' : 's'} deleted.`);
+  }
+
+  // ─── Rail: search ─────────────────────────────────────────────────────────
+
+  let searchTimer: number | undefined;
+
+  // The debounce spaces out when searches START; it says nothing about the order
+  // they FINISH in. Two in flight and the slower one landing last would paint
+  // results for a query the user has already moved on from.
+  let searchGeneration = 0;
+
+  async function runSearch(query: string): Promise<void> {
+    const generation = ++searchGeneration;
+    if (!query) {
+      resultsGroup.hidden = true;
+      treeGroups.hidden = false;
+      return;
+    }
+    treeGroups.hidden = true;
+    resultsGroup.hidden = false;
+    resultsList.innerHTML = `<div class="ds-empty ds-empty--inline"><p class="ds-empty__body">searching…</p></div>`;
+
+    const [convs, hits] = await Promise.all([
+      // Archived conversations are reachable ONLY here — the tree hides them —
+      // so search including them is what makes archiving reversible at all.
+      listConversations({ query, includeArchived: true }).catch(() => [] as ConversationSummary[]),
+      searchMessages(query, { limit: 30 }).catch(() => [] as SearchHit[]),
+    ]);
+    if (generation !== searchGeneration) return;   // a newer search has started
+
+    // A conversation whose title matched is shown once, at the top; message hits
+    // follow, each pointing at where the match actually is.
+    const titled = new Set(convs.map((c) => c.id));
+    resultsHead.textContent = `${convs.length + hits.length} result${convs.length + hits.length === 1 ? '' : 's'}`;
+    resultsList.innerHTML = '';
+
+    if (convs.length + hits.length === 0) {
+      resultsList.innerHTML = `<div class="ds-empty ds-empty--inline"><p class="ds-empty__body">no matches</p></div>`;
+      return;
+    }
+
+    convs.forEach((c) => resultsList.appendChild(conversationRow(c, 0)));
+
+    hits.filter((h) => !titled.has(h.conversation_id)).forEach((h) => {
+      const r = document.createElement('div');
+      r.className = 'ds-row ws-conv';
+      r.tabIndex = 0;
+      r.setAttribute('role', 'button');
+      r.innerHTML = `
+        <span class="ws-conv__body">
+          <span class="ws-conv__text">
+            <p class="ws-conv__title">${esc(h.title || 'Conversation')}</p>
+            <span class="ws-conv__snippet">${esc(h.snippet)}</span>
+          </span>
+        </span>`;
+      const open = () => openConversation(h.conversation_id);
+      r.addEventListener('click', open);
+      r.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+      });
+      resultsList.appendChild(r);
+    });
+  }
+
+  // ─── Thread ───────────────────────────────────────────────────────────────
+  // The transcript itself is shared with the drawer — one Owl, two placements.
+
+  const owlThread: Thread = createThread({
+    container: reading,
+    scroller: thread,
+    onNotice: toast,
+    onFollowChange: (following) => { jumpWrap.hidden = following; },
+  });
+
+  /** The Cadence mark, sized for an empty state. */
+  const MARK = `
+    <svg width="30" height="30" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <rect x="2.6" y="6.5" width="2.6" height="7" rx="1.3" fill="rgb(var(--ink-muted))"/>
+      <rect x="6.9" y="3.5" width="2.6" height="13" rx="1.3" fill="rgb(var(--ink-muted))"/>
+      <rect x="11.2" y="1.5" width="2.6" height="17" rx="1.3" fill="rgb(var(--accent))"/>
+      <rect x="15.5" y="5" width="2.6" height="10" rx="1.3" fill="rgb(var(--ink-muted))"/>
+    </svg>`;
+
+  function renderEmpty(): void {
+    const project = state.projects.find((p) => p.id === state.projectId);
+    owlThread.setEmptyState(`
+      <div class="ds-empty">
+        ${MARK}
+        <p class="ds-empty__title">Ask Owl anything</p>
+        <p class="ds-small ds-empty__body">${project
+          ? `You're in <strong>${esc(project.name)}</strong>, so this conversation inherits its standing instructions.`
+          : 'Your Acme knowledge partner — products, protocols, and the calls you have already had.'}</p>
+      </div>`);
+  }
+
+  el<HTMLButtonElement>('jump').addEventListener('click', () => owlThread.follow());
+
+  // ─── Conversation lifecycle ───────────────────────────────────────────────
+
+  function setCrumb(title: string): void {
+    const project = state.projects.find((p) => p.id === currentProjectId());
+    crumbProject.textContent = project?.name ?? '';
+    crumbProject.hidden = !project;
+    crumbTitle.textContent = title;
+  }
+
+  function currentProjectId(): string | null {
+    if (state.conversationId) {
+      const c = state.conversations.find((x) => x.id === state.conversationId);
+      if (c) return c.project_id ?? null;
+    }
+    return state.projectId;
+  }
+
+  /** The indicator states a fact: this conversation's project has instructions
+   *  that are reaching the prompt. It is not a toggle, because nothing in the
+   *  backend can currently switch them off per conversation. */
+  async function refreshContextMark(): Promise<void> {
+    const id = currentProjectId();
+    const project = id ? state.projects.find((p) => p.id === id) : null;
+    contextMark.hidden = !(project && project.instructions.trim());
+  }
+
+  // Which conversation is open belongs in the address, not in local storage.
+  // Stored, `/owl` from the rail silently resumed whatever was open last, and
+  // there was no way to ask for a new chat; in the URL a reload still lands
+  // where it was, and a bare `/owl` means what it says.
+  function rememberConversation(id: string | null): void {
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set('c', id);
+    else url.searchParams.delete('c');
+    history.replaceState(null, '', url);
+  }
+
+  function newConversation(projectId: string | null = null): void {
+    turnEpoch += 1;
+    if (state.streaming) { abort?.abort(); setStreaming(false); }
+    state.conversationId = null;
+    state.projectId = projectId;
+    // A new conversation is not about the previous one's call. Left set, every
+    // later chat would silently carry a stale call's vault scope.
+    state.callId = null;
+    rememberConversation(null);
+    messages.length = 0;
+    convMenuWrap.hidden = true;
+    owlThread.follow();
+    setCrumb('New conversation');
+    renderEmpty();
+    refreshContextMark();
+    renderTree();
+    input.focus();
+  }
+
+  async function openConversation(id: string): Promise<boolean> {
+    turnEpoch += 1;
+    if (state.streaming) { abort?.abort(); setStreaming(false); }
+    owlThread.setEmptyState(`<div class="ds-empty"><p class="ds-empty__body">loading…</p></div>`);
+    try {
+      const session = await getConversation(id);
+      state.conversationId = id;
+      state.projectId = session.project_id ?? null;
+      // Grounding is not persisted with a conversation, so reopening one drops it
+      // rather than pretending it was remembered.
+      state.callId = null;
+      rememberConversation(id);
+      messages.length = 0;
+      owlThread.clear();
+
+      const tier = tierOf(session.model_used);
+      (session.messages || []).forEach((m: ChatMessage) => {
+        if (m.role === 'user') owlThread.appendQuestion(m.content, '');
+        else owlThread.createAnswer(tier).finalise(m.content);
+        messages.push({ role: m.role, content: m.content });
+      });
+
+      // A reload is not new information. The builder stamps arrival on every
+      // entry it makes, so restored entries are settled here, before paint —
+      // only what this session actually produces arrives.
+      reading.querySelectorAll<HTMLElement>('.ds-arrive').forEach((node) => {
+        node.classList.remove('ds-arrive');
+        node.style.removeProperty('--arrive');
+      });
+
+      setCrumb(session.title || 'Conversation');
+      convMenuWrap.hidden = false;
+      await refreshContextMark();
+      renderTree();
+      owlThread.follow();
+      input.focus();
+      return true;
+    } catch {
+      owlThread.setEmptyState(`<div class="ds-empty"><p class="ds-empty__body">could not load this conversation</p></div>`);
+      return false;
+    }
+  }
+
+  function setStreaming(active: boolean): void {
+    state.streaming = active;
+    input.disabled = active;
+    sendBtn.hidden = active;
+    stopBtn.hidden = !active;
+  }
+
+  // Bumped whenever the conversation is torn down. A turn that outlives its own
+  // conversation compares this on the way out and writes nothing.
+  let turnEpoch = 0;
+
+  async function send(text: string): Promise<void> {
+    if (state.streaming || !text.trim()) return;
+    const epoch = turnEpoch;
+    const firstTurn = state.conversationId === null;
+    // Stands in until the server names the conversation from the exchange
+    // (`onTitle`, below) — a question is not a title, but it is what we have
+    // while the answer is still streaming.
+    if (firstTurn) setCrumb(text.slice(0, 80));
+
+    owlThread.appendQuestion(text);
+    messages.push({ role: 'user', content: text });
+
+    setStreaming(true);
+    abort = new AbortController();
+    const answer = owlThread.createAnswer();
+    let failed = false;
+
+    await streamChat({
+      messages,
+      conversationId: state.conversationId,
+      callId: state.callId,
+      projectId: firstTurn ? state.projectId : null,
+      signal: abort.signal,
+      onConvId: (id) => { state.conversationId = id; rememberConversation(id); convMenuWrap.hidden = false; },
+      onModel: (m) => answer.setTier(m),
+      onText: (_delta, full) => answer.setText(full),
+      onTitle: (t) => setCrumb(t),
+      onCorrection: (c) => owlThread.append(buildCorrectionCard(c)),
+      onError: (msg) => { failed = true; answer.fail(msg); },
+      onDone: (full) => {
+        if (epoch !== turnEpoch) return;   // this turn's conversation is gone
+        if (failed) return; // fail() already settled whatever had streamed
+        // An empty answer settles the entry rather than removing it: the entry
+        // holds the question too, and the server has already stored that.
+        if (full) { answer.finalise(full); messages.push({ role: 'assistant', content: full }); }
+        else answer.finalise('');
+      },
+    });
+
+    if (epoch !== turnEpoch) return;
+    setStreaming(false);
+    abort = null;
+    await reloadConversations();
+    renderTree();
+    if (firstTurn) input.focus();
+  }
+
+  // ─── Data loading ─────────────────────────────────────────────────────────
+
+  async function loadFolders(projectId: string): Promise<Folder[]> {
+    const folders = await listFolders(projectId).catch(() => [] as Folder[]);
+    state.folders.set(projectId, folders);
+    return folders;
+  }
+
+  const reloadFolders = loadFolders;
+
+  async function reloadConversations(): Promise<void> {
+    state.conversations = await listConversations({}).catch(() => [] as ConversationSummary[]);
+  }
+
+  async function reload(): Promise<void> {
+    const [projects] = await Promise.all([
+      listProjects().catch(() => [] as Project[]),
+      reloadConversations(),
+    ]);
+    state.projects = projects;
+    // Only the expanded projects need their folders — the rest load on open.
+    await Promise.all(projects.filter((p) => state.open.has(p.id)).map((p) => loadFolders(p.id)));
+    renderTree();
+    await refreshContextMark();
+  }
+
+  // ─── Events ───────────────────────────────────────────────────────────────
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = input.value;
+    input.value = '';
+    input.style.height = '';
+    send(text);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
+  });
+
+  stopBtn.addEventListener('click', () => abort?.abort());
+  el<HTMLButtonElement>('new-chat').addEventListener('click', () => newConversation(state.projectId));
+  deleteAllBtn.addEventListener('click', () => { void confirmDeleteAllConversations(); });
+  el<HTMLButtonElement>('new-project').addEventListener('click', promptNewProject);
+
+  convMenuBtn.addEventListener('click', () => {
+    const c = state.conversations.find((x) => x.id === state.conversationId);
+    if (c) conversationMenu(convMenuBtn, c);
+  });
+
+  searchInput.addEventListener('input', () => {
+    window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(() => runSearch(searchInput.value.trim()), 220);
+  });
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { searchInput.value = ''; runSearch(''); searchInput.blur(); }
+  });
+
+  /**
+   * The rail's open state and its preference belong to the shell, which remembers
+   * it under one key for the whole platform. The workspace only ever needs to
+   * *open* it — clicking the shell's own toggle keeps the two in step without a
+   * second source of truth.
+   */
+  function openRail(): void {
+    if (document.body.classList.contains('is-closed')) railToggle.click();
+  }
+
+  // ⌘K is the one shortcut anyone must know: it goes to search.
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      openRail();
+      searchInput.focus();
+      searchInput.select();
+    }
+  });
+
+  // ─── Boot ─────────────────────────────────────────────────────────────────
+
+  (async () => {
+    enableGrowingFields();
+    state.open = loadOpen();
+    // The shell has already gated on the session and painted the rail's user
+    // block, so the workspace no longer repeats it — which is also how it gains
+    // the admin link and sandbox toggle it never used to show.
+    const user = await requireSession();
+    if (!user) return;
+
+    await reload();
+
+    const params = new URLSearchParams(window.location.search);
+    // A stale or foreign `?c=` must not strand the page on an error with the
+    // dead id still in the address — it falls back to a fresh conversation.
+    const restore = params.get('c');
+    if (!restore || !await openConversation(restore)) newConversation();
+
+    // A question handed over from another surface — the home's composer, or
+    // "Ask Owl" on a call analysis. Until now only `?c=` was read, so those
+    // handoffs opened Owl and silently dropped what was being asked.
+    //
+    // It arrives in the composer rather than being sent: the sender does not
+    // know whether the wording is final, and spending a turn on their behalf is
+    // not ours to decide. `&send=1` is the opt-in for a question already committed to.
+    const handed = (params.get('q') || '').trim();
+    const grounding = (params.get('call_id') || '').trim();
+
+    if (handed) {
+      newConversation();
+      input.value = handed;
+      input.dispatchEvent(new Event('input'));   // let the field grow to fit
+      input.focus();
+    }
+
+    // Applied before any auto-send: `requestSubmit()` runs `send()` synchronously,
+    // so grounding set after it would arrive a turn too late.
+    if (grounding) state.callId = grounding;
+
+    if (handed && params.get('send') === '1') form.requestSubmit();
+  })();
+</script>
+</PlatformLayout>

@@ -1,0 +1,343 @@
+---
+/**
+ * Agents — the launcher.
+ *
+ * Every agent in one place, laid out the way a desktop lays out its applications:
+ * marks lead, you scan by shape, you type to narrow, you press to open. The rail
+ * carries at most three, chosen here.
+ *
+ * Built on `.ds-page`, like Knowledge and X-ray, rather than on page CSS of its
+ * own. That is not a detail — it is why the first version looked unfinished. It
+ * hand-rolled its head and hard-capped its grid, so it sat left in a third of the
+ * sheet while every other page in the product is a centred column. `.ds-page` has
+ * no width of its own: auto inline margins make it size to its widest child and
+ * centre, so the grid's width sets the column and everything lines up under it by
+ * construction rather than by agreement.
+ *
+ * Grouped by `stage` from `platform.ts`, because eleven marks in one grid answer
+ * "what exists" and never "which do I need first". Pinned first, so what you are
+ * configuring is visible while you configure it.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import { AGENTS, STAGES } from '../../../lib/platform';
+import { appSymbol } from '../../../lib/appSymbols';
+import { icon } from '../../../lib/icons';
+
+const MAX_PINNED = 3;
+/** A flat running index, so the arrival stagger reads across the whole page. */
+let arrival = 0;
+---
+<PlatformLayout title="Agents">
+  <div class="ds-page">
+    <header class="ds-page__head ds-arrive">
+      <p class="ds-eyebrow">Work</p>
+      <h1 class="ds-heading ds-page__title">Agents</h1>
+      <p class="ds-body ds-page__intro">
+        Each does one job. Owl runs them for you when a question calls for one, or open
+        one directly. Pin up to {MAX_PINNED} to keep them in the rail.
+      </p>
+    </header>
+
+    <div class="ds-search ag-find ds-arrive" style="--arrive: var(--dur-step)">
+      <span class="ds-search__icon" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="6" cy="6" r="4.25" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M9.2 9.2L12.5 12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <input class="ds-search__input" id="ag-filter" type="search" autocomplete="off"
+             placeholder="Type to filter…" aria-label="Filter agents" />
+      <span class="ds-mono ag-find__count" id="ag-count"></span>
+    </div>
+
+    <!-- Pinned. Rendered empty and filled from storage, because which agents are
+         pinned is only known in the browser. -->
+    <section class="ag-section" id="ag-pinned-section" hidden>
+      <div class="ag-section__head">
+        <h2 class="ds-eyebrow">In your rail</h2>
+        <span class="ds-mono ag-section__count" id="ag-pinned-count"></span>
+      </div>
+      <div class="ag-grid" id="ag-pinned"></div>
+    </section>
+
+    {STAGES.map((stage) => {
+      const members = AGENTS.filter((agent) => agent.stage === stage.id);
+      return (
+        <section class="ag-section" data-stage={stage.id}>
+          <div class="ag-section__head">
+            <h2 class="ds-eyebrow">{stage.label}</h2>
+            <span class="ds-mono ag-section__count">{members.length}</span>
+          </div>
+          <div class="ag-grid">
+            {members.map((agent) => (
+              <article class="ag-tile ds-tip ds-arrive" style={`--arrive: calc(var(--dur-step) * ${arrival += 1})`}
+                       data-agent={agent.slug} data-name={agent.name.toLowerCase()}
+                       data-does={agent.does.toLowerCase()}>
+                <a class="ag-tile__open" href={agent.href}>
+                  <span class="ag-tile__mark"
+                        style={`--wash: var(--app-${agent.stage}); --app-edge: var(--app-${agent.stage}-edge)`}
+                        set:html={appSymbol(agent.slug)} />
+                  <span class="ag-tile__name">{agent.name}</span>
+                </a>
+                <button class="ds-icon-btn ag-tile__pin" type="button"
+                        data-pin={agent.slug} aria-pressed="false"
+                        aria-label={`Pin ${agent.name} to the rail`} set:html={icon('pin')} />
+                <span class="ds-tip__body ag-tile__does">{agent.does}</span>
+              </article>
+            ))}
+          </div>
+        </section>
+      );
+    })}
+
+    <p class="ds-body ag-empty" id="ag-empty" hidden>Nothing matches that.</p>
+  </div>
+
+  <style>
+    /* Screen-level layout only. Everything visual comes from the design system;
+       these rules place its components and hold nothing of its own. */
+
+    /* The grid carries a definite width and `.ds-page` takes its column from it.
+       Five to a row is what makes each stage read as one line rather than as a
+       block that happens to wrap. */
+    .ag-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      width: 45rem;
+      gap: var(--space-2);
+    }
+
+    .ag-find { margin-bottom: var(--space-10); }
+    .ag-find__count { color: rgb(var(--ink-muted)); flex-shrink: 0; }
+
+    .ag-section { margin-bottom: var(--space-10); }
+    .ag-section[hidden] { display: none; }
+    /* Label left, count right, on a hairline. The count is the machine talking,
+       so it is mono — and the rule gives the two something to sit on, which is
+       the one place on this page where space alone could not do the job. */
+    .ag-section__head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid rgb(var(--rule-hairline));
+      margin-bottom: var(--space-5);
+    }
+    .ag-section__count { color: rgb(var(--ink-muted)); }
+
+    .ag-tile { position: relative; display: flex; }
+    .ag-tile[hidden] { display: none; }
+    .ag-tile__open {
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-2) var(--space-4);
+      border-radius: var(--radius-lg);
+      text-decoration: none; color: rgb(var(--ink));
+    }
+
+    /* The mark. The stage names itself three ways and the mark identifies the
+       agent: a wash tile, a charcoal face, and the stage's saturated hue in the
+       symbol's inlaid edge. Eleven hues chosen per agent said nothing; eleven
+       saturated tiles read as eleven coloured regions, which is why the tile is
+       a wash. The tile sets `--app-edge` and the drawing reads it, so one
+       drawing serves all three stages (see `lib/appSymbols.ts`). */
+    .ag-tile__mark {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 4rem; height: 4rem;
+      border-radius: var(--radius-app);
+      background: rgb(var(--wash));
+      box-shadow: var(--shadow-flat);
+      transition: transform var(--dur-tap) var(--ease-settle),
+                  box-shadow var(--dur-tick) var(--ease-phase);
+    }
+    .ag-tile__mark :global(svg) { width: 2rem; height: 2rem; }
+    /* It lifts toward the pointer rather than changing colour — the tint is the
+       stage and must not move when you merely point at an agent. */
+    .ag-tile__open:hover .ag-tile__mark,
+    .ag-tile__open:focus-visible .ag-tile__mark {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-raised);
+    }
+    /* Acknowledged on the way down, on the mark itself: the thing being pressed
+       is the app, not the cell it sits in. */
+    .ag-tile__open:active .ag-tile__mark { transform: scale(0.94); }
+
+    .ag-tile__name {
+      font-size: var(--text-small); line-height: var(--leading-snug);
+      color: rgb(var(--ink-secondary));
+    }
+    .ag-tile__open:hover .ag-tile__name { color: rgb(var(--ink)); }
+    /* The sentence is the system's tooltip, not a line in the tile: it costs no
+       layout, and `.ds-tip` already answers to hover and focus-within. */
+    .ag-tile__does { width: max-content; max-width: 15rem; white-space: normal; text-align: center; }
+
+    /* A second action on the same object, so it waits for hover or focus. A chip
+       of its own, because it sits on a coloured mark and cannot borrow contrast
+       from a tint it does not control. */
+    .ag-tile__pin {
+      position: absolute; top: 0; left: calc(50% + 1.375rem);
+      width: 1.375rem; height: 1.375rem;
+      background: rgb(var(--surface));
+      color: rgb(var(--ink-secondary));
+      border-radius: var(--radius-full);
+      box-shadow: var(--shadow-raised);
+      opacity: 0; transition: opacity var(--dur-tick) var(--ease-phase);
+    }
+    .ag-tile__pin :global(svg) { width: 0.75rem; height: 0.75rem; }
+    .ag-tile:hover .ag-tile__pin,
+    .ag-tile__pin:focus-visible,
+    .ag-tile__pin[aria-pressed='true'] { opacity: 1; }
+    .ag-tile__pin[aria-pressed='true'] { background: rgb(var(--ink)); color: rgb(var(--ink-on-ink)); }
+
+    .ag-empty { color: rgb(var(--ink-muted)); }
+
+    @media (max-width: 60rem) {
+      .ag-grid { width: 100%; grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
+
+  <script>
+    import { el } from '../../../lib/dom';
+    import { toast } from '../../../lib/overlays';
+    import { MAX_PINNED_AGENTS, readPinned, writePinned } from '../../../lib/pins';
+
+    const filter = el<HTMLInputElement>('ag-filter');
+    const count = el('ag-count');
+    const empty = el('ag-empty');
+    const pinnedSection = el('ag-pinned-section');
+    const pinnedCount = el('ag-pinned-count');
+    const pinnedGrid = el('ag-pinned');
+    const sections = [...document.querySelectorAll<HTMLElement>('.ag-section[data-stage]')];
+    const tiles = () => [...document.querySelectorAll<HTMLElement>('.ag-tile')];
+    const total = document.querySelectorAll('.ag-section[data-stage] .ag-tile').length;
+
+    /**
+     * The pinned row is a live copy of the tiles it mirrors, so an agent's mark,
+     * name and press behaviour are defined once. Rebuilt outright on every change
+     * rather than patched — three nodes are cheaper to redraw than to reconcile.
+     */
+    function renderPinned(pinned: string[]): void {
+      pinnedGrid.replaceChildren(...pinned.flatMap((slug) => {
+        const source = document.querySelector<HTMLElement>(
+          `.ag-section[data-stage] .ag-tile[data-agent="${slug}"]`,
+        );
+        if (!source) return [];
+        const copy = source.cloneNode(true) as HTMLElement;
+        copy.removeAttribute('style');          // the stagger belongs to the original
+        copy.classList.remove('ds-arrive');
+        return [copy];
+      }));
+      pinnedCount.textContent = `${pinned.length} of ${MAX_PINNED_AGENTS}`;
+      pinnedSection.hidden = pinned.length === 0;
+    }
+
+    /** Paint every pin control from the stored list, so state has one source. */
+    function render(): void {
+      const pinned = readPinned();
+      renderPinned(pinned);
+      for (const button of document.querySelectorAll<HTMLButtonElement>('[data-pin]')) {
+        button.setAttribute('aria-pressed', String(pinned.includes(button.dataset.pin!)));
+      }
+    }
+
+    // Delegated, because the pinned row's controls are clones that did not exist
+    // when this ran.
+    document.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-pin]');
+      if (!button) return;
+      event.preventDefault();
+
+      const slug = button.dataset.pin!;
+      const pinned = readPinned();
+      const already = pinned.includes(slug);
+
+      if (!already && pinned.length >= MAX_PINNED_AGENTS) {
+        toast(`The rail holds ${MAX_PINNED_AGENTS} agents. Unpin one first.`);
+        return;
+      }
+      writePinned(already ? pinned.filter((s) => s !== slug) : [...pinned, slug]);
+      render();
+    });
+
+    // Filtering matches the name and what the agent does, because someone looking
+    // for "the one that drafts the email" is not searching for "Composer".
+    function applyFilter(): void {
+      const query = filter.value.trim().toLowerCase();
+      for (const tile of tiles()) {
+        tile.hidden = Boolean(query)
+          && !tile.dataset.name!.includes(query)
+          && !tile.dataset.does!.includes(query);
+      }
+      // A heading over nothing is worse than no heading.
+      for (const section of sections) {
+        section.hidden = !section.querySelector('.ag-tile:not([hidden])');
+      }
+      pinnedSection.hidden = Boolean(query) || readPinned().length === 0;
+
+      const shown = sections.filter((section) => !section.hidden)
+        .reduce((n, section) => n + section.querySelectorAll('.ag-tile:not([hidden])').length, 0);
+      count.textContent = query ? `${shown} of ${total}` : `${total} agents`;
+      empty.hidden = shown > 0;
+    }
+    filter.addEventListener('input', applyFilter);
+
+    // Type anywhere to filter, as a launcher does; Escape gives the page back.
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && document.activeElement === filter) {
+        filter.value = '';
+        applyFilter();
+        filter.blur();
+        return;
+      }
+      const typing = document.activeElement === filter
+        || (document.activeElement as HTMLElement)?.isContentEditable;
+      if (typing || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key.length === 1 && event.key !== ' ') filter.focus();
+    });
+
+    /**
+     * Arrow keys walk the grid.
+     *
+     * Up and down move geometrically — to the nearest tile in the row above or
+     * below, by horizontal centre — rather than by a fixed stride. There is no one
+     * row width: `In your rail` holds up to three and the stages hold two to five.
+     */
+    document.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+      const open = (document.activeElement as HTMLElement)?.closest<HTMLElement>('.ag-tile__open');
+      if (!open) return;
+
+      const links = [...document.querySelectorAll<HTMLElement>('.ag-tile:not([hidden]) .ag-tile__open')];
+      const here = links.indexOf(open);
+      if (here < 0) return;
+      event.preventDefault();
+
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        links[Math.min(links.length - 1, Math.max(0, here + (event.key === 'ArrowLeft' ? -1 : 1)))]?.focus();
+        return;
+      }
+
+      const from = open.getBoundingClientRect();
+      const up = event.key === 'ArrowUp';
+      // A tolerance keeps sub-pixel layout differences from reading as rows.
+      const candidates = links.filter((link) => {
+        const top = link.getBoundingClientRect().top;
+        return up ? top < from.top - 4 : top > from.top + 4;
+      });
+      if (!candidates.length) return;
+
+      const edge = up
+        ? Math.max(...candidates.map((l) => l.getBoundingClientRect().top))
+        : Math.min(...candidates.map((l) => l.getBoundingClientRect().top));
+      const centre = from.left + from.width / 2;
+      candidates
+        .filter((l) => Math.abs(l.getBoundingClientRect().top - edge) < 4)
+        .sort((a, b) => {
+          const off = (r: DOMRect) => Math.abs(r.left + r.width / 2 - centre);
+          return off(a.getBoundingClientRect()) - off(b.getBoundingClientRect());
+        })[0]?.focus();
+    });
+
+    render();
+    applyFilter();
+  </script>
+</PlatformLayout>

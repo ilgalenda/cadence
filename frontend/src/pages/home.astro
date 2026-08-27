@@ -1,0 +1,209 @@
+---
+/**
+ * Home — what opens when Cadence launches: Owl, empty, ready.
+ *
+ * Built to `preview/screen-cadence-home.html`. The composer is the centre of
+ * gravity: a greeting above it, one quiet hint line beneath it, and one sunken
+ * card of ways out below. Nothing else competes for the middle of the screen.
+ *
+ * The composer hands its question to the Owl workspace rather than streaming
+ * here. One conversation implementation, not two: pressing Enter *is* the
+ * transition from an empty home into the conversation.
+ *
+ * Everything the page removed is still reachable — the rail lists every surface,
+ * and the three shortcuts below cover the ones a person actually starts from.
+ */
+import PlatformLayout from '../layouts/PlatformLayout.astro';
+import { icon } from '../lib/icons';
+
+/**
+ * The ways out. Three, and each lands where its label promises: a name that
+ * over-promises its destination costs more than the shortcut saves.
+ * Call history opens the library, where every analysed call is kept. Past Owl
+ * conversations are not orphaned by that: the rail lists Owl, and this page's
+ * own composer is the way into a conversation.
+ */
+const SHORTCUTS = [
+  { name: 'agents', label: 'Agents', href: '/work/agents', what: 'all eleven' },
+  { name: 'library', label: 'Call history', href: '/learn/library', what: 'every call analysed' },
+  { name: 'knowledge', label: 'Knowledge', href: '/learn/knowledge', what: 'what Owl knows' },
+] as const;
+---
+<PlatformLayout title="Home">
+  <div class="hm" id="hm">
+    <div class="hm__inner">
+      <!-- The greeting is completed, never replaced. The time of day needs no
+           network and paints immediately; the name arrives after the session
+           resolves and is appended, so nothing on screen is ever wrong. -->
+      <div class="hm-greet" data-reveal>
+        <svg width="36" height="36" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M4.2 7.2 5.2 2.4 9.6 5.3ZM15.8 7.2 14.8 2.4 10.4 5.3Z" fill="rgb(var(--ink))"/>
+          <path d="M4 10.2a6 6 0 0 1 12 0v1.4a6 6 0 0 1-12 0Z" fill="rgb(var(--ink))"/>
+          <circle cx="7.5" cy="9.9" r="2.5" fill="rgb(var(--surface))"/>
+          <circle cx="12.5" cy="9.9" r="2.5" fill="rgb(var(--surface))"/>
+          <circle cx="7.5" cy="9.9" r="1.15" fill="rgb(var(--accent))"/>
+          <circle cx="12.5" cy="9.9" r="1.15" fill="rgb(var(--accent))"/>
+          <path d="M10 11.6l1.15 2.1H8.85Z" fill="rgb(var(--surface))"/>
+        </svg>
+        <h1 class="ds-display hm-greet__line">
+          <span id="greeting-part"></span><span class="hm-greet__name" id="greeting-name"></span>
+        </h1>
+      </div>
+
+      <!-- The opening composer: asking is the only thing on this screen, so the
+           whole apparatus for it is one slab. `--open` is what the design system
+           means by nothing competing with the composer for the centre. -->
+      <form id="ask" data-reveal>
+        <div class="ds-composer ds-composer--open">
+          <textarea class="ds-composer__input" id="ask-input" rows="1"
+                    placeholder="Ask Owl, or name an agent to run…"
+                    aria-label="Ask Owl"></textarea>
+          <div class="ds-composer__bar">
+            <span class="ds-composer__gap"></span>
+            <button class="ds-icon-btn ds-icon-btn--fill" type="submit" aria-label="Send">
+              <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M6 11V1M1.5 5.5 6 1l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <!-- The one shortcut worth stating, stated once. Keys wear `.ds-kbd`; the
+           sentence around them is sans, per the doctrine on mono. -->
+      <p class="ds-small hm-sub" data-reveal>
+        Enter sends · <kbd class="ds-kbd">⌘</kbd> <kbd class="ds-kbd">K</kbd> for anything
+      </p>
+
+      <!-- The ways out. One sunken card, the system's row treatment inside it,
+           so this box and the agents index read as the same thing. -->
+      <nav class="ds-well hm-ways" aria-label="Shortcuts" data-reveal>
+        {SHORTCUTS.map((shortcut, index) => (
+          <a class="ds-row hm-way" href={shortcut.href}>
+            <span class="ds-row__icon" set:html={icon(shortcut.name)} />
+            <span class="ds-row__label">{shortcut.label}</span>
+            <span class="ds-mono hm-way__what">{shortcut.what}</span>
+            <span class="ds-mono hm-way__key">⌘{index + 1}</span>
+          </a>
+        ))}
+      </nav>
+    </div>
+  </div>
+
+  <style>
+    /* Screen-level layout only. Tone and type come from the design system;
+       these rules place its components and hold the hover choreography the
+       home preview defines for its own composition. */
+    /* The sheet scrolls, not this — one scroller, so one scrollbar. */
+    .hm {
+      flex: 1; min-height: 0;
+      display: flex; flex-direction: column;
+      padding: var(--space-10) var(--space-8) var(--space-12);
+    }
+    /* Centred with auto margins rather than `justify-content`, which centres by
+       distributing free space and so pushes the top of a tall stack out of reach
+       when there is none. Auto margins collapse to zero instead, leaving the
+       whole stack scrollable. */
+    .hm__inner {
+      width: 100%; max-width: var(--measure-read);
+      margin-inline: auto; margin-block: auto;
+    }
+
+    .hm-greet {
+      display: flex; flex-direction: column; align-items: center; gap: var(--space-5);
+      margin-bottom: var(--space-8); text-align: center;
+    }
+    .hm-greet__line { margin: 0; }
+    /* The appended name is the quieter half of the line, per the preview —
+       and hidden until it lands, so the line never reflows around it. */
+    .hm-greet__name { color: rgb(var(--ink-muted)); opacity: 0; }
+
+    .hm-sub { margin: var(--space-4) 0 0; text-align: center; }
+
+    /* The well holds rows, so its padding is the row gutter and nothing more. */
+    .hm-ways { margin-top: var(--space-8); padding: var(--space-2); }
+    /* The press is acknowledged on the way down, matching `.ds-btn:active`. */
+    .hm-way:active { transform: translateY(1px); }
+    .hm-way__what, .hm-way__key { flex: none; white-space: nowrap; }
+    /* The key takes no width: on hover it replaces the description rather than
+       crowding it, so neither ever truncates. */
+    .hm-way__key {
+      position: absolute; right: var(--space-3); top: 50%; transform: translateY(-50%);
+      opacity: 0; transition: opacity var(--dur-tick) var(--ease-phase);
+    }
+    .hm-way__what { transition: opacity var(--dur-tick) var(--ease-phase); }
+    .hm-way:hover .hm-way__what, .hm-way:focus-visible .hm-way__what { opacity: 0; }
+    .hm-way:hover .hm-way__key, .hm-way:focus-visible .hm-way__key { opacity: 1; }
+
+    /* Armed by script before the first paint. Without it nothing is hidden, so a
+       script that never runs leaves a readable page rather than an empty one. */
+    .hm[data-armed] [data-reveal] { opacity: 0; }
+
+    @media (max-width: 60rem) { .hm { padding: var(--space-8) var(--space-4) var(--space-10); } }
+  </style>
+
+  <script>
+    import { displayName, requireSession } from '../lib/session';
+    import { enableGrowingFields } from '../design-system/grow';
+    import { reveal } from '../design-system/springs';
+
+    const byId = (id: string) => document.getElementById(id)!;
+    const input = byId('ask-input') as HTMLTextAreaElement;
+
+    // Hide the stack before it can paint, then bring it in. Arming here rather
+    // than in the stylesheet is what makes the hiding conditional on this script.
+    byId('hm').setAttribute('data-armed', '');
+
+    // ── Ask ─────────────────────────────────────────────────────────────────
+    // The question goes to the workspace, which owns the one conversation
+    // implementation. `send=1` because the person pressed send here — they have
+    // committed to the wording.
+    byId('ask').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const question = input.value.trim();
+      if (!question) return;
+      window.location.href = `/owl?q=${encodeURIComponent(question)}&send=1`;
+    });
+
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        (byId('ask') as HTMLFormElement).requestSubmit();
+      }
+    });
+
+    // ⌘1 · ⌘2 · ⌘3 — the three shortcuts, in the order they are shown.
+    document.addEventListener('keydown', (event) => {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      const slot = Number(event.key);
+      if (!slot || slot > 3) return;
+      const row = document.querySelectorAll<HTMLAnchorElement>('.hm-way')[slot - 1];
+      if (row) { event.preventDefault(); window.location.href = row.href; }
+    });
+
+    // ── Greeting ────────────────────────────────────────────────────────────
+
+    /** Time of day, in the register the card uses. */
+    function partOfDay(hour: number): string {
+      if (hour < 12) return 'Morning';
+      if (hour < 18) return 'Afternoon';
+      return 'Evening';
+    }
+
+    byId('greeting-part').textContent = partOfDay(new Date().getHours());
+
+    (async () => {
+      const user = await requireSession();
+      if (!user) return;
+      const first = displayName(user).split(' ')[0];
+      const name = byId('greeting-name');
+      name.textContent = first ? `, ${first}.` : '.';
+      reveal([name]);
+    })();
+
+    // ── Arrival ─────────────────────────────────────────────────────────────
+
+    reveal([...document.querySelectorAll('[data-reveal]')]);
+
+    enableGrowingFields();
+    input.focus();
+  </script>
+</PlatformLayout>

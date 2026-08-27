@@ -1,11 +1,18 @@
 ---
 import { CADENCE_VERSION } from '../lib/version';
 ---
-<footer class="h-7 shrink-0 border-t border-rule-subtle bg-surface-1 flex items-center justify-between px-6">
-  <span class="text-[11px] font-mono text-ink-muted">// cadence</span>
-  <a
-    href="/changelog"
-    class="text-[11px] font-mono text-ink-muted hover:text-accent transition-colors duration-150 ease-decelerate"
-    title="View changelog"
-  >v{CADENCE_VERSION}</a>
+<footer class="foot">
+  <span class="ds-mono">cadence</span>
+  <a class="ds-mono foot__version" href="/changelog" title="View the changelog">v{CADENCE_VERSION}</a>
 </footer>
+
+<style>
+  .foot {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 1.75rem; padding: 0 var(--space-4);
+    border-top: 1px solid rgb(var(--rule-hairline));
+    flex-shrink: 0;
+  }
+  .foot__version { text-decoration: none; transition: color var(--dur-tick) var(--ease-phase); }
+  .foot__version:hover { color: rgb(var(--ink)); }
+</style>

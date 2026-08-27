@@ -1,5 +1,9 @@
-HAIKU_MODEL = "claude-haiku-4-5-20251001"
-SONNET_MODEL = "claude-sonnet-4-6"
+from agents.mind.registry import MODELS, Tier
+
+# Model IDs come from the Owl Core registry — the single source of truth for the
+# model generation. `select_model` (the dynamic haiku<->sonnet router) is unchanged.
+HAIKU_MODEL = MODELS[Tier.HAIKU]
+SONNET_MODEL = MODELS[Tier.SONNET]
 
 # Always routes to Sonnet — strong signal of analytical intent.
 _STRONG_KEYWORDS = {

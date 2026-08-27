@@ -1,0 +1,118 @@
+---
+/**
+ * The shared look of a research brief, a market recall and a composed touch.
+ *
+ * Four surfaces render these — Research, Campaign intelligence, Composer and the
+ * path runner — because `lib/briefView.ts`, `lib/intelView.ts` and
+ * `lib/touchesView.ts` build the DOM once for all of them. The styles have to be
+ * shared for the same reason the builders are: a brief that looks different
+ * depending on where you opened it is two designs, not one.
+ *
+ * Markup-free on purpose. Astro scopes `<style>` per component, so a component
+ * whose only job is a global stylesheet is how a builder in a `.ts` module gets
+ * styled without every page restating it.
+ *
+ * The builders still emit `.ds-mono` on field keys, a habit from the instrument
+ * era. The studio holds Kode Mono to identifiers — a key that names a field is
+ * a label, not an identifier — so the key and value rules below re-state the
+ * face in sans. They use the two-class descent (`.brief__row .brief__key`) to
+ * outweigh `.ds-mono` without repainting the builders on every surface at once.
+ */
+---
+<style is:global>
+  /* ── A research brief ────────────────────────────────────────────────────── */
+  .brief__title {
+    color: rgb(var(--ink));
+    margin: var(--space-6) 0 var(--space-3);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid rgb(var(--rule-hairline));
+  }
+  .brief__title:first-child { margin-top: 0; }
+  .brief__row {
+    display: grid; grid-template-columns: 9rem 1fr;
+    gap: var(--space-4); padding-block: var(--space-2);
+  }
+  /* The key is a label, so it wears the sans caption face, not the whisper. */
+  .brief__row .brief__key {
+    font-family: var(--font-sans);
+    font-size: var(--text-caption);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-body);
+    color: rgb(var(--ink-muted));
+  }
+  .brief__value, .brief__prose { color: rgb(var(--ink-secondary)); line-height: var(--leading-relaxed); }
+  .brief__prose { margin: 0 0 var(--space-3); max-width: var(--measure-read); }
+  .brief__list { margin: 0 0 var(--space-3); padding-left: var(--space-5); }
+  .brief__list li {
+    color: rgb(var(--ink-secondary)); line-height: var(--leading-relaxed);
+    margin-bottom: var(--space-1);
+  }
+  .brief__tags { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+  .brief__source {
+    color: rgb(var(--accent-ink)); text-decoration: none;
+    border-bottom: 1px solid rgb(var(--accent-hairline));
+  }
+  .brief__source:hover { border-bottom-color: rgb(var(--accent)); }
+
+  /* ── A market recall ─────────────────────────────────────────────────────── */
+  /* Each point is a claim with its own attribution, so it is set as a block rather
+     than a bullet: the call it came from has to sit with it. */
+  .intel__list { list-style: none; margin: 0 0 var(--space-3); padding: 0; }
+  .intel__point {
+    padding: var(--space-3) 0 var(--space-3) var(--space-4);
+    border-left: 2px solid rgb(var(--rule));
+    margin-bottom: var(--space-3);
+  }
+  .intel__point:last-child { margin-bottom: 0; }
+  .intel__what { color: rgb(var(--ink)); margin: 0; line-height: var(--leading-relaxed); }
+  .intel__why {
+    color: rgb(var(--ink-secondary)); margin: var(--space-1) 0 0;
+    line-height: var(--leading-relaxed); max-width: var(--measure-read);
+  }
+  .intel__from { color: rgb(var(--ink-muted)); margin: var(--space-2) 0 0; }
+
+  /* ── A composed touch ────────────────────────────────────────────────────── */
+  /* The card surface is stated here rather than trusted to the builders: some
+     emit `.ds-panel` alongside and some do not, and a touch must read as one
+     soft card wherever it appears. Same tokens as `.ds-card`, so the two never
+     drift apart in tone. */
+  .touch {
+    background: rgb(var(--surface));
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-raised);
+    padding: var(--space-6); margin-bottom: var(--space-5);
+  }
+  .touch__head {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+    padding-bottom: var(--space-3); border-bottom: 1px solid rgb(var(--rule-hairline));
+    margin-bottom: var(--space-4);
+  }
+  .touch__name { color: rgb(var(--ink)); }
+  .touch__field { margin-bottom: var(--space-4); }
+  .touch__field:last-child { margin-bottom: 0; }
+  /* Keys are labels; values are prose. Both are sans, whatever the builder said. */
+  .touch__field .touch__key {
+    font-family: var(--font-sans);
+    font-size: var(--text-caption);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-body);
+    color: rgb(var(--ink-muted));
+    margin: 0 0 var(--space-1);
+  }
+  /* `pre-wrap` because an email body's own line breaks are part of the draft. */
+  .touch__field .touch__value {
+    font-family: var(--font-sans);
+    font-size: var(--text-small);
+    letter-spacing: var(--tracking-body);
+    color: rgb(var(--ink-secondary)); margin: 0;
+    line-height: var(--leading-relaxed); white-space: pre-wrap;
+  }
+  .touch__points { margin: 0; padding-left: var(--space-5); }
+  .touch__points li { color: rgb(var(--ink-secondary)); line-height: var(--leading-relaxed); }
+  .touch__note { color: rgb(var(--ink-muted)); margin-top: var(--space-5); }
+
+  /* The channel chips, wherever the mix is chosen. `.ds-tag` supplies the pill;
+     this only makes a chip pressable. */
+  .channels { display: flex; gap: var(--space-2); margin-top: var(--space-2); }
+  .channels button { cursor: pointer; }
+</style>

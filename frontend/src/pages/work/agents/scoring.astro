@@ -1,0 +1,535 @@
+---
+/**
+ * Lead Scoring — the behavioural read of one lead.
+ *
+ * The page exists to make the score *inspectable*. A grade with no visible
+ * reasoning is something you either trust blindly or ignore, so the breakdown
+ * and the signals that drove it are shown alongside it, and the page states
+ * plainly that the number is deterministic — the same behaviour always scores
+ * the same, and the model cannot move it.
+ *
+ * That claim is what shapes the verdict: the computed half on the left, the
+ * model's read on the right, so which is which is visible rather than asserted.
+ * It renders through `lib/scoreView.ts`.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import { icon } from '../../../lib/icons';
+---
+<PlatformLayout title="Lead scoring" requires="lead">
+  <!-- Two states, one page. Unscored it is an ordinary task column: the ask
+       centred in the field, vertically too, like /home. Scored, the ask folds to
+       a reopenable line on the run sequence's grammar and the verdict takes the
+       whole field, anchored to the top — so the answer is what you land on
+       rather than something below the form that produced it. -->
+  <div class="agent-page">
+    <div class="agent-page__column agent-page__column--wide" id="column">
+      <div class="ask" id="ask">
+        <div class="ask__main">
+          <header class="agent-page__head ds-arrive">
+            <p class="ds-eyebrow">Lead scoring</p>
+            <h1 class="ds-heading ds-page__title">How warm is this lead?</h1>
+            <p class="ds-lead ds-page__intro">
+              Paste what a visitor did. The grade is computed, not judged — the same behaviour
+              always scores the same, and the model never moves the number.
+            </p>
+          </header>
+
+          <form class="analyse ds-arrive" style="--arrive: var(--dur-step)" id="form">
+            <label class="ds-label" for="signal">Lead signal</label>
+            <textarea class="ds-field ds-textarea" id="signal"
+              placeholder="/pricing 45s&#10;/hardware/open-time-server 2m 10s&#10;/case-studies 30s&#10;&#10;Acme Bank · 500-1000 staff · Stockholm"></textarea>
+            <p class="ds-help">Page paths with dwell times score most precisely; free text still works.</p>
+
+            <div class="analyse__actions">
+              <button class="ds-btn ds-btn--accent" id="run" type="submit">Score this lead</button>
+              <!-- Nothing on this page can be tried without a lead to hand. This is
+                   how you find out what it does before you have one. -->
+              <button class="ds-btn ds-btn--ghost ds-btn--sm" id="try" type="button">Try an example</button>
+              <span class="ds-mark ds-mark--live" id="running" hidden>reading</span>
+            </div>
+          </form>
+
+          <div class="ds-banner ds-banner--fault error" id="error" hidden>
+            <span class="ds-banner__label">Could not score</span>
+            <span id="error-text"></span>
+          </div>
+        </div>
+
+        <!-- What the scorer is looking for, before it has been given anything to
+             look at. Read from the model itself (`GET /leads/scale`) rather than
+             restated here, so the screen explaining the scoring and the screen
+             showing a result cannot describe two different models. It also fills
+             a field that was otherwise empty on every wide screen. -->
+        <aside class="scale ds-arrive" id="scale" style="--arrive: calc(var(--dur-step) * 2)" hidden>
+          <p class="ds-eyebrow scale__head">How it scores</p>
+          <dl class="scale__list" id="scale-list"></dl>
+          <p class="ds-caption scale__bands" id="scale-bands"></p>
+        </aside>
+      </div>
+
+      <!-- The finished ask, on the run sequence's collapse grammar: it shows what
+           was asked and reopens on click. -->
+      <button class="asked ds-step__head ds-arrive" id="asked" type="button" aria-expanded="false" hidden>
+        <span class="ds-step__name">Lead signal</span>
+        <span class="ds-step__summary" id="asked-summary"></span>
+        <span class="asked__action ds-small">Score another</span>
+      </button>
+
+      <section class="result" id="result" hidden>
+        <!-- One line, read left to right: the grade, the score behind it, who it
+             was, and how hot the model calls it. Unlabelled — a big coloured
+             letter beside a number needs no captions saying which is which.
+             The meter is honest now: the score is out of 100 by construction
+             (`services/lead_scoring.py`), where it used to be an unbounded sum
+             drawn as a proportion of a hundred it could pass without noticing. -->
+        <div class="verdict ds-arrive">
+          <p class="verdict__letter" id="grade">—</p>
+          <div class="verdict__score">
+            <p class="verdict__number ds-numeric">
+              <span id="score">—</span><span class="verdict__of" id="out-of"></span>
+            </p>
+            <div class="ds-meter verdict__meter"><div class="ds-meter__fill" id="meter" style="width: 0%"></div></div>
+          </div>
+          <div class="verdict__who">
+            <p class="ds-title verdict__company" id="company">—</p>
+            <p class="ds-small verdict__contact" id="contact"></p>
+          </div>
+          <span class="ds-mark" id="strength" hidden></span>
+
+          <!-- The handoff belongs to the verdict, not to the foot of the page.
+               Knowing a lead is an A has no value until you know who to call, and
+               at the bottom this sat below the fold at every window we support —
+               past two panels of supporting detail. Here it is on the line that
+               answers the question, hung on the grid's right edge, which is space
+               the verdict was not using. -->
+          <div class="next" id="next">
+            <a class="ds-btn ds-btn--accent" id="to-xray">
+              <span class="next__icon" aria-hidden="true" set:html={icon('xray')} />
+              <span>Find the people to approach</span>
+            </a>
+            <!-- What travels, not that something does: X-ray threads these into
+                 its discovery prompt, which is the only reason scoring ran first.
+                 The company is not repeated — it is set in full on this same line. -->
+            <p class="ds-caption next__note">carries the role, product fit and behaviour</p>
+          </div>
+        </div>
+
+        <!-- The arithmetic on the left, what it means on the right — the page's
+             whole argument, laid out. -->
+        <div class="cols ds-arrive" id="cols" style="--arrive: calc(var(--dur-step) * 2)">
+          <section class="ds-panel">
+            <!-- The bands come from the score itself, so this page never carries
+                 its own copy of where a grade begins. -->
+            <div class="ds-panel__head">
+              <p class="ds-eyebrow">What drove it</p>
+              <span class="ds-mono" id="bands"></span>
+            </div>
+            <div class="ds-panel__body">
+              <table class="ds-table">
+                <thead id="breakdown-head"><tr><th>Component</th><th class="ds-table__num">Points</th></tr></thead>
+                <tbody id="breakdown"></tbody>
+              </table>
+
+              <!-- The components say how much; these say what of. -->
+              <div class="pages" id="pages-block" hidden>
+                <p class="ds-eyebrow pages__head">Pages visited</p>
+                <ul class="pages__list" id="pages"></ul>
+              </div>
+            </div>
+          </section>
+
+          <div class="cols__reading" id="reading">
+            <section class="ds-panel" id="read-panel" hidden>
+              <div class="ds-panel__head"><p class="ds-eyebrow">How it reads</p></div>
+              <div class="ds-panel__body read" id="read"></div>
+            </section>
+
+            <!-- A lead with no recognisable page visits has no behavioural
+                 signals, which is a real answer — but an empty panel reads as a
+                 fault, so the panel goes rather than sits blank. -->
+            <section class="ds-panel" id="signals-panel" hidden>
+              <div class="ds-panel__head"><p class="ds-eyebrow">Signals seen</p></div>
+              <div class="ds-panel__body">
+                <div class="signals" id="signals"></div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </div>
+
+  <style>
+    /* Screen-level layout only. The page frame is the shared `.agent-page`
+       column; everything tonal and typographic comes from the design system.
+
+       Everything below breaks on the **column**, not the viewport. The rail is
+       216px open and 56px closed, so the same window gives this page two widths
+       160px apart — a viewport query gets one of them wrong by construction, and
+       it is why an earlier version kept two panels side by side in a column with
+       no room for them. */
+    .agent-page__column { container-type: inline-size; container-name: ask; }
+    /* Unscored, the ask is its own centred column inside the wide field — the
+       task page every other agent is. Scored, it is gone and the field belongs
+       to the verdict, so the page runs on one left axis instead of two. */
+    /* Left-aligned, never centred: stacked, the ask keeps the reading measure but
+       hangs off the same edge the verdict and the panels will use. Centred, it
+       drifted inward while the results below it spanned the column. */
+    .ask { width: 100%; max-width: var(--measure-read); }
+    .ask__main { min-width: 0; }
+    /* `.agent-page__head` takes a 4rem breath before its first working region,
+       which is the rhythm of a page of sections. Here the very next thing is the
+       field you came to fill in, and that much air reads as a missing element. */
+    .ask .agent-page__head { margin-bottom: var(--space-8); }
+    /* A Leadinfo line is a full URL and a dwell; at the form measure it wraps
+       every time. The ask reads better as wide as the column it sits in. */
+    .analyse { max-width: var(--measure-read); }
+    .analyse__actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-5); }
+    .error { margin-top: var(--space-6); }
+
+    /* The model, stated beside the ask rather than under it. Under, it pushes the
+       button off a short window; beside, it fills a field that was empty anyway.
+       Only once there is room for both — below this the ask is the whole column. */
+    /* The legend, as its own bubble. Its eyebrow does not line up with the ask's
+       — the padding a bubble needs sees to that — so it is centred against the
+       left column instead, which is an alignment you can actually see. */
+    .scale {
+      /* Stacked under the ask on a narrow screen; the grid below re-hangs it. */
+      margin-top: var(--space-8);
+      padding: var(--space-5) var(--space-6);
+      background: rgb(var(--surface-sunken));
+      border-radius: var(--radius-lg);
+    }
+    .scale__head { margin: 0 0 var(--space-4); }
+    /* The ceilings hang off the bubble's inner edge, like the points column of a
+       panel's table — a bounded surface is what makes a right-aligned number read
+       as aligned rather than adrift. */
+    .scale__list {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-3) var(--space-4);
+      margin: 0;
+    }
+    .scale__bands {
+      margin: var(--space-5) 0 0; padding-top: var(--space-4);
+      border-top: 1px solid rgb(var(--rule-hairline));
+      color: rgb(var(--ink-muted));
+    }
+
+    /* The ask uses the verdict's grid, to the pixel: same halves, same gutter. So
+       scoring a lead changes what is on the page and nothing about where it sits
+       — no edge moves, and the split down the middle stays put. */
+    @container ask (min-width: 58rem) {
+      .ask {
+        max-width: none;
+        display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: var(--space-5); align-items: center;
+      }
+      .scale { margin-top: 0; }
+      /* An author `display: grid` outranks `hidden`, and the ask is hidden the
+         moment a lead is scored. */
+      .ask[hidden] { display: none; }
+    }
+
+    /* The folded ask. `.ds-step__head` supplies the row; this gives it the rule
+       that separates a finished question from its answer. */
+    .asked {
+      padding-bottom: var(--space-3);
+      border-bottom: 1px solid rgb(var(--rule-hairline));
+      cursor: pointer;
+    }
+    /* `.ds-step__summary` grows to fill its row, which on an 84rem field would
+       throw the action against the far edge. The rule spans the field; what sits
+       on it clusters left, like the verdict below it. */
+    .asked .ds-step__summary { flex: 0 1 auto; }
+    .asked__action { color: rgb(var(--ink-muted)); white-space: nowrap; }
+    .asked:hover .asked__action { color: rgb(var(--ink)); }
+
+    .result { margin-top: var(--space-6); }
+
+    /* The verdict, as one line rather than three islands. Big and bold, per the
+       studio — hierarchy is size and weight together, so the parts sit on the
+       canvas and let type do the separating rather than a surface.
+       Clustered left, never stretched to the edges: the verdict is a sentence a
+       few hundred pixels long, and pinning its ends to an 84rem field would
+       open a void in the middle of it. The slack is margin, not a gap. */
+    .verdict {
+      display: flex; flex-wrap: wrap; align-items: center;
+      gap: var(--space-6);
+      padding-bottom: var(--space-8);
+    }
+    .verdict__letter { font-size: var(--text-display); font-weight: var(--weight-bold); line-height: 1; margin: 0; letter-spacing: var(--tracking-display); }
+    .verdict__number { font-size: var(--text-heading); font-weight: var(--weight-bold); line-height: 1; margin: 0; letter-spacing: var(--tracking-display); color: rgb(var(--ink-secondary)); }
+    /* The denominator, stated rather than implied — a bare 34 is only meaningful
+       to someone who already knows the scale. */
+    .verdict__of { font-size: var(--text-title); font-weight: var(--weight-regular); color: rgb(var(--ink-muted)); }
+    /* The track reads because the verdict sits on the canvas — on a sunken
+       surface it would be the same tone as its own background. */
+    .verdict__meter { width: 8rem; margin-top: var(--space-3); }
+    .verdict__who { min-width: 0; }
+    .verdict__company { margin: 0; }
+    .verdict__contact { margin: var(--space-1) 0 0; }
+
+    /* Even halves: the arithmetic and the reading carry comparable weight, and
+       neither is the subordinate of the other. One column until the field can
+       hold both. */
+    .cols {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-5);
+      align-items: start;
+      margin-top: var(--space-6);
+    }
+    .cols__reading { display: grid; gap: var(--space-5); }
+    /* An author `display: grid` would otherwise override `hidden`. */
+    .cols__reading[hidden] { display: none; }
+    /* Nothing to set against the arithmetic: it falls back to the reading
+       measure rather than stretching a lone table across the wide field. */
+    .cols.is-solo { max-width: var(--measure-read); }
+
+    /* What was actually visited, under the components computed from it. */
+    .pages { margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid rgb(var(--rule-hairline)); }
+    .pages__head { margin: 0 0 var(--space-3); }
+    .pages__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+
+    /* `.ds-table thead th` sets `text-align: left` and outweighs `.ds-table__num`
+       on specificity, so a numeric header sits left of the column it heads. */
+    .cols th.ds-table__num { text-align: right; }
+
+    .signals { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+    /* Pushed to the far end of the verdict line, so the answer and what to do
+       about it share one row and sit on the grid's outer edges. */
+    .next { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
+    .next__icon { display: inline-flex; }
+    .next__note { margin: 0; color: rgb(var(--ink-muted)); text-align: right; }
+
+    @container ask (min-width: 58rem) {
+      .cols:not(.is-solo) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    }
+
+    /* Measured, not guessed: the verdict holds the handoff on its line down to a
+       70rem column and wraps below it. Once it wraps, `margin-left: auto` would
+       strand the button alone against the right edge of an otherwise empty row,
+       so it comes back to the left and follows the verdict instead. */
+    @container ask (max-width: 70rem) {
+      .next { margin-left: 0; align-items: flex-start; }
+      .next__note { text-align: left; }
+    }
+
+    /* Narrower still: the company can no longer share a line with the score. */
+    @container ask (max-width: 44rem) {
+      .verdict { gap: var(--space-5); }
+      .verdict__who { flex-basis: 100%; }
+    }
+  </style>
+
+  <!-- The read's inner nodes are built by `lib/scoreView.ts` at run time, so they
+       never carry Astro's scope attribute and a scoped rule would not reach them.
+       Global, but every selector is anchored to `.read`, so nothing escapes the
+       panel it describes. -->
+  <style is:global>
+    /* The reset comes first: `.read > * + *` and a class selector carry the same
+       weight, so a later `margin: 0` would win and close the stack up. */
+    .read > * { margin: 0; }
+    .read > * + * { margin-top: var(--space-4); }
+    .read__why { color: rgb(var(--ink-secondary)); }
+    .read__facts {
+      display: grid; grid-template-columns: auto minmax(0, 1fr);
+      gap: var(--space-2) var(--space-5);
+    }
+    .read__facts dt { color: rgb(var(--ink-muted)); }
+    .read__facts dd { margin: 0; color: rgb(var(--ink-secondary)); }
+
+    .scale__row { min-width: 0; }
+    .scale__name { color: rgb(var(--ink)); display: block; }
+    .scale__detail { color: rgb(var(--ink-muted)); display: block; }
+    .scale__cap { color: rgb(var(--ink-secondary)); align-self: start; }
+
+    .pages__row {
+      display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+      gap: var(--space-3); align-items: baseline;
+    }
+    .pages__kind { color: rgb(var(--ink-muted)); }
+    .pages__path { color: rgb(var(--ink-secondary)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pages__dwell { color: rgb(var(--ink-muted)); }
+    /* The cap a component is measured against, quieter than the points it caps. */
+    .score-cap { color: rgb(var(--ink-muted)); }
+
+    /* `.ds-table__sub` is capped at 26ch for the many-column people table. This
+       one has two columns and room to spare, so the evidence for a factor is
+       allowed its full cell rather than being clipped at half of it. */
+    #breakdown .ds-table__sub { max-width: none; }
+  </style>
+
+  <script>
+    import { offerScoredLead } from '../../../lib/handoff';
+    import { el } from '../../../lib/dom';
+    import {
+      describeThresholds, gradeColour, hasRead, paintBreakdown, paintPages, paintRead,
+      paintScale, paintSignals, strengthMark, summariseSignal, type Lead, type Scale,
+    } from '../../../lib/scoreView';
+
+    const form = el<HTMLFormElement>('form');
+    const runBtn = el<HTMLButtonElement>('run');
+    const running = el('running');
+    const errorBox = el('error');
+    const result = el('result');
+    const nextLink = el<HTMLAnchorElement>('to-xray');
+    const next = el('next');
+    const column = el('column');
+    const ask = el('ask');
+    const asked = el('asked');
+    const signal = el<HTMLTextAreaElement>('signal');
+
+    /** The verdict on screen right now — what a handoff carries. */
+    let verdict: Lead = {};
+
+    /**
+     * Fold the ask away, or bring it back.
+     *
+     * Folded, the column also stops centring itself in the field: a page that
+     * grows a verdict and keeps re-centring drifts underfoot, which is why
+     * `--top` exists (the path runner uses it for the same reason).
+     */
+    function foldAsk(folded: boolean): void {
+      ask.hidden = folded;
+      asked.hidden = !folded;
+      asked.setAttribute('aria-expanded', String(!folded));
+      column.classList.toggle('agent-page__column--top', folded);
+    }
+
+    asked.addEventListener('click', () => {
+      foldAsk(false);
+      signal.focus();
+    });
+
+    /** A real session: a pricing visit, a long product read, a case study, a bounce. */
+    const EXAMPLE = [
+      '10:02\thttps://www.acme.example/pricing\t45s',
+      '10:03\thttps://www.acme.example/hardware/open-time-server\t2m 10s',
+      '10:05\thttps://www.acme.example/case-studies\t30s',
+      '10:01\thttps://www.acme.example/\t5s',
+      '',
+      'Acme Bank · 1001-5000 staff · Stockholm',
+    ].join('\n');
+
+    el('try').addEventListener('click', () => {
+      signal.value = `Page views\n${EXAMPLE}`;
+      signal.focus();
+    });
+
+    // The model explains itself from the model. A page that restated the ceilings
+    // would be a second copy of them, which is the drift this endpoint exists to
+    // prevent — so if the fetch fails the panel simply stays away.
+    (async () => {
+      try {
+        const res = await fetch('/api/sales/leads/scale');
+        if (!res.ok) return;
+        const shape: Scale = await res.json();
+        if (!paintScale(el('scale-list'), shape.components)) return;
+        el('scale-bands').textContent =
+          `${describeThresholds(shape.thresholds)} · out of ${shape.max_score ?? 100}`;
+        el('scale').hidden = false;
+      } catch {
+        // No explanation is better than a wrong one.
+      }
+    })();
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = signal.value.trim();
+      if (!text) {
+        el('error-text').textContent = 'Paste what the visitor did first.';
+        errorBox.hidden = false;
+        return;
+      }
+
+      runBtn.disabled = true;
+      running.hidden = false;
+      errorBox.hidden = true;
+      try {
+        const res = await fetch('/api/sales/leads/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `Failed (${res.status})`);
+        render((await res.json()).final || {});
+        el('asked-summary').textContent = summariseSignal(text);
+        foldAsk(true);
+        // The verdict replaced the ask at the top of the column, so put the top
+        // of the column in view — otherwise you keep the scroll position of a
+        // form that is no longer there.
+        const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        column.closest('.ds-scroll')?.scrollTo({ top: 0, behavior: still ? 'auto' : 'smooth' });
+      } catch (err: any) {
+        el('error-text').textContent = err?.message || 'The read did not complete.';
+        errorBox.hidden = false;
+        result.hidden = true;
+      } finally {
+        runBtn.disabled = false;
+        running.hidden = true;
+      }
+    });
+
+    // The handoff carries the whole verdict, not just the company name. X-ray's
+    // prompt builder threads product_fit, signal_strength, role and industry into
+    // the discovery prompt, so a search that starts from a scored lead is grounded
+    // in *why* the lead is warm — which is the only reason the scoring step ran
+    // first. It travels in sessionStorage rather than the query string: the verdict
+    // is a sizeable object carrying the lead's role and behaviour, and a URL would
+    // put that in browser history and any access log that sees it.
+    //
+    // Bound once, reading the current verdict — binding inside `render` would
+    // leave a listener per lead scored, each firing with a stale verdict.
+    nextLink.addEventListener('click', () => offerScoredLead(verdict));
+
+    function render(final: Lead): void {
+      verdict = final;
+      result.hidden = false;
+
+      const grade = String(final.lead_grade ?? '—');
+
+      el('grade').textContent = grade;
+      el('grade').style.color = `rgb(var(--${gradeColour(grade)}))`;
+
+      const score = Number(final.lead_score ?? 0);
+      const outOf = Number(final.lead_max_score ?? 100);
+      el('score').textContent = String(final.lead_score ?? '—');
+      el('out-of').textContent = Number.isFinite(outOf) && outOf > 0 ? `/${outOf}` : '';
+      // The scorer already bounds the score to the scale; clamping here too means
+      // a future model that forgets to cannot draw a bar past its own track.
+      el('meter').style.width = `${Math.max(0, Math.min(100, (score / (outOf || 100)) * 100))}%`;
+      el('bands').textContent = describeThresholds(final.lead_thresholds);
+
+      el('company').textContent = final.company || 'Unidentified company';
+      el('contact').textContent = final.contact_name || '';
+
+      const strength = (final.signal_strength || '').trim();
+      el('strength').className = strengthMark(strength);
+      el('strength').textContent = strength.toLowerCase();
+      el('strength').hidden = strength === '';
+
+      // Column headings over an empty table are furniture; drop them.
+      el('breakdown-head').hidden = paintBreakdown(el('breakdown'), final.score_breakdown) === 0;
+      el('pages-block').hidden = paintPages(el('pages'), final.score_page_views) === 0;
+
+      const signalCount = paintSignals(el('signals'), final.score_signals);
+      el('signals-panel').hidden = signalCount === 0;
+
+      const read = hasRead(final);
+      el('read-panel').hidden = !read;
+      if (read) paintRead(el('read'), final);
+
+      // With nothing on the reading side, the breakdown stops being half of a
+      // pair and goes back to being one column.
+      const hasReading = read || signalCount > 0;
+      el('reading').hidden = !hasReading;
+      el('cols').classList.toggle('is-solo', !hasReading);
+
+      next.hidden = !final.company;
+      nextLink.href = `/work/agents/xray?company=${encodeURIComponent(final.company || '')}&from=scoring`;
+    }
+  </script>
+</PlatformLayout>

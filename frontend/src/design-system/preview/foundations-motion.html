@@ -1,0 +1,213 @@
+<!-- @dsCard group="Foundations" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Motion &amp; space — Cadence Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../primitives.css">
+<link rel="stylesheet" href="preview.css">
+<style>
+  .pv-track { position: relative; height: 3rem; background: rgb(var(--surface-sunken)); border-radius: var(--radius-md); overflow: hidden; }
+  .pv-puck  { position: absolute; top: 50%; left: var(--space-2); width: 1.75rem; height: 1.75rem; margin-top: -0.875rem;
+              background: rgb(var(--accent)); border-radius: var(--radius-sm); }
+  .pv-track.is-run .pv-puck { transform: translateX(calc(100% * var(--travel, 8))); }
+  .pv-ease  { display: grid; grid-template-columns: 7rem 1fr; align-items: center; gap: var(--space-4); }
+
+  .pv-scale { display: flex; align-items: flex-end; gap: var(--space-2); }
+  .pv-scale div { background: rgb(var(--accent) / 0.18); border-radius: var(--radius-xs); }
+  .pv-scale span { display: block; margin-top: var(--space-2); font-family: var(--font-mono); font-size: var(--text-micro); color: rgb(var(--ink-muted)); text-align: center; }
+</style>
+</head>
+<body class="ds-root">
+
+<header class="pv-head">
+  <p class="ds-eyebrow">Foundations · 03</p>
+  <h1>Motion &amp; space</h1>
+  <p>
+    The system's character lives in how it moves. A phase-locked loop settles onto its target;
+    it does not bounce past it and correct. So motion here is <strong>critically damped by
+    default</strong> — things arrive and stop. Overshoot is permitted in exactly one case:
+    when the user's own gesture carried momentum into it. A flick may overshoot; nothing that
+    merely appeared ever does. Motion is used to reveal structure, confirm an action, or direct
+    attention. Never for spectacle.
+  </p>
+</header>
+
+<section class="pv-section">
+  <h2>Easing</h2>
+  <p class="ds-caption" style="margin-bottom: var(--space-4); max-width: var(--measure-read);">
+    For state that changes on its own clock — hover, focus, colour, a panel opening. Anything a
+    person can interrupt mid-flight wants a spring instead.
+  </p>
+  <div class="pv-stack" style="gap: var(--space-4);">
+    <div class="pv-ease">
+      <div>
+        <p class="ds-small" style="font-weight: var(--weight-medium); color: rgb(var(--ink));">settle</p>
+        <p class="pv-spec">entering</p>
+      </div>
+      <div class="pv-track" data-ease="var(--ease-settle)" data-dur="var(--dur-reveal)"><div class="pv-puck"></div></div>
+    </div>
+    <div class="pv-ease">
+      <div>
+        <p class="ds-small" style="font-weight: var(--weight-medium); color: rgb(var(--ink));">depart</p>
+        <p class="pv-spec">leaving</p>
+      </div>
+      <div class="pv-track" data-ease="var(--ease-depart)" data-dur="var(--dur-reveal)"><div class="pv-puck"></div></div>
+    </div>
+    <div class="pv-ease">
+      <div>
+        <p class="ds-small" style="font-weight: var(--weight-medium); color: rgb(var(--ink));">phase</p>
+        <p class="pv-spec">changing in place</p>
+      </div>
+      <div class="pv-track" data-ease="var(--ease-phase)" data-dur="var(--dur-reveal)"><div class="pv-puck"></div></div>
+    </div>
+  </div>
+  <button class="ds-btn ds-btn--secondary" id="run" style="margin-top: var(--space-4);">Play all</button>
+</section>
+
+<section class="pv-section">
+  <h2>Duration</h2>
+  <p class="ds-caption" style="margin-bottom: var(--space-4); max-width: var(--measure-read);">
+    Named for the gesture, not the number — so a change of pace is a change of vocabulary,
+    not a hunt for the right millisecond value.
+  </p>
+  <div class="pv-stack" style="gap: var(--space-3);">
+    <p class="ds-small"><span class="ds-mono" style="display:inline-block; width:9rem;">--dur-tick · 90ms</span> hover, focus — must feel instant</p>
+    <p class="ds-small"><span class="ds-mono" style="display:inline-block; width:9rem;">--dur-tap · 140ms</span> press, toggle, checkbox</p>
+    <p class="ds-small"><span class="ds-mono" style="display:inline-block; width:9rem;">--dur-shift · 220ms</span> dropdown, tab, accordion, row insert</p>
+    <p class="ds-small"><span class="ds-mono" style="display:inline-block; width:9rem;">--dur-reveal · 320ms</span> drawer, panel, dialog</p>
+    <p class="ds-small"><span class="ds-mono" style="display:inline-block; width:9rem;">--dur-stage · 460ms</span> route or full-surface change</p>
+    <p class="ds-small"><span class="ds-mono" style="display:inline-block; width:9rem;">--dur-beat · 2400ms</span> ambient — the thinking pulse, and nothing else</p>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Springs</h2>
+  <p class="ds-caption" style="margin-bottom: var(--space-4); max-width: var(--measure-read);">
+    For motion a person can interrupt. A transition runs to its target on a fixed clock and
+    cannot be grabbed mid-flight. A spring animates from the value currently on screen, so it can
+    be redirected at any instant, and it can take the velocity of the gesture that released it —
+    which is what removes the seam between dragging something and letting it go.
+  </p>
+  <p class="ds-caption" style="margin-bottom: var(--space-4); max-width: var(--measure-read);">
+    Stated as <strong>damping</strong> and <strong>response</strong>: two numbers to reason about,
+    rather than mass, stiffness and damping. Damping of 1 settles with no overshoot; below 1 it
+    overshoots once and returns. Response is how quickly the value reaches its target, in seconds —
+    <em>not</em> a duration, because a spring has none. Its settle time emerges from the two.
+  </p>
+  <div class="pv-stack" style="gap: var(--space-3);">
+    <p class="ds-small"><span class="ds-mono" style="display:inline-block; width:9rem;">settle · 1.0 / 0.4s</span> the default — anything that appears, repositions or resizes</p>
+    <p class="ds-small"><span class="ds-mono" style="display:inline-block; width:9rem;">carry · 0.8 / 0.3s</span> a flick, a throw, a drag release — momentum the person supplied</p>
+  </div>
+  <p class="pv-note" style="margin-top: var(--space-4);">
+    The rule that keeps this honest: <strong>overshoot is earned, never decorative.</strong> If the
+    motion did not begin with the user's hand, it uses <code>settle</code>. The two springs live in
+    <code>tokens.css</code> as numbers and are translated in exactly one place —
+    <code>design-system/springs.ts</code> — so a change of doctrine stays a change of tokens.
+  </p>
+</section>
+
+<section class="pv-section">
+  <h2>The beat</h2>
+  <p class="ds-caption" style="margin-bottom: var(--space-4); max-width: var(--measure-read);">
+    The one piece of ambient motion in the system, and the one place the timing metaphor
+    becomes literal. Three ticks at the ambient beat, phase-offset — a metronome counting,
+    not a spinner spinning. It appears only while something is genuinely in progress.
+  </p>
+  <div class="pv-row">
+    <div class="ds-thinking"><span class="ds-thinking__tick"></span><span class="ds-thinking__tick"></span><span class="ds-thinking__tick"></span></div>
+    <span class="ds-mark ds-mark--live">running</span>
+    <span class="ds-mono">web_discovery · 3 of 8 queries</span>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Reduced motion</h2>
+  <p class="pv-note">
+    Honoured structurally. Durations collapse to 1ms rather than 0 — low enough to be
+    imperceptible, non-zero so <code>transitionend</code> handlers still fire and no
+    component's state machine stalls. The ambient beat and the skeleton sweep stop entirely.
+    Springs cannot collapse the same way, since a spring with no response never calls back:
+    <code>springs.ts</code> reads the preference itself and cross-fades instead, keeping the
+    completion callback so nothing waiting on it is stranded.
+  </p>
+</section>
+
+<section class="pv-section">
+  <h2>Space — 4px base</h2>
+  <p class="ds-caption" style="margin-bottom: var(--space-4);">
+    Every gap, pad and inset in the platform is a multiple. There are no magic numbers
+    downstream of this scale.
+  </p>
+  <div class="pv-scale">
+    <div><div style="width: 4px;  height: 1rem;"></div><span>1</span></div>
+    <div><div style="width: 8px;  height: 1.5rem;"></div><span>2</span></div>
+    <div><div style="width: 12px; height: 2rem;"></div><span>3</span></div>
+    <div><div style="width: 16px; height: 2.5rem;"></div><span>4</span></div>
+    <div><div style="width: 20px; height: 3rem;"></div><span>5</span></div>
+    <div><div style="width: 24px; height: 3.5rem;"></div><span>6</span></div>
+    <div><div style="width: 32px; height: 4rem;"></div><span>8</span></div>
+    <div><div style="width: 40px; height: 4.5rem;"></div><span>10</span></div>
+    <div><div style="width: 48px; height: 5rem;"></div><span>12</span></div>
+    <div><div style="width: 64px; height: 5.5rem;"></div><span>16</span></div>
+    <div><div style="width: 96px; height: 6rem;"></div><span>24</span></div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Radius &amp; elevation</h2>
+  <p class="ds-caption" style="margin-bottom: var(--space-4); max-width: var(--measure-read);">
+    One radius scale: pills for controls, 24px for containers. Elevation is four steps and each means something: seated
+    in the plane, lifted a little, genuinely off it, or above everything over a scrim. A shadow
+    states distance from the plane and is never a border substitute — see
+    <strong>Material</strong> for which surfaces are allowed to leave the plane at all.
+  </p>
+  <div class="pv-row" style="gap: var(--space-6);">
+    <div style="text-align:center;">
+      <div style="width: 5rem; height: 4rem; background: rgb(var(--surface)); border-radius: var(--radius-sm); box-shadow: var(--shadow-flat);"></div>
+      <span class="pv-spec" style="display:block; margin-top: var(--space-2);">flat</span>
+    </div>
+    <div style="text-align:center;">
+      <div style="width: 5rem; height: 4rem; background: rgb(var(--surface)); border-radius: var(--radius-md); box-shadow: var(--shadow-raised);"></div>
+      <span class="pv-spec" style="display:block; margin-top: var(--space-2);">raised</span>
+    </div>
+    <div style="text-align:center;">
+      <div style="width: 5rem; height: 4rem; background: rgb(var(--surface)); border-radius: var(--radius-lg); box-shadow: var(--shadow-lifted);"></div>
+      <span class="pv-spec" style="display:block; margin-top: var(--space-2);">lifted</span>
+    </div>
+    <div style="text-align:center;">
+      <div style="width: 5rem; height: 4rem; background: rgb(var(--surface)); border-radius: var(--radius-lg); box-shadow: var(--shadow-overlay);"></div>
+      <span class="pv-spec" style="display:block; margin-top: var(--space-2);">overlay</span>
+    </div>
+  </div>
+</section>
+
+<script>
+  const tracks = document.querySelectorAll('.pv-track');
+  tracks.forEach(t => {
+    const puck = t.querySelector('.pv-puck');
+    puck.style.transitionProperty = 'transform';
+    puck.style.transitionTimingFunction = t.dataset.ease;
+    puck.style.transitionDuration = t.dataset.dur;
+  });
+
+  function play() {
+    tracks.forEach(t => {
+      const puck = t.querySelector('.pv-puck');
+      const distance = t.clientWidth - puck.clientWidth - 16;
+      puck.style.transform = `translateX(${distance}px)`;
+      // Return after the outbound leg settles, so the pair can be compared.
+      setTimeout(() => { puck.style.transform = 'translateX(0)'; }, 900);
+    });
+  }
+  document.getElementById('run').addEventListener('click', play);
+  play();
+</script>
+
+</body>
+</html>

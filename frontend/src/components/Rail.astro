@@ -1,0 +1,437 @@
+---
+/**
+ * The rail — one implementation, for every full surface.
+ *
+ * The platform had two: this structure, which the Owl workspace built from the
+ * design cards in Stage 1, and a `shell__*` one hand-rolled in R2 that every
+ * other surface used. That second rail is what "the menus are not aligned" was —
+ * a mono wordmark the shell card bans outright, typographic glyphs where the
+ * system draws icons, and no search, counts or collapsed state at all.
+ *
+ * Built to `preview/screen-cadence-home.html` and the rules on
+ * `preview/screen-shell.html`:
+ *
+ *   - the Cadence lockup once per surface, at the top of the frame, **mark plus
+ *     wordmark in the sans face** — never a mono label;
+ *   - the rail carries the whole platform, not just conversations, and **Owl is
+ *     the first row** so it is reachable from anywhere;
+ *   - **every path has its own icon**, drawn (`lib/icons.ts`), never typed;
+ *   - closed, it is not a narrower rail but a different instrument: language
+ *     drops away, every control sits on the same 2.25rem square, and each row's
+ *     name arrives on hover so nothing is guessed from a glyph.
+ *
+ * Rows come from `lib/platform.ts`, so the rail cannot advertise a surface that
+ * does not exist — and now cannot draw one without an icon either.
+ */
+import { AGENTS, LEARN, PATHS } from '../lib/platform';
+import { icon } from '../lib/icons';
+
+interface Props {
+  /** Current pathname, for the active row. */
+  here: string;
+  /** Owl provides its own conversation groups through the slot. */
+  showSearch?: boolean;
+}
+const { here, showSearch = true } = Astro.props;
+
+const isHere = (href: string, exact = false) =>
+  exact ? here === href : here === href || here.startsWith(`${href}/`);
+---
+<aside class="ws-rail ds-scroll" id="rail">
+  <div class="ws-rail__top">
+    <!-- The mark goes home. It had been a div carrying `text-decoration: none`,
+         which is a declaration only an anchor needs — a de-anchored link. -->
+    <a class="ws-brand" href="/home" aria-label="Cadence — home">
+      <span class="ws-brand__mark">
+        <svg width="24" height="24" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <rect x="2.6" y="6.5" width="2.6" height="7" rx="1.3" fill="rgb(var(--ink))"/>
+          <rect x="6.9" y="3.5" width="2.6" height="13" rx="1.3" fill="rgb(var(--ink))"/>
+          <rect x="11.2" y="1.5" width="2.6" height="17" rx="1.3" fill="rgb(var(--accent))"/>
+          <rect x="15.5" y="5" width="2.6" height="10" rx="1.3" fill="rgb(var(--ink))"/>
+        </svg>
+      </span>
+      <span class="ws-brand__name">Cadence</span>
+    </a>
+
+    <!-- The platform's primary action and search. The Owl workspace overrides this
+         slot with its own — a button that starts a conversation in place, and a
+         search over conversations rather than the knowledge base. -->
+    <slot name="top">
+      <a class="ds-btn ds-btn--primary rail__new" href="/home">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span>New conversation</span>
+      </a>
+
+      {showSearch && (
+        <div class="ds-search">
+          <svg class="ds-search__icon" width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+            <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M8.5 8.5l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <input class="ds-search__input" id="rail-search" type="search" autocomplete="off"
+                 placeholder="Search knowledge…" aria-label="Search the knowledge base" />
+        </div>
+      )}
+    </slot>
+  </div>
+
+  <div class="ws-rail__scroll ds-scroll">
+    <!-- Owl's workspace injects its search results, Projects and Recent here. -->
+    <slot name="before-groups" />
+
+    <div class="ws-group">
+      <div class="ws-group__head"><span class="ds-eyebrow">Workspace</span></div>
+      <a class={`ds-row${isHere('/home') ? ' is-active' : ''}`} href="/home">
+        <span class="ds-row__icon" set:html={icon('home')} />
+        <span class="ds-row__label">Home</span>
+      </a>
+      <!-- Owl is the first row after Home, per the shell card's rule. -->
+      <a class={`ds-row${isHere('/owl') ? ' is-active' : ''}`} href="/owl">
+        <span class="ds-row__icon" set:html={icon('owl')} />
+        <span class="ds-row__label">Owl</span>
+        <span class="ds-mono rail__hint">ask</span>
+      </a>
+    </div>
+
+    <!--
+      Agents. The rail carries the ones this person pinned — at most three — and
+      then one row to the rest.
+
+      It used to list all eleven, which is what made the rail unreadable: with the
+      top controls and the foot that is twenty-six controls in a column, more than
+      a 900px screen holds, so Knowledge fell below the fold and the collapsed rail
+      ran off the bottom. Eleven agents at equal weight is also no hierarchy at
+      all — every one of them looked as important as Home.
+
+      Every row is rendered and the unpinned ones are hidden before first paint
+      (see PlatformLayout), so the rail never builds itself in JS and never flashes
+      a list the person did not choose.
+    -->
+    <div class="ws-group">
+      <div class="ws-group__head"><span class="ds-eyebrow">Agents</span></div>
+      {AGENTS.map(agent => (
+        <a class={`ds-row rail__pinned${isHere(agent.href) ? ' is-active' : ''}`}
+           href={agent.href} data-agent={agent.slug} hidden>
+          <span class="ds-row__icon" set:html={icon(agent.icon)} />
+          <span class="ds-row__label">{agent.name}</span>
+          {!agent.built && <span class="ds-mono rail__hint">soon</span>}
+        </a>
+      ))}
+      <a class={`ds-row${isHere('/work/agents', true) ? ' is-active' : ''}`} href="/work/agents">
+        <span class="ds-row__icon" set:html={icon('agents')} />
+        <span class="ds-row__label">Agents</span>
+        <span class="ds-mono rail__hint">{AGENTS.length}</span>
+      </a>
+    </div>
+
+    <div class="ws-group">
+      <div class="ws-group__head"><span class="ds-eyebrow">Paths</span></div>
+      {PATHS.map(path => (
+        <a class={`ds-row${isHere(`/work/paths/${path.slug}`) ? ' is-active' : ''}`}
+           href={`/work/paths/${path.slug}`}>
+          <span class="ds-row__icon" set:html={icon(path.icon)} />
+          <span class="ds-row__label">{path.name}</span>
+        </a>
+      ))}
+    </div>
+
+    <div class="ws-group">
+      <div class="ws-group__head"><span class="ds-eyebrow">Knowledge</span></div>
+      {LEARN.map(surface => (
+        <a class={`ds-row${isHere(surface.href) ? ' is-active' : ''}`} href={surface.href}>
+          <span class="ds-row__icon" set:html={icon(surface.icon)} />
+          <span class="ds-row__label">{surface.name}</span>
+          {!surface.built && <span class="ds-mono rail__hint">soon</span>}
+        </a>
+      ))}
+    </div>
+
+    <slot name="after-groups" />
+  </div>
+
+  <!--
+    The foot: one row, one control.
+
+    It had been three tiers — name and role, then a `sandbox off` mark that was
+    the visually heaviest object in the whole foot (mono, bulleted, underlined,
+    louder than the person's own name), then a version string. Four alignments in
+    one block, and collapsed it became a near-white disc with a faint speck under
+    it, floating on no grid.
+
+    The version is already stated by the page footer and the sandbox is admin
+    debug chrome, so both moved into the menu. What is left is the person, and
+    pressing them opens everything else.
+  -->
+  <div class="ws-rail__foot">
+    <button class="ws-user" id="user-menu" type="button" aria-haspopup="menu"
+            aria-label="Account and settings">
+      <span class="ws-user__avatar" id="user-avatar">·</span>
+      <span class="ws-user__id">
+        <span class="ds-small ws-user__name" id="user-name"></span>
+        <span class="ds-caption ws-user__role" id="user-role"></span>
+      </span>
+      <span class="ws-user__more" aria-hidden="true" set:html={icon('more')} />
+    </button>
+
+    <!--
+      Both stay in the DOM, hidden. `session.ts` owns what logging out and
+      toggling the sandbox actually *do* and binds them by these ids at boot; the
+      menu presses them and reads the toggle's label for its true state. One
+      owner each, as before — the menu is a door, not a second implementation.
+    -->
+    <div class="rail__wired" aria-hidden="true">
+      <a id="admin-link" href="/admin" hidden tabindex="-1"></a>
+      <button id="logout-btn" type="button" tabindex="-1"></button>
+      <button id="sandbox-toggle" type="button" tabindex="-1"></button>
+    </div>
+  </div>
+</aside>
+
+<style is:global>
+  /* The rail's own layout. Every primitive inside it is design-system; these
+     rules position them. White on the white field, per the shell card — the
+     right hairline is the whole structure between rail and field. */
+  .ws-rail {
+    display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+    background: rgb(var(--canvas));
+    border-right: 1px solid rgb(var(--rule-hairline));
+  }
+  .ws-rail__top { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); flex-shrink: 0; }
+
+  .ws-brand { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-2); text-decoration: none; }
+  .ws-brand__mark { display: flex; align-items: center; flex: none; }
+  /* Sans, per the shell card — a mono label here is a stated defect. */
+  .ws-brand__name {
+    font-family: var(--font-sans); font-size: var(--text-lead);
+    font-weight: var(--weight-regular); letter-spacing: -.03em; line-height: 1;
+    color: rgb(var(--ink));
+  }
+
+  .rail__new { width: 100%; text-decoration: none; }
+  .rail__hint { color: rgb(var(--ink-muted)); }
+
+  .ws-rail__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--space-2) var(--space-3); }
+  .ws-group { margin-top: var(--space-5); }
+  .ws-group__head { display: flex; align-items: center; justify-content: space-between; padding: 0 var(--space-2) var(--space-2); }
+  .ws-rail__scroll .ds-row { text-decoration: none; }
+  /* `.ds-row` is `display: flex`, which overrides the `hidden` attribute's own
+     `display: none`. Without this, every unpinned agent would still be drawn. */
+  .ws-rail__scroll .ds-row[hidden] { display: none; }
+
+  .ws-rail__foot { padding: var(--space-2); border-top: 1px solid rgb(var(--rule-hairline)); flex-shrink: 0; }
+  /* The person is the control. Sized and padded like a row, because that is what
+     it is — the last row of the rail, sitting on the same square as the rest. */
+  .ws-user {
+    display: flex; align-items: center; gap: var(--space-2);
+    width: 100%; min-height: 2.25rem; padding: var(--space-1) var(--space-2);
+    border: 0; border-radius: var(--radius-sm);
+    background: none; font: inherit; text-align: left; cursor: pointer;
+    color: rgb(var(--ink-secondary));
+    transition: background-color var(--dur-tick) var(--ease-phase);
+  }
+  .ws-user:hover { background: rgb(var(--ink) / 0.05); }
+  .ws-user__avatar {
+    width: 1.75rem; height: 1.75rem; border-radius: var(--radius-full);
+    background: rgb(var(--ink)); color: rgb(var(--ink-on-ink));
+    display: flex; align-items: center; justify-content: center;
+    font-size: var(--text-caption); font-weight: var(--weight-medium); flex-shrink: 0;
+  }
+  .ws-user__id { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: var(--leading-snug); }
+  .ws-user__name { color: rgb(var(--ink)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ws-user__role { color: rgb(var(--ink-muted)); white-space: nowrap; }
+  /* Quiet until wanted: it says the row opens onto something, without competing
+     with the name for the eye. */
+  .ws-user__more { display: inline-flex; flex-shrink: 0; color: rgb(var(--ink-muted)); opacity: 0; transition: opacity var(--dur-tick) var(--ease-phase); }
+  .ws-user:hover .ws-user__more, .ws-user:focus-visible .ws-user__more { opacity: 1; }
+  /* The wired-but-unseen controls, in a container that cannot be un-hidden.
+     Their own `hidden` attribute was not enough: `wireSandboxToggle` sets
+     `hidden = false` and paints `.ds-mark` on the toggle at boot, which put
+     `sandbox off` back in the foot — louder than the person's name — even though
+     the markup asked for it to be hidden. A parent that is `display: none` is
+     not something a child can argue with. */
+  .rail__wired { display: none; }
+
+  /* ── Compact ─────────────────────────────────────────────────────────────
+     Not a narrower rail: a different instrument. Language drops away, every
+     control sits on the same 2.25rem square, and a row's name arrives on hover.
+
+     Keyed on `is-compact`, which the shell derives before paint from the
+     person's preference OR a viewport too narrow to afford labels (see
+     PlatformLayout). It used to be two rule sets — `is-closed` and a hand-copied
+     media query — and they had already drifted: below 60rem the rail was narrow
+     with **no tooltips at all**, because the `::after` and its `overflow: visible`
+     were never copied across. One instrument, one definition.
+
+     Every rule that touches a shared primitive is scoped to `#rail`. This block
+     is global (the rail styles a grid it does not own), and the marker lands on
+     `<body class="shell">`, so an unscoped `.is-compact .ds-row` matched every row
+     in the document: closing the rail stripped the labels off the home shortcut
+     card and the agents index, and squashed the search box on Knowledge, Library
+     and Admin. The rail styles the rail. */
+  .is-compact #rail .ws-rail__top { padding: var(--space-2); align-items: center; }
+  .is-compact #rail .ws-brand { padding: var(--space-1) 0; justify-content: center; }
+  .is-compact #rail .ws-brand__name { display: none; }
+  .is-compact #rail .ws-group__head { display: none; }
+  /* The eyebrows are gone, so the groups are told apart by air first and a
+     hairline second — structure is space, then a rule. A single hairline between
+     nineteen identical squares was not enough to find a section by. */
+  /* Slotted content that is pure language — conversation trees, placeholders —
+     marks itself `data-closed-hide`, per the home screen card's construction. */
+  .is-compact #rail [data-closed-hide] { display: none; }
+  .is-compact #rail .ws-group { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid rgb(var(--rule-hairline)); }
+  .is-compact #rail .ws-rail__scroll > .ws-group:first-child { margin-top: var(--space-2); padding-top: 0; border-top: 0; }
+  .is-compact #rail .ws-rail__scroll { overflow: visible; }
+  .is-compact #rail .ds-row { position: relative; width: 2.25rem; height: 2.25rem; padding: 0; justify-content: center; margin-inline: auto; }
+  .is-compact #rail .ds-row > :not(.ds-row__icon) { display: none; }
+  /* With the label gone the glyph IS the row, so it stops being metadata: it is
+     drawn larger and at the label's own contrast (`--ink-secondary`) rather than
+     at `--ink-muted`, which the tokens file documents as the floor. A 13px mark
+     at the contrast floor is what made the closed rail unreadable. */
+  .is-compact #rail .ds-row__icon { margin: 0; width: 1.0625rem; color: rgb(var(--ink-secondary)); }
+  .is-compact #rail .ds-row__icon svg { width: 1.0625rem; height: 1.0625rem; }
+  /* These two restate hover and active inside this scope on purpose. The
+     selectors above carry an id, so they outrank the state rules in primitives
+     and would otherwise flatten both states to one colour. */
+  .is-compact #rail .ds-row:hover .ds-row__icon { color: rgb(var(--ink)); }
+  .is-compact #rail .ds-row.is-active .ds-row__icon { color: rgb(var(--ink)); }
+  .is-compact #rail .rail__new { width: 2.25rem; padding: 0; justify-content: center; }
+  .is-compact #rail .rail__new span { display: none; }
+  .is-compact #rail .ds-search { width: 2.25rem; padding: 0; justify-content: center; }
+  .is-compact #rail .ds-search__input { display: none; }
+  /* The foot is the same instrument as the rows, and it was not. It stacked a
+     1.75rem avatar and three 1.875rem buttons at 8px apart in a 40px column —
+     three sizes, none on the row grid, no square, and the glyphs left at
+     `--chrome-ink-muted` while the rows above were raised. Four round marks in a
+     vertical run with nothing to separate them read as one blob, which is what
+     "the bottom part is all combined together" was. */
+  /* Compact: the same 2.25rem square as every row above it, holding the 1.75rem
+     avatar. It had been a 2.25rem near-white disc — the brightest object in the
+     whole rail — with a second control stacked under it on no grid at all. */
+  .is-compact #rail .ws-user { width: 2.25rem; height: 2.25rem; padding: 0; justify-content: center; margin-inline: auto; }
+  .is-compact #rail .ws-user__id, .is-compact #rail .ws-user__more { display: none; }
+  /* The compact rail's hover label, drawn on <body>.
+     It cannot live in the rail: `.ws-rail` is `overflow: hidden` so its scroller
+     is contained, which clips anything positioned past the rail's right edge —
+     so the label that was supposed to mean "nothing is guessed from a glyph" had
+     never once been visible. Hence a portal, and hence one element rather than
+     one per row. A charcoal glass pill, per the closed-rail demo — a tooltip is
+     one of the charcoal objects — and sans, because a row's name is a word, not
+     a machine identifier. */
+  .rail-tip {
+    position: fixed; z-index: var(--z-toast);
+    padding: var(--space-1) var(--space-3);
+    background: rgb(var(--chrome) / var(--glass-dark));
+    backdrop-filter: blur(var(--blur-thin)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--blur-thin)) saturate(var(--glass-saturate));
+    color: rgb(var(--chrome-ink));
+    border-radius: var(--radius-full);
+    font-family: var(--font-sans); font-size: var(--text-caption);
+    white-space: nowrap; pointer-events: none;
+    opacity: 0; transform: translateX(-2px);
+    transition: opacity var(--dur-tick) var(--ease-phase), transform var(--dur-tick) var(--ease-settle);
+  }
+  .rail-tip.is-on { opacity: 1; transform: translateX(0); }
+
+</style>
+
+<script>
+  // Enter searches the knowledge base — a real surface, rather than a field that
+  // looks interactive and does nothing while the ⌘K palette is unbuilt.
+  import { menu, type MenuItem } from '../lib/overlays';
+  import { CADENCE_VERSION } from '../lib/version';
+
+  /**
+   * Account and settings.
+   *
+   * Assembled at click rather than at render, so every entry reflects state that
+   * only exists after boot: the admin entries follow `#admin-link`'s revealed
+   * state rather than guessing at the role, and the sandbox reads its own label,
+   * which `session.ts` keeps truthful.
+   */
+  const userMenu = document.getElementById('user-menu');
+  userMenu?.addEventListener('click', () => {
+    const adminLink = document.getElementById('admin-link');
+    const sandbox = document.getElementById('sandbox-toggle');
+    const isAdmin = Boolean(adminLink && !adminLink.hidden);
+
+    const items: MenuItem[] = [
+      { label: 'Integrations', run: () => { window.location.href = '/work/integrations'; } },
+    ];
+    if (isAdmin) {
+      items.push({ label: 'Admin', run: () => { window.location.href = '/admin'; } });
+      // The label already states which way the toggle is pointing, so the menu
+      // shows it verbatim rather than describing the same state a second way.
+      if (sandbox) items.push({ label: sandbox.textContent?.trim() || 'sandbox', run: () => sandbox.click() });
+    }
+    items.push(
+      'separator',
+      { label: `Cadence ${CADENCE_VERSION}`, run: () => { window.location.href = '/changelog'; } },
+      'separator',
+      { label: 'Log out', danger: true, run: () => document.getElementById('logout-btn')?.click() },
+    );
+
+    menu(userMenu as HTMLElement, items);
+  });
+
+  const search = document.getElementById('rail-search') as HTMLInputElement | null;
+  search?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    const q = search.value.trim();
+    if (q) window.location.href = `/learn/knowledge?q=${encodeURIComponent(q)}`;
+  });
+
+  // Every control carries its own name as the compact-rail hover label. A row
+  // takes it from the label it already renders, so the two can never disagree; a
+  // foot button takes it from the `aria-label` it already needs.
+  for (const row of document.querySelectorAll('#rail .ds-row')) {
+    const label = row.querySelector('.ds-row__label');
+    if (label) row.setAttribute('data-tip', label.textContent!.trim());
+  }
+  for (const button of document.querySelectorAll('#rail .ws-rail__foot .ds-icon-btn')) {
+    const name = button.getAttribute('aria-label');
+    if (name) button.setAttribute('data-tip', name);
+  }
+
+  // The label itself lives on <body>, not in the rail.
+  //
+  // It used to be an `::after` on the row, positioned past the rail's right edge —
+  // where `.ws-rail`'s `overflow: hidden` clipped it. That overflow is load-bearing
+  // (it contains the scroller), so the compact rail's names had never appeared at
+  // all: the promise that nothing is guessed from a glyph was never kept, which is
+  // most of why the collapsed rail could not be read.
+  const tip = document.createElement('span');
+  tip.className = 'rail-tip';
+  tip.setAttribute('role', 'presentation');
+  document.body.appendChild(tip);
+
+  const hide = () => tip.classList.remove('is-on');
+
+  const show = (control: Element) => {
+    // Only when the rail is actually compact — open, the row carries its own label.
+    if (!document.body.classList.contains('is-compact')) return;
+    const name = control.getAttribute('data-tip');
+    if (!name) return;
+    const box = control.getBoundingClientRect();
+    tip.textContent = name;
+    tip.style.left = `${box.right + 8}px`;
+    // Measured after the text is set, so a two-word name centres as well as a
+    // one-word one.
+    tip.style.top = `${box.top + box.height / 2 - tip.offsetHeight / 2}px`;
+    tip.classList.add('is-on');
+  };
+
+  for (const control of document.querySelectorAll('#rail [data-tip]')) {
+    control.addEventListener('mouseenter', () => show(control));
+    control.addEventListener('mouseleave', hide);
+    // Keyboard users reach these too, and a label that only answers to a mouse is
+    // half a label.
+    control.addEventListener('focus', () => show(control));
+    control.addEventListener('blur', hide);
+  }
+
+  // A label pinned to a control that has moved is worse than no label.
+  document.querySelector('#rail .ws-rail__scroll')?.addEventListener('scroll', hide);
+  window.addEventListener('resize', hide);
+</script>

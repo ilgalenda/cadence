@@ -1,0 +1,572 @@
+---
+/**
+ * A path, walked.
+ *
+ * One page for all three, because a path is a *sequence over the same agents*
+ * rather than a third kind of thing. `platform.ts` declares which agents and in
+ * what order; `lib/paths.ts` declares how each step gets its input and what its
+ * result contributes. This page only draws that and drives it.
+ *
+ * The point of walking rather than visiting each agent by hand is the handoff.
+ * Lead scoring's whole verdict is handed to X-ray as `signal_analysis`, and the
+ * discovery prompt is built from it — so the search is grounded in *why* the lead
+ * is warm. By hand, X-ray only ever has a company name.
+ *
+ * Where a path's agents run out, it says so. Nothing here renders a step as
+ * merely pending when the agent behind it does not exist yet.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import { PATHS, pathBySlug, stepsOf } from '../../../lib/platform';
+import AgentViewStyles from '../../../components/AgentViewStyles.astro';
+
+export function getStaticPaths() {
+  return PATHS.map((path) => ({ params: { path: path.slug } }));
+}
+
+const path = pathBySlug(Astro.params.path!)!;
+const steps = stepsOf(path);
+---
+<PlatformLayout title={path.name} requires={path.grant}>
+  <!-- The run spine owns one centred working column, anchored to the top: a
+       walk grows downwards as steps complete, so re-centring it vertically on
+       every paint would make the whole page drift underfoot. -->
+  <div class="agent-page" data-path={path.slug}>
+    <div class="agent-page__column agent-page__column--top">
+      <header class="agent-page__head ds-arrive">
+        <p class="ds-eyebrow">Path</p>
+        <h1 class="ds-heading ds-page__title">{path.name}</h1>
+        <p class="ds-lead ds-page__intro">{path.when}</p>
+        <p class="ds-caption page__channel">{path.channel}</p>
+      </header>
+
+      <!-- The run's own section head: name left, progress right, a hairline to
+           sit on — the same grammar as the launcher's stage heads. -->
+      <div class="agent-page__sect run-head ds-arrive" style="--arrive: var(--dur-step)">
+        <h2 class="ds-eyebrow">The run</h2>
+        <div class="run-head__state">
+          <span class="ds-meter run-head__meter">
+            <span class="ds-meter__fill" id="progress-fill" style="width: 0%"></span>
+          </span>
+          <span class="ds-mono" id="progress-label"></span>
+          <button class="ds-btn ds-btn--ghost ds-btn--sm" id="restart" type="button" hidden>Start over</button>
+        </div>
+      </div>
+
+      <div class="ds-run">
+      {steps.map((agent, order) => (
+        <section class="ds-step ds-arrive" style={`--arrive: calc(var(--dur-step) * ${order + 2})`} data-step={agent.slug}>
+          <button class="ds-step__head" type="button" data-head>
+            <span class="ds-step__name">{agent.name}</span>
+            <span class="ds-step__summary" data-summary>{agent.does}</span>
+          </button>
+
+          <div class="ds-step__body ds-card ds-arrive" data-body hidden>
+            {agent.slug === 'scoring' && (
+              <div class="field">
+                <label class="ds-label" for="scoring-text">Lead signal</label>
+                <textarea class="ds-field ds-textarea ds-textarea--resizable" id="scoring-text"
+                  placeholder="/pricing 45s&#10;/hardware/open-time-server 2m 10s&#10;&#10;Acme Bank · 500-1000 staff · Stockholm"></textarea>
+                <p class="ds-help">Page paths with dwell times score most precisely; free text still works.</p>
+              </div>
+            )}
+
+            {agent.slug === 'gtm' && (
+              <div class="field">
+                <div class="field__row">
+                  <div class="field__cell">
+                    <label class="ds-label" for="gtm-vertical">Vertical or ICP</label>
+                    <input class="ds-field" id="gtm-vertical" placeholder="finance, private 5G, defence" autocomplete="off" />
+                  </div>
+                  <div class="field__cell">
+                    <label class="ds-label" for="gtm-seed">Or look like <span class="font-normal text-ink-muted">optional</span></label>
+                    <input class="ds-field" id="gtm-seed" placeholder="Northgate Nordics" autocomplete="off" />
+                  </div>
+                </div>
+                <div class="field__cell field__cell--wide">
+                  <label class="ds-label" for="gtm-notes">Constraints <span class="font-normal text-ink-muted">optional</span></label>
+                  <input class="ds-field" id="gtm-notes" placeholder="Nordics only, over 500 staff, recently funded" autocomplete="off" />
+                </div>
+              </div>
+            )}
+
+            {agent.slug === 'xray' && (
+              <p class="ds-small step__lead" data-xray-lead></p>
+            )}
+
+            {agent.slug === 'research' && (
+              <div class="field">
+                <div class="field__cell field__cell--wide">
+                  <label class="ds-label" for="research-company">Company</label>
+                  <input class="ds-field" id="research-company" placeholder="Northgate Nordics" autocomplete="off" />
+                  <p class="ds-help" data-research-lead></p>
+                </div>
+                <div class="field__cell field__cell--wide">
+                  <label class="ds-label" for="research-notes">Anything else it should know <span class="font-normal text-ink-muted">optional</span></label>
+                  <input class="ds-field" id="research-notes" placeholder="They mentioned White Rabbit on the last call" autocomplete="off" />
+                </div>
+              </div>
+            )}
+
+            {agent.slug === 'composer' && (
+              <div class="field">
+                <div class="field__cell field__cell--wide">
+                  <span class="ds-label">Channels</span>
+                  <div class="channels" id="composer-channels">
+                    <button class="ds-tag ds-tag--accent" type="button" data-channel="email" aria-pressed="true">Email</button>
+                    <button class="ds-tag" type="button" data-channel="linkedin" aria-pressed="false">LinkedIn</button>
+                    <button class="ds-tag" type="button" data-channel="call" aria-pressed="false">Call</button>
+                  </div>
+                </div>
+                <div class="field__cell field__cell--wide">
+                  <label class="ds-label" for="composer-notes">Anything to work in <span class="font-normal text-ink-muted">optional</span></label>
+                  <input class="ds-field" id="composer-notes" placeholder="Reference the tender, keep it under 80 words" autocomplete="off" />
+                </div>
+              </div>
+            )}
+
+            {!agent.built && (
+              <div class="ds-banner ds-banner--drift stop">
+                <span class="ds-banner__label">Not built yet</span>
+                <p class="stop__body">
+                  {agent.does} The path stops here until this agent is built — nothing further in
+                  the sequence can run.
+                </p>
+              </div>
+            )}
+
+            {agent.built && (
+              <div class="step__actions" data-actions>
+                <button class="ds-btn ds-btn--accent" type="button" data-run>Run {agent.name}</button>
+                <span class="ds-mark ds-mark--live" data-running hidden>running</span>
+                <span class="ds-caption" data-waiting></span>
+              </div>
+            )}
+
+            <div class="ds-banner ds-banner--fault step__error" data-error hidden>
+              <span class="ds-banner__label">Could not run</span>
+              <span data-error-text></span>
+            </div>
+
+            <div class="step__people ds-arrive" data-people hidden></div>
+
+            <!-- Where a step's result is a set and the next step needs one of
+                 them, the pick sits on the result — choosing is not an agent's
+                 work, so it is not a step of its own.
+
+                 **After** the result, not before it. X-ray's pick rows name the
+                 same people as the table, and `paintPersonPicks` already
+                 describes that table as "above" — it was below. Reading three
+                 names, then reading them again with their evidence, inverts the
+                 decision: you review the people and then take one forward. -->
+            <div class="picks ds-arrive" data-picks hidden>
+              <p class="ds-eyebrow picks__head">Take one forward</p>
+              <ul class="ds-list picks__list" data-picks-list></ul>
+            </div>
+            <div class="step__brief ds-arrive" data-brief hidden></div>
+            <div class="step__touches ds-arrive" data-touches hidden></div>
+          </div>
+        </section>
+      ))}
+      </div>
+    </div>
+  </div>
+
+  <AgentViewStyles />
+
+  <style>
+    /* Screen-level layout only. The page scaffold is the shared `.agent-page`
+       column, the spine and step states are `.ds-run`/`.ds-step`, the tone
+       comes from the system — what is left here is this screen's own glue. */
+    .page__channel { margin-top: var(--space-2); color: rgb(var(--ink-muted)); }
+
+    /* Progress sits with the run's name, not orphaned under the title. The
+       meter needs centre alignment — it has no baseline to sit on. */
+    .run-head { align-items: center; }
+    .run-head__state { display: flex; align-items: center; gap: var(--space-4); }
+    .run-head__meter { width: 12rem; }
+
+    /* An open step's body is a card lifted off the field; a breath separates
+       it from the head it hangs under. The card owns the column width, so the
+       fields inside it fill rather than capping themselves. */
+    .ds-step__body { margin-top: var(--space-3); }
+    .field__row { display: flex; gap: var(--space-5); flex-wrap: wrap; }
+    .field__cell { flex: 1; min-width: 14rem; }
+    .field__cell--wide { margin-top: var(--space-4); }
+
+    .step__lead { max-width: var(--measure-read); }
+    .step__actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-5); }
+    .step__error { margin-top: var(--space-5); max-width: var(--measure-read); }
+    .step__people, .step__brief, .step__touches { margin-top: var(--space-5); }
+
+    .stop { max-width: var(--measure-read); }
+    .stop__body { margin: 0; }
+
+    .picks { margin-top: var(--space-6); }
+    .picks__head { padding-bottom: var(--space-2); }
+
+    /* Pick rows are painted by the script below, so their glue is reached
+       through `:global(...)` — scoped selectors never match nodes made at
+       runtime. A pick is a `.ds-row`; the one taken forward is `is-active`,
+       the grey well every selection in the system wears. */
+    .picks__list :global(.pick) { width: 100%; gap: var(--space-4); text-align: left; }
+    .picks__list :global(.pick__name) { font-weight: var(--weight-medium); color: rgb(var(--ink)); white-space: nowrap; }
+    .picks__list :global(.pick__why) { flex: 1; min-width: 0; font-size: var(--text-small); color: rgb(var(--ink-secondary)); }
+
+    @media (max-width: 60rem) {
+      .run-head { flex-wrap: wrap; }
+    }
+  </style>
+
+  <script>
+    import { pathBySlug } from '../../../lib/platform';
+    import {
+      absorb, canRun, clearRun, inputProblem, loadRun, pickCompany, pickPerson,
+      progress, requestFor, responseProblem, saveRun, summarise, walk,
+      type Carry, type StepInput,
+    } from '../../../lib/paths';
+    import { createPeopleList, type PeopleList } from '../../../lib/peopleList';
+    // The brief and the touches render the same here as on the agents' own pages.
+    import { paintBrief } from '../../../lib/briefView';
+    import { paintTouches } from '../../../lib/touchesView';
+    import { confirmAction } from '../../../lib/overlays';
+
+    const page = document.querySelector<HTMLElement>('[data-path]')!;
+    const path = pathBySlug(page.dataset.path!)!;
+
+    let carry: Carry = loadRun(path.slug);
+    /** Steps the person has deliberately reopened, so painting does not shut them. */
+    const reopened = new Set<string>();
+    let peopleList: PeopleList | null = null;
+    /** Composer's channel mix, and whatever came back unusable. */
+    let composerChannels: string[] = ['email'];
+    let composerMissing: string[] = [];
+
+    document.getElementById('composer-channels')?.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-channel]');
+      if (!button) return;
+      const channel = button.dataset.channel!;
+      composerChannels = composerChannels.includes(channel)
+        ? composerChannels.filter((c) => c !== channel)
+        : [...composerChannels, channel];
+      const on = composerChannels.includes(channel);
+      button.setAttribute('aria-pressed', String(on));
+      button.className = on ? 'ds-tag ds-tag--accent' : 'ds-tag';
+    });
+
+    const stepEl = (slug: string) => page.querySelector<HTMLElement>(`[data-step="${slug}"]`)!;
+    const within = <T extends HTMLElement>(slug: string, attr: string) =>
+      stepEl(slug).querySelector<T>(`[${attr}]`);
+
+    // ── Painting ────────────────────────────────────────────────────────────
+
+    function paint(): void {
+      const steps = walk(path, carry);
+
+      steps.forEach(({ agent, state, waiting, offersPick }) => {
+        const el = stepEl(agent.slug);
+        el.classList.remove('ds-step--done', 'ds-step--active', 'ds-step--waiting', 'ds-step--unbuilt');
+        el.classList.add(`ds-step--${state}`);
+
+        const summary = within(agent.slug, 'data-summary')!;
+        summary.textContent = state === 'done' ? summarise(agent.slug, carry) : agent.does;
+
+        const body = within(agent.slug, 'data-body')!;
+        // An unbuilt step shows its stop; a done step folds away until reopened.
+        body.hidden = state === 'done' && !reopened.has(agent.slug);
+
+        const head = within<HTMLButtonElement>(agent.slug, 'data-head')!;
+        head.disabled = state !== 'done';
+
+        const runBtn = within<HTMLButtonElement>(agent.slug, 'data-run');
+        const waitLabel = within(agent.slug, 'data-waiting');
+        if (runBtn) {
+          const ready = canRun(agent.slug, carry);
+          runBtn.disabled = !ready;
+          runBtn.textContent = state === 'done' ? `Run ${agent.name} again` : `Run ${agent.name}`;
+          if (waitLabel) waitLabel.textContent = ready ? '' : waiting;
+        }
+
+        paintPicks(agent.slug, offersPick);
+        if (agent.slug === 'xray') paintXray(state);
+        if (agent.slug === 'research') paintResearch();
+        if (agent.slug === 'composer') paintComposer();
+      });
+
+      const { done, runnable } = progress(path, carry);
+      const fill = document.getElementById('progress-fill')!;
+      fill.style.width = runnable ? `${(done / runnable) * 100}%` : '0%';
+      document.getElementById('progress-label')!.textContent = `${done} of ${runnable}`;
+
+      const restart = document.getElementById('restart') as HTMLButtonElement;
+      restart.hidden = done === 0;
+    }
+
+    /** GTM proposes companies; X-ray proposes people. Either way, one goes forward. */
+    function paintPicks(slug: string, offersPick: boolean): void {
+      if (slug === 'xray') { paintPersonPicks(offersPick); return; }
+
+      const box = within(slug, 'data-picks');
+      if (!box) return;
+      const companies = carry.companies ?? [];
+      box.hidden = !offersPick || companies.length === 0;
+      if (box.hidden) return;
+
+      const list = within(slug, 'data-picks-list')!;
+      list.innerHTML = '';
+      companies.forEach((company) => {
+        const li = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `ds-row pick${company.name === carry.company ? ' is-active' : ''}`;
+        button.innerHTML = '<span class="pick__name"></span><span class="pick__why"></span><span class="ds-mono">→</span>';
+        // Model output — set as text, never as markup.
+        button.querySelector('.pick__name')!.textContent = company.name;
+        button.querySelector('.pick__why')!.textContent = company.why;
+        button.addEventListener('click', () => {
+          carry = pickCompany(company.name, carry);
+          saveRun(path.slug, carry);
+          paint();
+        });
+        li.appendChild(button);
+        list.appendChild(li);
+      });
+    }
+
+    /**
+     * Research prefills from the run and says what it will use.
+     *
+     * The company field is filled from the carry rather than being read-only: on
+     * the inbound path nothing upstream supplies one, and the same step has to work
+     * both ways.
+     */
+    function paintResearch(): void {
+      const field = document.getElementById('research-company') as HTMLInputElement | null;
+      if (field && !field.value && carry.company) field.value = carry.company;
+
+      const lead = within('research', 'data-research-lead');
+      if (!lead) return;
+
+      const person = carry.person
+        ? (carry.person.full_name || carry.person.name || 'the person picked above')
+        : '';
+      if (carry.lead && person) {
+        lead.textContent = `Will research ${carry.company} and ${person}, using the scored verdict — `
+          + 'the grade, what drove it and the product fit all sharpen the brief.';
+      } else if (carry.lead) {
+        lead.textContent = `Will research ${carry.company} using the scored verdict.`;
+      } else if (person) {
+        lead.textContent = `Will research the company and ${person}.`;
+      } else {
+        lead.textContent = 'Name the company. A decision-maker picked above makes the brief sharper.';
+      }
+
+      const mount = within('research', 'data-brief');
+      if (!mount) return;
+      if (carry.brief) {
+        paintBrief(mount, carry.brief);
+        mount.hidden = false;
+      } else {
+        mount.hidden = true;
+      }
+    }
+
+    /** Composer shows what it wrote, and that nothing has been sent. */
+    function paintComposer(): void {
+      const mount = within('composer', 'data-touches');
+      if (!mount) return;
+      if (carry.drafts && Object.keys(carry.drafts).length) {
+        paintTouches(mount, carry.drafts, composerMissing);
+        mount.hidden = false;
+      } else {
+        mount.hidden = true;
+      }
+    }
+
+    /**
+     * Choosing the decision-maker Research will profile.
+     *
+     * Names only — the emails and phone numbers on these rows were paid for and
+     * belong in the table above, or in a saved shortlist. Repeating them here would
+     * spread the same personal data across one more place for no gain.
+     */
+    function paintPersonPicks(offersPick: boolean): void {
+      const box = within('xray', 'data-picks');
+      if (!box) return;
+      const people = carry.people ?? [];
+      box.hidden = !offersPick || people.length === 0;
+      if (box.hidden) return;
+
+      const head = box.querySelector('.picks__head');
+      if (head) head.textContent = 'Who should the brief be about?';
+
+      const list = within('xray', 'data-picks-list')!;
+      list.innerHTML = '';
+      people.forEach((person) => {
+        const name = person.full_name || person.name || '—';
+        const picked = carry.person
+          && (carry.person.linkedin_url || carry.person.full_name || carry.person.name) ===
+             (person.linkedin_url || person.full_name || person.name);
+
+        const li = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `ds-row pick${picked ? ' is-active' : ''}`;
+        button.innerHTML = '<span class="pick__name"></span><span class="pick__why"></span><span class="ds-mono">→</span>';
+        button.querySelector('.pick__name')!.textContent = name;
+        button.querySelector('.pick__why')!.textContent = person.job_title || '';
+        button.addEventListener('click', () => {
+          carry = pickPerson(person, carry);
+          saveRun(path.slug, carry);
+          paint();
+        });
+        li.appendChild(button);
+        list.appendChild(li);
+      });
+    }
+
+    /** X-ray states what it will search, and shows what it found. */
+    function paintXray(state: string): void {
+      const lead = within('xray', 'data-xray-lead');
+      if (lead) {
+        lead.textContent = carry.company
+          ? carry.lead
+            ? `Searching ${carry.company}, grounded in the scored signal — the grade, what drove it, and the product fit all sharpen who comes back.`
+            : `Searching ${carry.company} for everyone matching the ICP.`
+          : 'A company is needed before people can be found.';
+      }
+
+      const mount = within('xray', 'data-people')!;
+      const found = carry.people;
+      mount.hidden = !found?.length;
+      if (!found?.length) return;
+
+      if (!peopleList) {
+        // Same spend rule as the X-ray page: an email arrives with the person.
+        peopleList = createPeopleList(mount, { allowSave: true, autoEnrich: true });
+      }
+      // Re-rendering on every paint would drop revealed details, so the table is
+      // only refilled when the run's people actually changed.
+      if (mount.dataset.showing !== String(found.length) || mount.dataset.company !== carry.company) {
+        mount.dataset.showing = String(found.length);
+        mount.dataset.company = carry.company ?? '';
+        peopleList.render(found, { source: carry.company ?? '' });
+      }
+    }
+
+    // ── Reopening a finished step ───────────────────────────────────────────
+
+    page.querySelectorAll<HTMLButtonElement>('[data-head]').forEach((head) => {
+      head.addEventListener('click', () => {
+        const slug = head.closest<HTMLElement>('[data-step]')!.dataset.step!;
+        reopened.has(slug) ? reopened.delete(slug) : reopened.add(slug);
+        paint();
+      });
+    });
+
+    // ── Running a step ──────────────────────────────────────────────────────
+
+    function inputFor(slug: string): StepInput {
+      if (slug === 'scoring') {
+        return { text: (document.getElementById('scoring-text') as HTMLTextAreaElement).value };
+      }
+      if (slug === 'gtm') {
+        return {
+          vertical: (document.getElementById('gtm-vertical') as HTMLInputElement).value,
+          seedCompany: (document.getElementById('gtm-seed') as HTMLInputElement).value,
+          notes: (document.getElementById('gtm-notes') as HTMLInputElement).value,
+        };
+      }
+      if (slug === 'research') {
+        return {
+          company: (document.getElementById('research-company') as HTMLInputElement).value,
+          notes: (document.getElementById('research-notes') as HTMLInputElement).value,
+        };
+      }
+      if (slug === 'composer') {
+        return {
+          channels: composerChannels,
+          notes: (document.getElementById('composer-notes') as HTMLInputElement).value,
+        };
+      }
+      return {};
+    }
+
+    page.querySelectorAll<HTMLButtonElement>('[data-run]').forEach((button) => {
+      const slug = button.closest<HTMLElement>('[data-step]')!.dataset.step!;
+      button.addEventListener('click', () => run(slug, button));
+    });
+
+    async function run(slug: string, button: HTMLButtonElement): Promise<void> {
+      const errorBox = within(slug, 'data-error')!;
+      const errorText = within(slug, 'data-error-text')!;
+      const running = within(slug, 'data-running')!;
+
+      const input = inputFor(slug);
+      const problem = inputProblem(slug, input, carry);
+      if (problem) {
+        errorText.textContent = problem;
+        errorBox.hidden = false;
+        return;
+      }
+
+      errorBox.hidden = true;
+      button.disabled = true;
+      running.hidden = false;
+      try {
+        const { url, body } = requestFor(slug, carry, input);
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          throw new Error((await res.json().catch(() => ({}))).detail || `The step failed (${res.status})`);
+        }
+
+        const result = await res.json();
+        // A 200 is not the same as a usable answer — see `responseProblem`.
+        const problem = responseProblem(slug, result);
+        if (problem) throw new Error(problem);
+
+        // Composer names what it could not write; the touch view states it rather
+        // than leaving a requested channel silently absent.
+        if (slug === 'composer') composerMissing = result.missing ?? [];
+        carry = absorb(slug, result, carry);
+        saveRun(path.slug, carry);
+        // A re-run replaces its own result, so the step folds back up.
+        reopened.delete(slug);
+        paint();
+      } catch (err: any) {
+        errorText.textContent = err?.message || 'The step did not complete.';
+        errorBox.hidden = false;
+      } finally {
+        running.hidden = true;
+        button.disabled = false;
+        paint();
+      }
+    }
+
+    // ── Starting over ───────────────────────────────────────────────────────
+
+    document.getElementById('restart')!.addEventListener('click', async () => {
+      const confirmed = await confirmAction({
+        title: 'Start this path over?',
+        body: 'What each step found is discarded. Anything saved as a shortlist is kept.',
+        confirm: 'Start over',
+      });
+      if (!confirmed) return;
+
+      carry = {};
+      clearRun(path.slug);
+      reopened.clear();
+      peopleList = null;
+      const mount = within('xray', 'data-people');
+      if (mount) { mount.innerHTML = ''; delete mount.dataset.showing; delete mount.dataset.company; }
+      paint();
+    });
+
+    // A run restored from a previous visit has had revealed emails and phone
+    // numbers stripped — those live in a saved shortlist, not in browser storage.
+    paint();
+  </script>
+</PlatformLayout>

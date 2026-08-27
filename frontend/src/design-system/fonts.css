@@ -1,0 +1,68 @@
+/* ============================================================================
+   Cadence Design System — font faces
+   ----------------------------------------------------------------------------
+   The design system declares two faces by their real names: `Roboto` and
+   `Kode Mono`. The design project self-hosts them; the app installs them from
+   npm, where fontsource registers its variable builds under *invented* family
+   names — `Roboto Variable`, `Kode Mono Variable`.
+
+   Rather than bend `tokens.css` to fontsource's naming — which is what made the
+   platform's type drift from the previews — the packaged files are declared
+   here under the names the system actually uses. `tokens.css` therefore stays
+   byte-identical to the design project, and the app renders the faces the cards
+   render.
+
+   Roboto matters specifically: Google redrew it in 2022. `@fontsource/roboto`
+   ships the OLD static drawing, which is why the app looked wrong even though
+   both said "Roboto". These point at the variable builds — the current drawing,
+   and the one the design project uses.
+
+   Both axes are declared as ranges, so a single file serves every weight the
+   system asks for instead of one request per weight.
+   ========================================================================== */
+
+/* Roboto — the brand face. Weight axis covers thin (100) through bold (700). */
+@font-face {
+  font-family: 'Roboto';
+  src: url('@fontsource-variable/roboto/files/roboto-latin-wght-normal.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Roboto';
+  src: url('@fontsource-variable/roboto/files/roboto-latin-ext-wght-normal.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+    U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Kode Mono — the machine's readout. Weight axis 400–700. */
+@font-face {
+  font-family: 'Kode Mono';
+  src: url('@fontsource-variable/kode-mono/files/kode-mono-latin-wght-normal.woff2') format('woff2-variations');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Kode Mono';
+  src: url('@fontsource-variable/kode-mono/files/kode-mono-latin-ext-wght-normal.woff2') format('woff2-variations');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+    U+2113, U+2C60-2C7F, U+A720-A7FF;
+}

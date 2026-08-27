@@ -1,0 +1,73 @@
+---
+/**
+ * One analysed call.
+ *
+ * Moved from `agents/calls/call.astro` onto the platform shell. `AnalysisResult`
+ * is reused untouched: three other surfaces render the same component, and forking
+ * it to restyle this one page would leave four copies of the same reading to keep
+ * in step. It moves with them when the `calls` section is retired.
+ *
+ * Addressed by `?id=` as it always was — the site builds static, so the id cannot
+ * be a path segment.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import AnalysisResult from '../../../components/AnalysisResult.astro';
+---
+<PlatformLayout title="Call analysis" requires="calls">
+  <div class="ds-page">
+    <header class="ds-page__head">
+      <p class="ds-eyebrow">Learn · call library</p>
+      <h1 class="ds-heading ds-page__title" id="title">Call analysis</h1>
+      <p class="ds-mono page__when" id="when"></p>
+    </header>
+
+    <div id="state" class="ds-small state">loading analysis…</div>
+
+    <!-- The shared reading, hidden until it has something to show. -->
+    <AnalysisResult showClear={false} />
+  </div>
+
+  <style>
+    /* Screen-level layout only. The head sits on `.ds-page`; the shared
+       `AnalysisResult` carries its own styling. */
+    .page__when { color: rgb(var(--ink-muted)); }
+    .state { color: rgb(var(--ink-muted)); padding-block: var(--space-8); }
+  </style>
+
+  <script>
+    const state = document.getElementById('state')!;
+    const id = new URLSearchParams(window.location.search).get('id');
+
+    function fail(message: string): void {
+      state.textContent = message;
+    }
+
+    if (!id) {
+      fail('no call requested');
+    } else {
+      fetch(`/api/sales/calls/${encodeURIComponent(id)}`)
+        .then((res) => {
+          if (res.status === 404) throw new Error('missing');
+          if (!res.ok) throw new Error(String(res.status));
+          return res.json();
+        })
+        .then((session) => {
+          const result = session.result || {};
+          result._title = session.title || 'Call analysis';
+          result._call_id = session.id;
+
+          document.title = `${result._title} — Cadence`;
+          document.getElementById('title')!.textContent = result._title;
+          document.getElementById('when')!.textContent = session.timestamp || '';
+
+          (window as any).renderAnalysisResult(result);
+          state.hidden = true;
+        })
+        .catch((err: Error) => {
+          fail(err.message === 'missing'
+            ? 'no such call — it may have been deleted'
+            : 'could not load this analysis — is the backend running?');
+        });
+    }
+  </script>
+</PlatformLayout>

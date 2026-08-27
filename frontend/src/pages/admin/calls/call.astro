@@ -1,54 +1,69 @@
 ---
-import DashboardLayout from '../../../layouts/DashboardLayout.astro';
+/**
+ * One call, seen by an admin.
+ *
+ * The same shared `AnalysisResult` every other call surface renders — the only
+ * difference is the endpoint, which reaches across users, and the owner shown
+ * beside the title.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
 import AnalysisResult from '../../../components/AnalysisResult.astro';
 ---
-<DashboardLayout title="Admin · Call">
-  <div class="px-10 py-12 max-w-4xl">
+<PlatformLayout title="Call">
+  <div class="ds-page">
+    <header class="ds-page__head">
+      <p class="ds-eyebrow">Admin · calls</p>
+      <h1 class="ds-heading ds-page__title" id="call-heading">Call analysis</h1>
+      <span class="ds-mark ds-mark--idle" id="call-owner" hidden></span>
+    </header>
 
-    <div class="mb-8">
-      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Admin · Calls</p>
-      <h1 id="call-heading" class="text-3xl font-semibold tracking-tightest leading-tight mb-3">Call Analysis.</h1>
-      <a href="/admin" class="font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">← admin dashboard</a>
-    </div>
-
-    <div id="load-state" class="py-8 font-mono text-xs text-ink-muted">// loading analysis…</div>
+    <div class="ds-small state" id="load-state">loading analysis…</div>
 
     <AnalysisResult showClear={false} />
-
   </div>
 
+  <style>
+    /* Screen-level layout only. The head sits on `.ds-page`; the shared
+       `AnalysisResult` carries its own styling. */
+    .state { color: rgb(var(--ink-muted)); padding-block: var(--space-8); }
+  </style>
+
   <script>
-    const params    = new URLSearchParams(window.location.search);
-    const id        = params.get('id');
-    const loadState = document.getElementById('load-state')!;
-    const heading   = document.getElementById('call-heading')!;
+    const byId = (id: string) => document.getElementById(id)!;
+    const id = new URLSearchParams(window.location.search).get('id');
+
+    function fail(message: string): void {
+      const state = byId('load-state');
+      state.textContent = message;
+      state.style.color = 'rgb(var(--signal-fault))';
+    }
 
     if (!id) {
-      loadState.textContent  = '// no call id provided';
-      loadState.className    = 'py-8 font-mono text-xs text-signal-danger';
+      fail('no call id provided');
     } else {
       fetch(`/api/admin/calls/${encodeURIComponent(id)}`)
-        .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
-        .then(session => {
+        .then((r) => { if (!r.ok) throw new Error('not found'); return r.json(); })
+        .then((session) => {
           const result = session.result || {};
-          result._title = session.title || 'Call Analysis';
-          (window as any).renderAnalysisResult(result);
-          loadState.remove();
-          const label = (session.title || 'Call Analysis') + (session.timestamp ? ' · ' + session.timestamp : '');
-          heading.textContent = label;
+          result._title = session.title || 'Call analysis';
+          result._call_id = session.id;
+
+          const label = (session.title || 'Call analysis')
+            + (session.timestamp ? ' · ' + session.timestamp : '');
+          byId('call-heading').textContent = session.title || 'Call analysis';
+
+          // Whose call it is — the one thing this view adds over the others.
           if (session.username) {
-            const chip = document.createElement('span');
-            chip.className   = 'ml-3 font-mono text-[11px] uppercase tracking-label text-ink-muted';
-            chip.textContent = session.username;
-            heading.appendChild(chip);
+            const owner = byId('call-owner');
+            owner.textContent = session.username;
+            owner.hidden = false;
           }
-          const arHeading = document.getElementById('ar-heading');
-          if (arHeading) arHeading.textContent = label;
+
+          (window as any).renderAnalysisResult(result);
+          byId('ar-heading').textContent = label;
+          byId('load-state').hidden = true;
         })
-        .catch(() => {
-          loadState.textContent = '// analysis not found';
-          loadState.className   = 'py-8 font-mono text-xs text-signal-danger';
-        });
+        .catch(() => fail('analysis not found'));
     }
   </script>
-</DashboardLayout>
+</PlatformLayout>

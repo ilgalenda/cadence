@@ -30,6 +30,15 @@ CALLS_DIR = DYNAMIC_DIR / "calls"
 LEAD_DIR = DYNAMIC_DIR / "lead"
 DYNAMIC_GLOSSARY_DIR = DYNAMIC_DIR / "glossary"
 
+#: Where a learning came from, and therefore which directory holds it.
+#:
+#: A closed vocabulary because the destination used to be inferred from the
+#: free-text `agent` name — `CALLS_DIR if agent == "calls" else LEAD_DIR`. When
+#: the calls agent was renamed to `call_analysis`, every learning Knowledge
+#: Capture wrote fell through to the else-branch and was filed under leads,
+#: unnoticed for a month, because a fallback cannot fail.
+_LEARNING_DIRS: dict[str, Path] = {"call": CALLS_DIR, "lead": LEAD_DIR}
+
 # Pillar 3 — Added Knowledge (user corrections, admin-gated)
 ADDED_DIR = VAULT_DIR / "added"
 ADDED_PENDING_DIR = ADDED_DIR / "pending"
@@ -57,14 +66,14 @@ for _d in [
 # ---------------------------------------------------------------------------
 
 _LINK_ENTITIES: dict[str, tuple[str, str]] = {
-    # Timebeat products
+    # Acme products
     "White Rabbit Ecosystem":  ("product",   "white-rabbit"),
     "Open Time Server":        ("product",   "open-time-server"),
     "Open Timecard":           ("product",   "open-timecard"),
     "Clock Quorum":            ("product",   "clock-quorum"),
     "Clock Sync Software":     ("product",   "clock-sync-software"),
     "Time as a Service":       ("product",   "taas"),
-    "Timebeat Mini":           ("product",   "timebeat-mini"),
+    "Acme Mini":           ("product",   "acme-mini"),
     "P2P Squared":             ("product",   "p2p-squared"),
     "PTP Squared":             ("product",   "ptp-squared"),
     "White Rabbit":            ("product",   "white-rabbit"),
@@ -97,7 +106,7 @@ _LINK_ENTITIES: dict[str, tuple[str, str]] = {
     "ISO 9001":                ("regulatory","iso-9001"),
     "DORA":                    ("regulatory","dora"),
     # Key customers / partners
-    "Nokia":                   ("customer",  "nokia"),
+    "Arclight Networks":                   ("customer",  "arclight-networks"),
     "Microsoft":               ("customer",  "microsoft"),
     "Green Key":               ("customer",  "green-key"),
     "McLaren":                 ("customer",  "mclaren"),
@@ -232,6 +241,7 @@ def write_learning(
     description: str,
     content: str,
     category: str,
+    origin: str,
     agent: str,
     contributed_by: str,
     source_id: str,
@@ -245,11 +255,20 @@ def write_learning(
     Requires both `title` and `description` — every runtime write must carry
     a one-sentence summary used by Owl, Obsidian property views, and the
     admin UI. Returns the written file path.
+
+    `origin` decides the directory and must name one of `_LEARNING_DIRS`;
+    `agent` is attribution only. They are separate because who wrote a learning
+    and where it belongs are different questions, and conflating them is what
+    misfiled a month of writes.
     """
     if not title or not title.strip():
         raise ValueError("write_learning: title is required")
     if not description or not description.strip():
         raise ValueError("write_learning: description is required (one-sentence summary)")
+    if origin not in _LEARNING_DIRS:
+        raise ValueError(
+            f"write_learning: origin must be one of {sorted(_LEARNING_DIRS)}, not {origin!r}"
+        )
 
     enriched_body, detected_products, detected_tags = _inject_links_and_enrich_meta(
         content,
@@ -260,7 +279,7 @@ def write_learning(
     entry_id = uuid.uuid4().hex
     slug = _slug(title)
     filename = f"{entry_id[:8]}--{slug}.md"
-    target_dir = CALLS_DIR if agent == "calls" else LEAD_DIR
+    target_dir = _LEARNING_DIRS[origin]
 
     meta = {
         "id": entry_id,
@@ -283,40 +302,13 @@ def write_learning(
     return path
 
 
-def write_entity(
-    *,
-    title: str,
-    entity_type: str,
-    description: str,
-    tags: list[str] | None = None,
-    aliases: list[str] | None = None,
-) -> Path:
-    """Write a curated entity file (product / term / protocol / customer).
-
-    Entity files are the link targets for [[wikilinks]] in learning entries.
-    Idempotent: overwrites if the file already exists (entity definitions can be updated).
-    """
-    slug = _slug(title)
-    path = ENTITIES_DIR / f"{slug}.md"
-    meta = {
-        "id": uuid.uuid4().hex,
-        "title": title,
-        "type": "entity",
-        "entity_type": entity_type,
-        "aliases": aliases or [],
-        "tags": tags or [],
-    }
-    path.write_text(_write_fm(meta) + "\n\n" + description.strip(), encoding="utf-8")
-    invalidate_vault_cache()
-    return path
-
-
 def write_glossary_term(
     *,
     term: str,
     description: str,
     body: str = "",
     source_id: str,
+    source_title: str,
     contributed_by: str,
     aliases: list[str] | None = None,
     tags: list[str] | None = None,
@@ -326,9 +318,14 @@ def write_glossary_term(
     Skips if the term exists in either the Company-tier seed glossary
     (`company/glossary/`) or the Dynamic glossary (`dynamic/glossary/`).
     `description` is the short one/two-sentence summary surfaced everywhere.
-    `body` is the full expanded entry (definition + Timebeat context + sales
+    `body` is the full expanded entry (definition + Acme context + sales
     note + related products). If `body` is empty, `description` is used.
     Returns path or None if the term is already known.
+
+    `source_title` is stored beside `source_id` deliberately. The call library
+    trims at `MAX_SESSIONS` and deleting a call cleans nothing up, so a term
+    outlives the record of where it came from; without the title captured here,
+    a term whose call is gone can only show a bare hex id.
     """
     if not description or not description.strip():
         raise ValueError("write_glossary_term: description is required")
@@ -346,6 +343,7 @@ def write_glossary_term(
         "aliases": aliases or [],
         "tags": tags or [],
         "first_seen_in": source_id,
+        "source_title": source_title,
         "contributed_by": contributed_by,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -413,6 +411,99 @@ def write_added_knowledge(
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     path.write_text(_write_fm(meta) + "\n\n" + enriched_body, encoding="utf-8")
+    return path
+
+
+def write_contribution(
+    *,
+    title: str,
+    description: str,
+    content: str,
+    kind: str,
+    contributed_by: str,
+    entity_type: str = "",
+    aliases: list[str] | None = None,
+    tags: list[str] | None = None,
+    products: list[str] | None = None,
+    source: str = "",
+    confidence: str = "medium",
+    batch_id: str = "",
+    display_name: str = "",
+) -> Path:
+    """Write one contributed knowledge entry into the Added pillar pending queue.
+
+    The sibling of :func:`write_added_knowledge`, for knowledge someone hands
+    over in bulk rather than a correction to something Owl said in a session. It
+    lands in the same `added/pending/` queue and is **not** loaded by Owl until an
+    admin approves it — `approve_added`, `reject_added`, `list_added` and the
+    admin surface all work on frontmatter and do not care that `type` here is
+    `contribution` rather than `correction`.
+
+    `kind` records which part of the vault the knowledge is destined for. It is
+    not acted on: filing into `company/` is a judgement an admin makes at
+    approval, and guessing it at import would put unreviewed material into the
+    canonical pillar.
+
+    `contributed_by` is a **Cadence username**, not a display name: it is what
+    `contributions_by` matches on to show a person their own work. `display_name`
+    is the human form used in the provenance line that reaches Owl's prompt, and
+    falls back to the username when it is not given.
+
+    `content` is expected to have been through
+    :func:`agents.shared.contributions.normalise_entry`, which demotes its
+    headings so it cannot impersonate a section of Owl's assembled prompt.
+    """
+    if not title or not title.strip():
+        raise ValueError("write_contribution: title is required")
+    if not description or not description.strip():
+        raise ValueError("write_contribution: description is required")
+    if not content or not content.strip():
+        raise ValueError("write_contribution: content is required")
+    if not contributed_by or not contributed_by.strip():
+        raise ValueError("write_contribution: contributed_by is required")
+
+    enriched_body, detected_products, detected_tags = _inject_links_and_enrich_meta(
+        content,
+        existing_products=list(products or []),
+        existing_tags=list(tags or []),
+    )
+
+    entry_id = uuid.uuid4().hex
+    filename = f"{entry_id[:8]}--{_slug(title)}.md"
+    path = ADDED_PENDING_DIR / filename
+
+    meta = {
+        "id": entry_id,
+        "title": title.strip(),
+        "description": description.strip(),
+        "tier": "added",
+        "status": "pending",
+        "type": "contribution",
+        "kind": kind,
+        "entity_type": entity_type,
+        "aliases": list(aliases or []),
+        "contributed_by": contributed_by.strip(),
+        "source": source.strip(),
+        "confidence": confidence,
+        "batch_id": batch_id,
+        "tags": detected_tags,
+        "products": detected_products,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # The provenance line is part of the body, not only the frontmatter, because
+    # `_fmt_learning_for_context` renders the body into Owl's prompt under a
+    # heading that says to treat the section as authoritative. Whose knowledge it
+    # is should travel with it into that prompt.
+    provenance = f"*Contributed by {(display_name or contributed_by).strip()}"
+    if source.strip():
+        provenance += f", from {source.strip()}"
+    provenance += f". Confidence: {confidence}.*"
+
+    path.write_text(
+        _write_fm(meta) + "\n\n" + provenance + "\n\n" + enriched_body,
+        encoding="utf-8",
+    )
     return path
 
 
@@ -490,6 +581,85 @@ def list_added(status: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Attribution — who contributed what
+# ---------------------------------------------------------------------------
+# Presentation only. The vault is global and every approved entry is in every
+# user's context; these helpers answer "which of it is this person's", so their
+# own work can be named as theirs rather than dissolving into the corpus. They
+# filter nothing out of anybody's view.
+
+
+def contributions_by(
+    username: str,
+    *,
+    tags: list[str] | None = None,
+    products: list[str] | None = None,
+    max_added: int = 60,
+) -> tuple[list["_Candidate"], set[str]]:
+    """One person's approved entries, and the ids the shared section selected.
+
+    Returns `(mine, selected_ids)`. `mine` is everything in `added/approved/`
+    attributed to `username`, newest-scoring first. `selected_ids` is what
+    `_build_added_section` chose for this turn with the same arguments, so a
+    caller can tell which of `mine` is already quoted in the prompt and which
+    would otherwise be missing.
+
+    Matching is on `contributed_by`, falling back to `submitted_by` — bulk
+    contributions carry the first, Owl-session corrections the second.
+    """
+    if not username or not username.strip():
+        return [], set()
+
+    _, selected = _build_added_section(tags, products, max_added)
+    selected_ids = {c.entry_id for c in selected if c.entry_id}
+
+    wanted = username.strip().casefold()
+    mine: list[_Candidate] = []
+    for path in ADDED_APPROVED_DIR.glob("*.md"):
+        try:
+            text = path.read_text(encoding="utf-8")
+            meta, body = _parse_fm(text)
+            if not body.strip():
+                continue
+            owner = str(meta.get("contributed_by") or meta.get("submitted_by") or "").strip()
+            if owner.casefold() != wanted:
+                continue
+            mine.append(
+                _Candidate(
+                    score=_score_candidate(meta, tags, products),
+                    created_at=meta.get("created_at", ""),
+                    title=meta.get("title", ""),
+                    category=meta.get("category", ""),
+                    contributed_by=owner,
+                    tags=meta.get("tags", []) if isinstance(meta.get("tags"), list) else [],
+                    products=meta.get("products", []) if isinstance(meta.get("products"), list) else [],
+                    body=body,
+                    entry_id=meta.get("id", ""),
+                )
+            )
+        except Exception:
+            pass
+
+    mine.sort(key=lambda c: (c.score, c.created_at), reverse=True)
+    return mine, selected_ids
+
+
+def format_for_context(candidate: "_Candidate") -> str:
+    """One candidate rendered the way every vault section renders its entries."""
+    return _fmt_learning_for_context(
+        {
+            "title": candidate.title,
+            "category": candidate.category,
+            "contributed_by": candidate.contributed_by,
+            "created_at": candidate.created_at,
+            "tags": candidate.tags,
+            "products": candidate.products,
+        },
+        candidate.body,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Retrofitting — enrich existing files in place
 # ---------------------------------------------------------------------------
 
@@ -550,6 +720,10 @@ class _Candidate:
     tags: list[str] = field(default_factory=list)
     products: list[str] = field(default_factory=list)
     body: str = ""
+    #: The entry's vault id, when it has one. Added-pillar callers need to know
+    #: *which* entries were selected, so a contributor's own unselected work can
+    #: be carried separately; learnings never set it.
+    entry_id: str = ""
 
 
 def _score_candidate(meta: dict, tags: list[str] | None, products: list[str] | None) -> float:
@@ -747,24 +921,78 @@ def _build_learnings_section(
     return section, selected
 
 
-def _build_added_section(max_added: int) -> str | None:
-    """# Approved Added Knowledge — admin-blessed user corrections."""
-    approved_blocks: list[str] = []
-    approved_paths = sorted(ADDED_APPROVED_DIR.glob("*.md"), reverse=True)[:max_added]
-    for path in approved_paths:
+def _build_added_section(
+    tags: list[str] | None,
+    products: list[str] | None,
+    max_added: int,
+) -> tuple[str | None, list["_Candidate"]]:
+    """# Approved Added Knowledge — admin-blessed corrections and contributions.
+
+    Returns (section, selected). Scored exactly as the learnings section is, and
+    for the same reason: the pillar is now bigger than the budget, so which
+    entries reach the prompt has to be a decision rather than an accident.
+
+    **It used to be an accident.** The selection was
+    `sorted(ADDED_APPROVED_DIR.glob("*.md"), reverse=True)[:max_added]`, and the
+    filenames it sorted are `{uuid4().hex[:8]}--{slug}.md` — so the sort key was
+    random. Below the cap nobody noticed; above it, an import of two hundred
+    entries would have put twenty arbitrary ones in front of Owl and silently
+    discarded the rest. `list_added` still sorts that way, which is harmless
+    because the admin queue shows every entry rather than a slice.
+
+    `selected` is returned so a caller can tell which entries made it — the
+    own-contributions block carries a contributor's *unselected* work, and needs
+    to know which that is to avoid repeating what is already in the prompt.
+    """
+    candidates: list[_Candidate] = []
+    for path in ADDED_APPROVED_DIR.glob("*.md"):
         try:
             text = path.read_text(encoding="utf-8")
             meta, body = _parse_fm(text)
-            approved_blocks.append(_fmt_learning_for_context(meta, body))
+            if not body.strip():
+                continue
+            candidates.append(
+                _Candidate(
+                    score=_score_candidate(meta, tags, products),
+                    created_at=meta.get("created_at", ""),
+                    title=meta.get("title", ""),
+                    category=meta.get("category", ""),
+                    # Corrections carry `submitted_by`, contributions `contributed_by`.
+                    contributed_by=meta.get("contributed_by") or meta.get("submitted_by", ""),
+                    tags=meta.get("tags", []) if isinstance(meta.get("tags"), list) else [],
+                    products=meta.get("products", []) if isinstance(meta.get("products"), list) else [],
+                    body=body,
+                    entry_id=meta.get("id", ""),
+                )
+            )
         except Exception:
             pass
-    if approved_blocks:
-        return (
-            f"# Approved Added Knowledge ({len(approved_blocks)} entries)\n\n"
-            "*Admin-approved corrections submitted by users. Treat as authoritative.*\n\n"
-            + "\n\n---\n\n".join(approved_blocks)
+
+    candidates.sort(key=lambda c: (c.score, c.created_at), reverse=True)
+    selected = candidates[:max_added]
+    if not selected:
+        return None, []
+
+    blocks = [
+        _fmt_learning_for_context(
+            {
+                "title": c.title,
+                "category": c.category,
+                "contributed_by": c.contributed_by,
+                "created_at": c.created_at,
+                "tags": c.tags,
+                "products": c.products,
+            },
+            c.body,
         )
-    return None
+        for c in selected
+    ]
+    section = (
+        f"# Approved Added Knowledge ({len(selected)} entries)\n\n"
+        "*Admin-approved knowledge submitted by the team. Treat as authoritative.*\n\n"
+        + "\n\n---\n\n".join(blocks)
+    )
+    return section, selected
 
 
 def _build_referenced_entities_section(
@@ -803,7 +1031,10 @@ def load_vault_for_context(
     tags: list[str] | None = None,
     products: list[str] | None = None,
     max_learnings: int = 30,
-    max_added: int = 20,
+    # Raised from 20 with the scoring fix. Entries are short — a correction is
+    # two sentences — and the pillar is about to take bulk imports, so a budget
+    # that small would discard most of what is contributed.
+    max_added: int = 60,
 ) -> str:
     """Assemble Owl's full context across the three Cadence Knowledge pillars.
 
@@ -834,8 +1065,9 @@ def load_vault_for_context(
     if learnings_section is not None:
         parts.append(learnings_section)
 
-    if (s := _build_added_section(max_added)) is not None:
-        parts.append(s)
+    added_section, _selected_added = _build_added_section(tags, products, max_added)
+    if added_section is not None:
+        parts.append(added_section)
 
     if selected:
         if (s := _build_referenced_entities_section(selected, loaded_entity_slugs)) is not None:
@@ -1155,53 +1387,3 @@ def invalidate_vault_cache() -> None:
     """
     _vault_session_cache.clear()
 
-
-# Claude Sonnet 4.6 pricing, USD per million tokens.
-# input applies to uncached input; cache writes cost 1.25x and reads 0.1x.
-_SONNET_46_RATES_PER_MTOK = {
-    "input": 3.00,
-    "output": 15.00,
-    "cache_write": 3.75,
-    "cache_read": 0.30,
-}
-
-
-def log_cache_usage(label: str, usage) -> None:
-    """Print per-call token counts and an estimated cost for one response.
-
-    `usage` is the `response.usage` object from the Anthropic SDK. Safe to call
-    on streaming results once the stream has finished and `get_final_message()`
-    has been awaited; otherwise pass the resolved usage explicitly.
-
-    Breaks the input down into the three billing tiers (uncached input, cache
-    write, cache read) plus output, reports the total tokens that flowed through
-    the call, and estimates cost at Sonnet 4.6 rates. Cost assumes the caller is
-    on claude-sonnet-4-6; treat it as indicative for other models.
-    """
-    if usage is None:
-        return
-    try:
-        created = getattr(usage, "cache_creation_input_tokens", 0) or 0
-        read = getattr(usage, "cache_read_input_tokens", 0) or 0
-        inp = getattr(usage, "input_tokens", 0) or 0
-        out = getattr(usage, "output_tokens", 0) or 0
-
-        # Total prompt size = uncached input + cache write + cache read.
-        total_input = inp + created + read
-        total_tokens = total_input + out
-
-        rates = _SONNET_46_RATES_PER_MTOK
-        cost = (
-            inp * rates["input"]
-            + created * rates["cache_write"]
-            + read * rates["cache_read"]
-            + out * rates["output"]
-        ) / 1_000_000
-
-        print(
-            f"[cache] {label} read={read} create={created} input={inp} "
-            f"output={out} total_in={total_input} total={total_tokens} "
-            f"cost=${cost:.4f}"
-        )
-    except Exception:
-        pass

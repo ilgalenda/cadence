@@ -1,0 +1,187 @@
+---
+/**
+ * Campaign intelligence — what this market already told us.
+ *
+ * The market is all this needs. Named on its own it recalls the market broadly;
+ * given a company too, the recall is aimed at the account being prepared for.
+ * Inside a path it runs after Research and takes the market from the brief, which
+ * is why nothing here asks for a market twice.
+ *
+ * Nothing is kept. An outline costs two model calls against local files, so it is
+ * cheaper to run again than to file — and one kept for a week is worse than
+ * useless once another call in that market lands. That is stated on the page
+ * rather than left as a missing button.
+ *
+ * The outline renders through `lib/intelView.ts`, shared with the path runner.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import AgentViewStyles from '../../../components/AgentViewStyles.astro';
+
+/** Memory's own verticals (`agents/mind/memory.py`). The backend normalises to
+ *  these, so offering anything else would invite an answer about `other`. */
+const MARKETS = [
+  { value: 'finance', label: 'Finance' },
+  { value: 'defence', label: 'Defence' },
+  { value: 'telecom', label: 'Telecom' },
+  { value: 'broadcast', label: 'Broadcast' },
+  { value: 'private-5g', label: 'Private 5G' },
+  { value: 'other', label: 'Other' },
+];
+---
+<PlatformLayout title="Campaign intelligence" requires="lead">
+  <div class="agent-page">
+    <div class="agent-page__column">
+      <header class="agent-page__head ds-arrive">
+        <p class="ds-eyebrow">Agent</p>
+        <h1 class="ds-heading ds-page__title">Campaign intelligence</h1>
+        <p class="ds-lead ds-page__intro">
+          What the team has already heard in a market: the objections that come up, what actually
+          hurts, what has landed before, and how to open. Read from every analysed call — not the
+          web — and every point names the conversation it came from.
+        </p>
+      </header>
+
+      <div class="form ds-arrive" style="--arrive: var(--dur-step)">
+        <div class="form__row">
+          <div class="form__cell">
+            <label class="ds-label" for="vertical">Market</label>
+            <select class="ds-select" id="vertical">
+              {MARKETS.map((market) => (
+                <option value={market.value}>{market.label}</option>
+              ))}
+            </select>
+          </div>
+          <div class="form__cell">
+            <label class="ds-label" for="company">Account <span class="form__optional">optional</span></label>
+            <input class="ds-field" id="company" placeholder="Northgate Nordics" autocomplete="off" />
+          </div>
+        </div>
+        <div class="form__cell form__cell--wide">
+          <label class="ds-label" for="notes">Anything it should take account of <span class="form__optional">optional</span></label>
+          <input class="ds-field" id="notes" placeholder="They already run White Rabbit" autocomplete="off" />
+        </div>
+
+        <div class="form__actions">
+          <button class="ds-btn ds-btn--accent" type="button" id="run">Recall this market</button>
+          <span class="ds-mark ds-mark--live" id="running" hidden>recalling</span>
+          <span class="ds-error" id="error"></span>
+        </div>
+
+        <p class="ds-caption form__note">
+          Reads the analysed calls, so it does not search the web — use Research for what is
+          happening at a specific company now. Nothing is kept: run it again when you need it,
+          and it will include any call analysed since.
+        </p>
+      </div>
+
+      <section class="result ds-arrive" id="result" hidden>
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow" id="result-title">Outline</h2>
+          <div class="result__actions">
+            <button class="ds-btn ds-btn--secondary ds-btn--sm" type="button" id="ask">Ask Owl about this</button>
+            <a class="ds-btn ds-btn--primary ds-btn--sm" id="compose" href="/work/agents/composer">Write the touches</a>
+          </div>
+        </div>
+        <div id="intel"></div>
+      </section>
+    </div>
+  </div>
+
+  <AgentViewStyles />
+
+  <style>
+    /* Screen-level layout only. The page frame is the shared `.agent-page`
+       column; everything tonal and typographic comes from the design system. */
+    .form { max-width: var(--measure-form); }
+    .form__row { display: flex; gap: var(--space-4); }
+    .form__cell { flex: 1; min-width: 0; margin-bottom: var(--space-4); }
+    .form__cell--wide { width: 100%; }
+    .form__optional { color: rgb(var(--ink-muted)); font-weight: var(--weight-regular); }
+    .form__actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-2); }
+    .form__note { color: rgb(var(--ink-muted)); margin-top: var(--space-4); max-width: var(--measure-read); }
+
+    .result { margin-top: var(--space-12); }
+    .result__actions { display: flex; gap: var(--space-3); flex-shrink: 0; align-items: center; }
+
+    @media (max-width: 60rem) {
+      .form__row { flex-direction: column; gap: 0; }
+    }
+  </style>
+
+  <script>
+    import { hasContent, paintIntel, type Intel } from '../../../lib/intelView';
+
+    const byId = (id: string) => document.getElementById(id)!;
+    let current: Intel | null = null;
+
+    function fail(message: string): void {
+      byId('error').textContent = message;
+    }
+
+    function show(intel: Intel): void {
+      current = intel;
+
+      const account = (byId('company') as HTMLInputElement).value.trim();
+      byId('result-title').textContent = [intel.vertical, account].filter(Boolean).join(' · ') || 'Outline';
+      paintIntel(byId('intel'), intel);
+
+      // Composing needs a brief, which this agent does not produce — so the button
+      // hands over the account and lets Composer say what it still needs.
+      const compose = byId('compose') as HTMLAnchorElement;
+      compose.href = account
+        ? `/work/agents/composer?company=${encodeURIComponent(account)}`
+        : '/work/agents/composer';
+      compose.hidden = !hasContent(intel);
+
+      byId('result').hidden = false;
+      byId('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    byId('run').addEventListener('click', async () => {
+      const button = byId('run') as HTMLButtonElement;
+      fail('');
+      button.disabled = true;
+      byId('running').hidden = false;
+
+      try {
+        const res = await fetch('/api/sales/intel/outline', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            vertical: (byId('vertical') as HTMLSelectElement).value,
+            company: (byId('company') as HTMLInputElement).value.trim(),
+            notes: (byId('notes') as HTMLInputElement).value.trim(),
+          }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        show(await res.json());
+      } catch {
+        fail('Could not run the recall — is the backend running?');
+      } finally {
+        button.disabled = false;
+        byId('running').hidden = true;
+      }
+    });
+
+    byId('ask').addEventListener('click', () => {
+      if (!current) return;
+      const objection = (current.objections ?? [])[0]?.objection ?? '';
+      // Handed to the workspace unsent, as it was when this opened a drawer:
+      // the wording is a starting point and the question is the person's to
+      // finish. `send=1` is deliberately absent.
+      const question = encodeURIComponent(
+        `In ${current.vertical}, the recall says they push back with: ${objection} `
+          + 'How have we answered that before?',
+      );
+      window.location.href = `/owl?q=${question}`;
+    });
+
+    // Arriving from another surface with a market or an account already in mind.
+    const params = new URLSearchParams(window.location.search);
+    const market = params.get('vertical');
+    const account = params.get('company');
+    if (market) (byId('vertical') as HTMLSelectElement).value = market;
+    if (account) (byId('company') as HTMLInputElement).value = account;
+    if (market || account) byId('run').focus();
+  </script>
+</PlatformLayout>

@@ -1,0 +1,126 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forms — Cadence Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../primitives.css">
+<link rel="stylesheet" href="preview.css">
+</head>
+<body class="ds-root">
+
+<header class="pv-head">
+  <p class="ds-eyebrow">Components · 03</p>
+  <h1>Forms</h1>
+  <p>
+    A form in this platform is a set of decisions someone is making about work that will run.
+    So the controls state the decision plainly — <strong>a checked box is filled charcoal</strong>,
+    a selected segment inverts, a switch travels 2px and stops — and the form itself is one
+    column at a readable measure, because scanning left and right across a settings grid is
+    how people miss the thing they have just turned on.
+  </p>
+</header>
+
+<section class="pv-section">
+  <h2>Choice</h2>
+  <div class="pv-stack" style="max-width: var(--measure-form); gap: var(--space-5);">
+    <label class="ds-choice">
+      <input type="checkbox" class="ds-check" checked>
+      <span class="ds-choice__text">Enrich emails automatically<span class="ds-choice__hint">Runs on every match. Phone numbers still require an explicit ask.</span></span>
+    </label>
+    <label class="ds-choice">
+      <input type="checkbox" class="ds-check">
+      <span class="ds-choice__text">Include past customers<span class="ds-choice__hint">Accounts with a closed-won deal in the last 24 months.</span></span>
+    </label>
+    <label class="ds-choice">
+      <input type="checkbox" class="ds-check" disabled>
+      <span class="ds-choice__text" style="color: rgb(var(--ink-muted));">Sync to CRM<span class="ds-choice__hint">Connect a CRM in settings to enable this.</span></span>
+    </label>
+    <hr class="ds-rule" style="margin-block: var(--space-2);">
+    <label class="ds-choice">
+      <input type="radio" name="depth" class="ds-radio" checked>
+      <span class="ds-choice__text">Fast<span class="ds-choice__hint">Haiku. Answers in under a second, no tool calls.</span></span>
+    </label>
+    <label class="ds-choice">
+      <input type="radio" name="depth" class="ds-radio">
+      <span class="ds-choice__text">Deep<span class="ds-choice__hint">Sonnet. Runs agents, cites sources, takes longer.</span></span>
+    </label>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Switch &amp; segment</h2>
+  <div class="pv-stack" style="max-width: var(--measure-form); gap: var(--space-5);">
+    <label class="ds-choice" style="align-items: center; justify-content: space-between;">
+      <span class="ds-choice__text">Project context<span class="ds-choice__hint">Owl reads the whole project, not just this thread.</span></span>
+      <input type="checkbox" class="ds-switch" checked>
+    </label>
+    <label class="ds-choice" style="align-items: center; justify-content: space-between;">
+      <span class="ds-choice__text">Ambient run notifications<span class="ds-choice__hint">Tell me when a background agent finishes.</span></span>
+      <input type="checkbox" class="ds-switch">
+    </label>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding-top: var(--space-2);">
+      <span class="ds-small">View</span>
+      <div class="ds-segment">
+        <button class="ds-segment__item is-active">Thread</button>
+        <button class="ds-segment__item">Table</button>
+        <button class="ds-segment__item">Timeline</button>
+      </div>
+    </div>
+  </div>
+  <p class="pv-note" style="margin-top: var(--space-6);">A switch takes effect immediately and needs no Save. If a control needs confirming, it is not a switch — it is a field with a button beside it.</p>
+</section>
+
+<section class="pv-section">
+  <h2>Fields</h2>
+  <div class="pv-stack" style="max-width: var(--measure-form); gap: var(--space-5);">
+    <div>
+      <label class="ds-label" for="q1">Company</label>
+      <input class="ds-field" id="q1" placeholder="e.g. Northgate Nordics">
+      <p class="ds-help">The company whose people you want surfaced.</p>
+    </div>
+    <div>
+      <label class="ds-label" for="q2">Model</label>
+      <select class="ds-select" id="q2">
+        <option>Sonnet — deep, cites sources</option>
+        <option>Haiku — fast, no tools</option>
+      </select>
+    </div>
+    <div>
+      <label class="ds-label" for="q3">Brief</label>
+      <textarea class="ds-textarea ds-field" id="q3" placeholder="What should the agent look for?"></textarea>
+      <p class="ds-help">Grows as you type, to a ceiling of 18rem, then scrolls.</p>
+    </div>
+    <div style="display: flex; gap: var(--space-2); justify-content: flex-end;">
+      <button class="ds-btn ds-btn--ghost">Cancel</button>
+      <button class="ds-btn ds-btn--primary">Save campaign</button>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>On a charcoal object</h2>
+  <div class="pv-frame ds-chrome" style="padding: var(--space-6);">
+    <div class="pv-stack" style="max-width: var(--measure-form);">
+      <label class="ds-choice" style="align-items: center; justify-content: space-between;">
+        <span class="ds-choice__text" style="color: rgb(var(--chrome-ink));">Run in background<span class="ds-choice__hint" style="color: rgb(var(--chrome-ink-muted));">Keep working while the agent finishes.</span></span>
+        <input type="checkbox" class="ds-switch" checked>
+      </label>
+      <div class="pv-row">
+        <button class="ds-btn ds-btn--primary">Run</button>
+        <button class="ds-btn ds-btn--secondary">Schedule</button>
+        <span class="ds-mark ds-mark--live">running</span>
+      </div>
+    </div>
+  </div>
+  <p class="pv-note" style="margin-top: var(--space-6);">Every control here is the same class as the one above it. <code class="pv-spec">.ds-chrome</code> on the container does the inverting — there is no dark variant of any component in this system.</p>
+</section>
+
+<script src="grow.js"></script>
+</body>
+</html>

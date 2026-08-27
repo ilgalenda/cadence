@@ -1,0 +1,617 @@
+---
+/**
+ * X-ray — find the named people worth approaching.
+ *
+ * **The type is chosen, never inferred.** X-ray sits downstream of exactly two
+ * things and the selector names them: a **GTM** target — a company, typed or
+ * handed over — and a **Score Lead** — an enquiry, scored here and then
+ * searched. They are not two ways of typing the same thing. A lead costs a
+ * scoring call, returns a verdict, and grounds discovery in the role and product
+ * fit that verdict found; a company runs a classification pass instead and
+ * grounds on a derived vertical. Different cost, different output, so the person
+ * says which they want and the box adapts to the answer.
+ *
+ * An earlier build guessed between them from the shape of the text. Guessing
+ * wrong searched for a firm called "Hi, we are evaluating PTP for our trading
+ * floor", and the person could not see the choice, let alone correct it — hidden
+ * state being worse than the mode switch it replaced (Sam, 2026-08-24).
+ *
+ * A three-way segment came before that, whose third option swept for a buying
+ * signal with no account to search at. That sweep moved to Signals, where a
+ * signal is already the subject.
+ *
+ * **This page is now on the platform's composition, which it had never joined.**
+ * Eleven agent surfaces share one: `.agent-page` › `.agent-page__column` › an
+ * eyebrow-title-lead head › the ask in the column › result and index sections
+ * under `.agent-page__sect` heads. X-ray had invented four things nobody else
+ * has — `fill` with its own scroller, a bordered ask bar above that scroller,
+ * the platform's only in-page `.ds-drawer`, and the only record index in the
+ * rail — and paid for them by being the only agent page with no title, the only
+ * one reporting its state as a mono caption rather than a `.ds-mark--live`, and
+ * the only one hiding a whole region at a breakpoint. Its closest sibling is
+ * `research.astro`: an ask, a long structured result, an index of what was kept,
+ * and a way onward. It is built like that now.
+ *
+ * The column is `--wide` because a table of fifteen people is genuinely wide,
+ * and `--top` because a result list grows downwards and re-centring it on every
+ * paint would make the page drift underfoot.
+ *
+ * **Results are a `.ds-table`, grouped by what you can do with the person.**
+ * `lib/peopleList.ts` owns that, and the design system had specified this exact
+ * table all along — see its header for the round trip that took.
+ *
+ * Screen design: `design-system/preview/screen-xray.html`.
+ *
+ * What stays here is what is genuinely this page's own: the ask and how it is
+ * arrived at, the index of saved shortlists, and the search itself.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+---
+<PlatformLayout title="X-ray" requires="lead">
+  <div class="agent-page">
+    <div class="agent-page__column agent-page__column--wide agent-page__column--top">
+      <header class="agent-page__head ds-arrive">
+        <p class="ds-eyebrow">X-ray</p>
+        <h1 class="ds-heading ds-page__title">Who to approach</h1>
+        <p class="ds-lead ds-page__intro">
+          Name a company and X-ray finds the people who could own timing there, with the
+          argument for approaching each one.
+        </p>
+      </header>
+
+      <form class="xr__ask ds-arrive" id="search-form" style="--arrive: var(--dur-step)">
+        <div class="xr__row">
+          <div class="ds-segment" role="tablist" aria-label="What to X-ray">
+            <button class="ds-segment__item is-active" type="button" role="tab"
+                    aria-selected="true" data-kind="gtm">GTM</button>
+            <button class="ds-segment__item" type="button" role="tab"
+                    aria-selected="false" data-kind="lead">Score Lead</button>
+          </div>
+
+          <!-- One slot, three things it can hold. Which one is showing is
+               decided by the selector and by whether a verdict already exists —
+               never by looking at what was typed. -->
+          <input class="ds-field xr__field" id="company" name="company"
+                 placeholder="Northgate Nordics" autocomplete="off" aria-label="Target company" />
+          <textarea class="ds-field ds-textarea xr__field" id="lead-text" rows="2" hidden
+                    placeholder="Paste the enquiry, form fill or email…" aria-label="The lead"></textarea>
+          <div class="xr__verdict" id="verdict" hidden>
+            <span class="xr__company" id="verdict-company"></span>
+            <span class="ds-caption" id="verdict-detail"></span>
+          </div>
+        </div>
+
+        <div class="xr__actions">
+          <button class="ds-btn ds-btn--accent" id="run" type="submit">Run X-ray</button>
+          <span class="ds-mark ds-mark--live" id="running" hidden>searching</span>
+        </div>
+
+        <div class="xr__minor">
+          <span class="ds-mark ds-mark--canon xr__chip" id="lead-chip" hidden></span>
+          <!-- Both disclosures sit on the row, opening in place. Behind the
+               closed drawer that used to hold them, neither control moved so
+               much as vanished. -->
+          <span id="ground-trigger"></span>
+          <span id="persona-picker"></span>
+          <button class="xr__link" type="button" id="lead-drop" hidden>use a different lead</button>
+          <!-- Sweeping for people showing a signal lives in Signals now: it has
+               no account, so X-ray would have no grounding to search from. -->
+          <a class="xr__link" href="/work/agents/signals" id="signals-link">looking for a buying signal?</a>
+        </div>
+
+        <div id="ground-panel-mount"></div>
+        <div id="persona-panel-mount"></div>
+
+        <p class="ds-caption xr__cost">
+          Discovery reads the public web. An email is then bought for everyone found with a
+          confirmed profile — inferred profiles are skipped — and a phone number only when
+          you ask for one.
+        </p>
+      </form>
+
+      <div class="ds-banner ds-banner--fault xr__banner" id="error" hidden>
+        <span class="ds-banner__label">Could not search</span>
+        <span id="error-text"></span>
+      </div>
+
+      <div class="ds-banner ds-banner--drift xr__banner" id="notes" hidden>
+        <span class="ds-banner__label">Incomplete</span>
+        <span id="notes-text"></span>
+      </div>
+
+      <section class="xr__result ds-arrive" id="result" hidden style="--arrive: calc(var(--dur-step) * 2)">
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow" id="result-title">People found</h2>
+          <span class="ds-mono" id="readout"></span>
+        </div>
+        <!-- Above the groups, so a selection states its count before the tables
+             it was drawn from. -->
+        <div id="bulk-mount"></div>
+        <div id="people"></div>
+      </section>
+
+      <div class="ds-empty xr__empty" id="empty">
+        <p class="ds-empty__title" id="empty-title">Nothing searched yet</p>
+        <p class="ds-empty__body" id="empty-note">
+          Every person comes back with the argument for approaching them, how reachable
+          they are, and how well they fit — so a shortlist can be narrowed before a
+          single email is bought.
+        </p>
+      </div>
+
+      <!-- Saved shortlists are records, so they are an index in the page, beside
+           Research's kept briefs and Composer's queue. They were in the rail,
+           which no other page does and which hid them whenever the rail shut.
+           Hidden until there is one: an empty group would advertise a feature
+           that has produced nothing. -->
+      <section class="xr__saved ds-arrive" id="saved" hidden style="--arrive: calc(var(--dur-step) * 3)">
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow">Saved shortlists</h2>
+          <span class="ds-mono" id="saved-count"></span>
+        </div>
+        <ul class="xr__savedlist ds-stagger" id="saved-list"></ul>
+      </section>
+    </div>
+  </div>
+
+  <style is:global>
+    /* Screen-level layout only. The page frame is the shared `.agent-page`
+       column; everything tonal and typographic comes from the design system. */
+    /* The ask spans the column, and the field inside it is what is capped. The
+       first build capped the whole form at `--measure-read` inside a `--wide`
+       column, so the head and the ask sat in the left half of a sheet the table
+       filled — two widths on one page, sharing no edge. The `.ds-page__intro`
+       keeps its own reading measure; the controls line up with the results. */
+    .xr__row { display: flex; align-items: center; gap: var(--space-3); }
+    .xr__field { flex: 1; min-width: 0; max-width: var(--measure-form); }
+    /* Guarded: `.ds-field` sets a display that outweighs `[hidden]`, and the
+       three inputs share one slot — the wrong two must actually be gone. */
+    .xr__field[hidden] { display: none; }
+    /* Lead scoring's verdict, read back where the input would be. */
+    .xr__verdict { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-px); }
+    .xr__verdict[hidden] { display: none; }
+    .xr__company { font-weight: var(--weight-medium); color: rgb(var(--ink)); }
+
+    .xr__actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-4); }
+    .xr__minor { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-3); }
+    .xr__chip[hidden] { display: none; }
+    .xr__cost { margin: var(--space-4) 0 0; max-width: var(--measure-read); color: rgb(var(--ink-muted)); }
+
+    .xr__banner { margin-top: var(--space-6); }
+    .xr__result { margin-top: var(--space-12); }
+    .xr__empty { max-width: var(--measure-read); margin: var(--space-12) auto 0; }
+    .xr__empty[hidden] { display: none; }
+    .xr__saved { margin-top: var(--space-16); }
+    .xr__savedlist { list-style: none; margin: 0; padding: 0; }
+    .xr__savedlist li + li { border-top: 1px solid rgb(var(--rule-hairline)); }
+
+    @media (max-width: 60rem) {
+      .xr__row { flex-wrap: wrap; }
+      .xr__minor { flex-wrap: wrap; gap: var(--space-3); }
+    }
+  </style>
+
+  <script>
+    import { notify, confirmAction, menu, toast } from '../../../lib/overlays';
+    import { createPeopleList } from '../../../lib/peopleList';
+    import { createRunControls } from '../../../lib/xrayRun';
+    import { createPersonaPicker } from '../../../lib/personaPicker';
+    import { takeScoredLead, type ScoredLead } from '../../../lib/handoff';
+    import { icon } from '../../../lib/icons';
+    import { el } from '../../../lib/dom';
+
+    const form      = el<HTMLFormElement>('search-form');
+    const runBtn    = el<HTMLButtonElement>('run');
+    const running   = el('running');
+    const errorBox  = el('error');
+    const errorText = el('error-text');
+    const notesBox  = el('notes');
+    const notesText = el('notes-text');
+    const resultBox = el('result');
+    const resultTitle = el('result-title');
+    const readout   = el('readout');
+    const peopleBox = el('people');
+    const empty     = el('empty');
+    const emptyTitle = el('empty-title');
+    const emptyNote = el('empty-note');
+    const savedBox  = el('saved');
+    const savedList = el('saved-list');
+    const savedCount = el('saved-count');
+    const companyField = el<HTMLInputElement>('company');
+    const leadField = el<HTMLTextAreaElement>('lead-text');
+    const verdictBox = el('verdict');
+    const leadChip  = el('lead-chip');
+
+    interface SavedShortlist {
+      id: string;
+      name: string;
+      source: string;
+      count: number;
+      updated_at: string;
+    }
+
+    /** The verdict handed over by lead scoring, if this visit came from there. */
+    let scoredLead: ScoredLead | null = null;
+    /** Where the verdict came from, which the chip states so it is never a mystery. */
+    let handedOverFrom = 'handed over from Lead scoring';
+
+    const run = createRunControls(el('ground-trigger'), el('ground-panel-mount'), {
+      onRerun: () => search(),
+      // The run states itself in the result section head's mono slot, which is
+      // where this platform's grammar puts the machine talking.
+      onReadout: (text) => { readout.textContent = text; },
+    });
+    const personaPicker = createPersonaPicker(el('persona-picker'), el('persona-panel-mount'));
+
+    const people = createPeopleList(peopleBox, {
+      allowSave: true,
+      bulkMount: el('bulk-mount'),
+      // Emails arrive with the people rather than two clicks later (Sam,
+      // 2026-08-24). It buys for the whole approachable set, so the cost note
+      // under the ask says so — this is the page's largest spend and it now
+      // happens without anybody pressing anything.
+      autoEnrich: true,
+      // Navigation only. Research briefs one chosen person, which is why this is
+      // a per-person way onward rather than something done to a selection.
+      personActions: [{
+        label: 'Research',
+        title: 'Brief this person and their company',
+        href: (person) => {
+          const params = new URLSearchParams({ company: String(person.company || '') });
+          const name = String(person.full_name || person.name || '');
+          if (name) params.set('person', name);
+          return `/work/agents/research?${params.toString()}`;
+        },
+      }],
+      // Saving changes what the index should show, and what the result is called.
+      onSaved: () => { paintResultTitle(); loadShortlists(); },
+    });
+
+    /**
+     * What the result section is showing.
+     *
+     * The subject lives here rather than being written into the shell's
+     * breadcrumb, which the page used to reach into by id. A page mutating the
+     * frame's own element is the frame's business, and the section head is
+     * where the grammar already keeps "what this is".
+     */
+    let lastSubject = '';
+    function paintResultTitle(): void {
+      const open = people.openShortlist;
+      resultTitle.textContent = open ? `Shortlist · ${open.name}`
+        : lastSubject ? `People found · ${lastSubject}` : 'People found';
+    }
+
+    // ── The ask ─────────────────────────────────────────────────────────────
+
+    /**
+     * Which of the two agents feeding X-ray this search comes from.
+     *
+     * Declared by the person, never guessed. `gtm` is a company — typed, or
+     * arrived from GTM. `lead` is an enquiry, which is scored before discovery
+     * runs, unless a verdict was already handed over by Lead scoring.
+     */
+    type Kind = 'gtm' | 'lead';
+    let kind: Kind = 'gtm';
+
+    document.querySelectorAll<HTMLButtonElement>('[data-kind]').forEach((tab) => {
+      tab.addEventListener('click', () => setKind(tab.dataset.kind as Kind));
+    });
+
+    function setKind(next: Kind): void {
+      kind = next;
+      document.querySelectorAll<HTMLElement>('[data-kind]').forEach((tab) => {
+        const on = tab.dataset.kind === kind;
+        tab.classList.toggle('is-active', on);
+        tab.setAttribute('aria-selected', String(on));
+      });
+      paintAsk();
+    }
+
+    /**
+     * Show the one input this kind of search actually needs.
+     *
+     * Score Lead has two states of its own: an empty one where the enquiry is
+     * pasted, and one where Lead scoring already did the work — which reads the
+     * verdict back rather than sitting as an empty box beside a chip claiming a
+     * lead is loaded.
+     */
+    function paintAsk(): void {
+      const handedOver = kind === 'lead' && Boolean(scoredLead);
+      companyField.hidden = kind !== 'gtm';
+      leadField.hidden = kind !== 'lead' || handedOver;
+      verdictBox.hidden = !handedOver;
+      el('lead-drop').hidden = !handedOver;
+      el('signals-link').hidden = handedOver;
+
+      runBtn.textContent = kind === 'gtm' ? 'Run X-ray'
+        : handedOver ? 'X-ray this lead'
+        : 'Score & X-ray';
+
+      if (handedOver && scoredLead) {
+        el('verdict-company').textContent = scoredLead.company ?? '';
+        el('verdict-detail').textContent =
+          [scoredLead.role, scoredLead.product_fit].filter(Boolean).join(' · ');
+      }
+      // Only a company search has a grounding worth correcting; a lead brings
+      // its own from the verdict, and the trigger says so.
+      run.setTunable(kind === 'gtm');
+      paintScoredLead();
+    }
+
+    /** Say the verdict exists and where it came from. */
+    function paintScoredLead(): void {
+      leadChip.hidden = !scoredLead || kind !== 'lead';
+      if (!scoredLead) return;
+      const score = typeof scoredLead.score === 'number' ? `scored ${scoredLead.score}` : 'scored';
+      leadChip.textContent = `${score} · ${handedOverFrom}`;
+    }
+
+    el('lead-drop').addEventListener('click', () => {
+      // Clearing the verdict returns Score Lead to its empty state, ready for a
+      // pasted enquiry — the company is carried over to GTM so switching there
+      // is not a blank screen either.
+      companyField.value = scoredLead?.company ?? companyField.value;
+      scoredLead = null;
+      paintAsk();
+      leadField.focus();
+    });
+
+    // ── Arriving from elsewhere ─────────────────────────────────────────────
+    // Lead scoring and GTM both hand a company over by link, and a shortlist can
+    // be linked to directly. A prefilled search is never auto-run: a search
+    // spends provider budget, so running it stays the person's decision.
+
+    (function readLink(): void {
+      const params = new URLSearchParams(window.location.search);
+
+      scoredLead = takeScoredLead();
+      const company = params.get('company');
+      if (company) companyField.value = company;
+      if (scoredLead && !company) companyField.value = scoredLead.company ?? '';
+      // Arriving with a verdict lands on Score Lead, because that is what was
+      // handed over; arriving with only a name lands on GTM.
+      setKind(scoredLead ? 'lead' : 'gtm');
+      if (scoredLead || company) runBtn.focus();
+
+      const shortlist = params.get('shortlist');
+      if (shortlist) openShortlistById(shortlist);
+    })();
+
+    // ── Search ──────────────────────────────────────────────────────────────
+
+    function setBusy(busy: boolean): void {
+      runBtn.disabled = busy;
+      running.hidden = !busy;
+      if (busy) { errorBox.hidden = true; notesBox.hidden = true; }
+    }
+
+    function fail(message: string): void {
+      errorText.textContent = message;
+      errorBox.hidden = false;
+      resultBox.hidden = true;
+      empty.hidden = true;
+      people.clear();
+      run.fail(message);
+    }
+
+    form.addEventListener('submit', (e) => { e.preventDefault(); search(); });
+
+    async function search(): Promise<void> {
+      const handedOver = kind === 'lead' && Boolean(scoredLead);
+      const asked = (kind === 'gtm' ? companyField.value : leadField.value).trim();
+
+      if (kind === 'gtm' && !asked) { fail('Name a company to X-ray.'); return; }
+      if (kind === 'lead' && !handedOver && !asked) { fail('Paste the lead to score.'); return; }
+
+      // Personas and a corrected grounding both come from the ask's own row.
+      const tuning = run.settings();
+      const personas = personaPicker.chosen();
+
+      // A lead pasted here has no subject until it has been scored, so the run
+      // is labelled honestly until the answer names the company.
+      const scoringFirst = kind === 'lead' && !handedOver;
+      const where = scoringFirst ? 'the pasted lead'
+        : handedOver ? (scoredLead!.company ?? 'the scored lead')
+        : asked;
+
+      setBusy(true);
+      // The page holds its shape while the search runs. Emptying it would say
+      // "nobody found" for the twenty seconds before the answer arrives.
+      empty.hidden = true;
+      resultBox.hidden = false;
+      people.skeleton();
+      run.start(scoringFirst ? 'scoring the lead' : where);
+
+      const started = Date.now();
+      try {
+        // One endpoint, three groundings. A handed-over verdict wins, then a
+        // pasted lead the server scores, and failing both the company name —
+        // which the server grounds by classifying the account first.
+        const body = handedOver
+          ? {
+              company: scoredLead!.company ?? '',
+              personas: personas.length ? personas : null,
+              signal_analysis: scoredLead,
+            }
+          : scoringFirst
+            ? { lead_text: asked, personas: personas.length ? personas : null }
+            : {
+                company: asked,
+                personas: personas.length ? personas : null,
+                // Sent only when corrected by hand; the backend then skips its
+                // own classification rather than overruling the person.
+                ...(tuning.industry ? { industry: tuning.industry } : {}),
+                ...(tuning.productFit ? { product_fit: tuning.productFit } : {}),
+              };
+
+        const res = await fetch('/api/sales/xray/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `Search failed (${res.status})`);
+
+        const data = await res.json();
+        // Whatever a fresh search finds, it is no longer the saved shortlist.
+        people.openShortlist = null;
+        const found = data.results || [];
+        const seconds = (Date.now() - started) / 1000;
+
+        // A pasted lead only names its company once it has been scored, so the
+        // ask catches up to what the server worked out and becomes the
+        // handed-over state — re-running must not score the same lead twice.
+        const subject = data.lead?.company || where;
+        if (data.lead) {
+          scoredLead = data.lead;
+          handedOverFrom = 'scored from the lead you pasted';
+          paintAsk();
+        }
+
+        show(found, subject, data.error);
+
+        // `provider_errors` and `truncated` are the backend's honesty fields. A
+        // partial answer that looks whole is the failure they exist to prevent,
+        // so they are said on the page rather than tucked into the readout.
+        const notes: string[] = [];
+        if (data.truncated) notes.push('the model’s answer was cut short, so this may be partial');
+        (data.provider_errors || []).forEach((note: string) => notes.push(note));
+        notesBox.hidden = notes.length === 0;
+        notesText.textContent = notes.join(' · ');
+
+        run.settle({ people: found, seconds, grounding: data.grounding });
+      } catch (err: any) {
+        fail(err?.message || 'Search failed.');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    // ── Results ─────────────────────────────────────────────────────────────
+
+    function show(
+      found: any[],
+      where: string,
+      searchError?: string | null,
+      options: { selectAll?: boolean } = {},
+    ): void {
+      lastSubject = where;
+      paintResultTitle();
+
+      if (found.length === 0) {
+        people.clear();
+        resultBox.hidden = true;
+        empty.hidden = false;
+        emptyTitle.textContent = 'Nobody found';
+        emptyNote.textContent = searchError
+          ? `Nothing came back for ${where} — ${searchError}.`
+          : `Nothing came back for ${where}. Try widening the personas, or a different signal.`;
+        return;
+      }
+
+      empty.hidden = true;
+      resultBox.hidden = false;
+      people.render(found, { source: where, selectAll: Boolean(options.selectAll) });
+    }
+
+    // ── Shortlists ──────────────────────────────────────────────────────────
+    // Saving lives with the list, beside revealing, because both act on the set
+    // that was ticked. What lives here is the browsable index of what was kept.
+
+    async function loadShortlists(): Promise<void> {
+      let saved: SavedShortlist[];
+      try {
+        const res = await fetch('/api/sales/xray/shortlists');
+        if (!res.ok) return;
+        saved = await res.json();
+      } catch {
+        // Saved shortlists are an addition to this page, not a precondition for
+        // it — a failed load must leave the search entirely usable.
+        return;
+      }
+
+      savedBox.hidden = saved.length === 0;
+      savedCount.textContent = `${saved.length} kept`;
+
+      savedList.innerHTML = '';
+      saved.forEach((shortlist) => savedList.appendChild(shortlistRow(shortlist)));
+    }
+
+    function shortlistRow(shortlist: SavedShortlist): HTMLElement {
+      // A record row. `.ds-row--record` reveals its actions on hover *and*
+      // focus-within, so the menu is reachable by keyboard.
+      const item = document.createElement('li');
+      const row = document.createElement('div');
+      row.className = 'ds-row ds-row--record';
+      row.innerHTML = `
+        <span class="ds-row__label" data-name></span>
+        <span class="ds-mono ds-caption" data-count></span>
+        <span class="ds-row__actions">
+          <button class="ds-icon-btn ds-icon-btn--sm" type="button" data-more aria-label="Shortlist actions">${icon('more')}</button>
+        </span>`;
+
+      // The name is whatever the user typed — set as text, never markup.
+      row.querySelector('[data-name]')!.textContent = shortlist.name;
+      row.querySelector('[data-count]')!.textContent =
+        `${shortlist.count} ${shortlist.count === 1 ? 'person' : 'people'}`;
+      row.title = `${shortlist.source || shortlist.name} · ${shortlist.updated_at}`;
+
+      row.addEventListener('click', (event) => {
+        if ((event.target as HTMLElement).closest('[data-more]')) return;
+        openShortlistById(shortlist.id);
+      });
+
+      const more = row.querySelector<HTMLButtonElement>('[data-more]')!;
+      more.addEventListener('click', () => menu(more, [
+        { label: 'Open', run: () => openShortlistById(shortlist.id) },
+        'separator',
+        { label: 'Delete', danger: true, run: () => removeShortlist(shortlist) },
+      ]));
+
+      item.appendChild(row);
+      return item;
+    }
+
+    async function openShortlistById(id: string): Promise<void> {
+      try {
+        const res = await fetch(`/api/sales/xray/shortlists/${encodeURIComponent(id)}`);
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'It could not be opened.');
+
+        const shortlist = await res.json();
+        people.openShortlist = { id: shortlist.id, name: shortlist.name };
+        // Everyone in a saved shortlist was ticked to get there, so they arrive
+        // ticked — ready to enrich further, or to be narrowed and saved again.
+        show(shortlist.people || [], shortlist.source || shortlist.name, null, { selectAll: true });
+        readout.textContent = `${(shortlist.people || []).length} kept`;
+      } catch (err: any) {
+        notify({ title: 'Could not open the shortlist', body: err?.message || 'It may have been deleted.' });
+        loadShortlists();
+      }
+    }
+
+    async function removeShortlist(shortlist: SavedShortlist): Promise<void> {
+      const confirmed = await confirmAction({
+        title: `Delete ${shortlist.name}?`,
+        body: 'The people and any emails revealed on them go with it. This cannot be undone.',
+        confirm: 'Delete',
+      });
+      if (!confirmed) return;
+
+      try {
+        const res = await fetch(`/api/sales/xray/shortlists/${encodeURIComponent(shortlist.id)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'It could not be deleted.');
+
+        if (people.openShortlist?.id === shortlist.id) {
+          people.openShortlist = null;
+          paintResultTitle();
+        }
+        toast(`${shortlist.name} deleted.`);
+        loadShortlists();
+      } catch (err: any) {
+        notify({ title: 'Could not delete the shortlist', body: err?.message || 'It is still there.' });
+      }
+    }
+
+    loadShortlists();
+  </script>
+</PlatformLayout>

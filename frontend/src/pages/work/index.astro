@@ -1,0 +1,24 @@
+---
+/**
+ * `/work` no longer exists as a surface.
+ *
+ * It listed the paths and the agents. Both now live in the rail, and the home
+ * names the three agents worth starting from — so this page was a menu duplicating
+ * a menu. The URL is kept because it is linked from elsewhere and typed from habit.
+ *
+ * Static output, so this is a client-side redirect rather than a 302.
+ */
+---
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="refresh" content="0; url=/home" />
+  <link rel="canonical" href="/home" />
+  <title>Cadence</title>
+</head>
+<body>
+  <p><a href="/home">Continue to Cadence</a></p>
+  <script>window.location.replace('/home');</script>
+</body>
+</html>

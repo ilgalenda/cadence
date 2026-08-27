@@ -1,4 +1,4 @@
-// IvanOS Meet Capture — content script
+// SamOS Meet Capture — content script
 // Observes Google Meet's caption DOM and accumulates a timestamped transcript.
 //
 // MAINTAINABILITY NOTE:

@@ -45,7 +45,70 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id, seq);
+
+-- Organisation. A project is the top-level container and carries standing
+-- instructions that ride into every conversation filed under it. Folders nest
+-- inside a project; conversations sit either in a folder, at a project's root,
+-- or unfiled.
+CREATE TABLE IF NOT EXISTS projects (
+  id            TEXT PRIMARY KEY,
+  username      TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  instructions  TEXT NOT NULL DEFAULT '',
+  position      INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  archived_at   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_user
+  ON projects(username, archived_at, position);
+
+CREATE TABLE IF NOT EXISTS folders (
+  id          TEXT PRIMARY KEY,
+  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  username    TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  parent_id   TEXT REFERENCES folders(id) ON DELETE CASCADE,
+  position    INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_folder_project
+  ON folders(project_id, parent_id, position);
 """
+
+# Columns added to `conversations` after the table shipped. SQLite has no
+# ADD COLUMN IF NOT EXISTS, so they are applied by inspecting the table.
+#
+# Deliberately NOT foreign keys: a conversation outlives its container. Deleting
+# a project unfiles its conversations rather than destroying them, which a
+# cascading FK would make impossible to express.
+_CONVERSATION_COLUMNS = {
+    "project_id":  "TEXT",
+    "folder_id":   "TEXT",
+    "pinned_at":   "TEXT",
+    "archived_at": "TEXT",
+}
+
+_CONVERSATION_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_conv_project
+  ON conversations(username, project_id, folder_id, deleted_at);
+"""
+
+
+def _add_missing_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
+    """Add any of ``columns`` the table does not already have.
+
+    Idempotent, so it is safe to run on every start. Only ever adds nullable
+    columns — existing rows keep their meaning and simply read as NULL, which is
+    exactly 'unfiled, unpinned, not archived'.
+    """
+    present = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    for name, decl in columns.items():
+        if name not in present:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
 
 
 @contextmanager
@@ -64,9 +127,12 @@ def connect() -> Iterator[sqlite3.Connection]:
 
 def init_db() -> None:
     conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(_SCHEMA)
+        _add_missing_columns(conn, "conversations", _CONVERSATION_COLUMNS)
+        conn.executescript(_CONVERSATION_INDEXES)
         conn.commit()
     finally:
         conn.close()

@@ -49,30 +49,43 @@ def users_credentials_file() -> Path:
     return data_root() / "agents" / "users_credentials.json"
 
 
-# Calls
+# Calls. `agents/calls` was retired in Stage 4 and its work is now Call Analysis,
+# Recap and Knowledge Capture under `agents/sales`, with the quizzes under
+# `agents/learn`. The directories keep their names for the reason given below.
+# `calls_transcripts()` went with `agents/meet` in the same slice — nothing stores a
+# transcript separately now that the analysis keeps its own.
 def calls_data() -> Path:
     return data_root() / "agents" / "calls" / "data"
-
-
-def calls_transcripts() -> Path:
-    return calls_data() / "transcripts"
 
 
 def calls_user_kb() -> Path:
     return data_root() / "agents" / "calls" / "knowledge" / "_user"
 
 
-# Lead
-def lead_data() -> Path:
+# Sales (the redesigned front half). `agents/high_intent` was retired into it in
+# R4 and `agents/lead` in Stage 3.3 — both packages are now gone. The directories
+# are deliberately unchanged from the modules they replaced: renaming the accessor
+# is a code change, moving the data is not, and a live snapshot should never be
+# rewritten just to match a package name. So `sales_data()` still resolves under
+# `lead/` and `sales_signals_data()` under `high_intent/`, and the only thing left
+# in either directory is data.
+def sales_data() -> Path:
     return data_root() / "agents" / "lead" / "data"
 
 
-def lead_user_kb() -> Path:
+def sales_user_kb() -> Path:
     return data_root() / "agents" / "lead" / "knowledge" / "_user"
 
 
-def lead_google_tokens() -> Path:
-    return lead_data() / "google_tokens.json"
+def sales_google_tokens() -> Path:
+    return sales_data() / "google_tokens.json"
+
+
+# Signals — the high-intent side of sales. Always sandboxed; see
+# `agents.sales.store.signals` for why that rule is preserved.
+def sales_signals_data() -> Path:
+    return data_root() / "agents" / "high_intent" / "data"
+
 
 
 # Owl
@@ -80,24 +93,9 @@ def owl_data() -> Path:
     return data_root() / "agents" / "owl" / "data"
 
 
+# Owl Core / Mind (platform-level per-user memory)
+def mind_data() -> Path:
+    return data_root() / "agents" / "mind" / "data"
+
+
 # High-Intent
-def high_intent_data() -> Path:
-    return data_root() / "agents" / "high_intent" / "data"
-
-
-# Duty & Tax
-def duty_data() -> Path:
-    return data_root() / "agents" / "duty" / "data"
-
-
-# Onboarding
-def onboarding_data() -> Path:
-    return data_root() / "agents" / "onboarding" / "data"
-
-
-# Forecasting
-def forecast_data() -> Path:
-    return data_root() / "agents" / "forecast" / "data"
-
-
-# >>> cadence:paths — `create_agent.py` inserts new per-agent path helpers above this line.

@@ -1,0 +1,187 @@
+---
+/**
+ * Campaign selection — the shape of the campaign, before anyone writes a word.
+ *
+ * Deterministic: the same lead always gives the same plan, so there is no "run"
+ * that spends anything and the page computes on load and on change. What it asks
+ * for is only what the rules take — how the lead arose, how warm it is, and
+ * whether anyone is named.
+ *
+ * Inside a path this arrives computed from Lead scoring's whole verdict, and the
+ * page says so rather than letting a plan built from defaults look identical to
+ * one built from a real read.
+ *
+ * The mix is the one part a person edits. The archetype and the sequence come from
+ * the playbook; which channels they will actually work is theirs to say — and the
+ * chosen mix is what Composer receives.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import AgentViewStyles from '../../../components/AgentViewStyles.astro';
+
+const SIGNAL_TYPES = [
+  { value: 'inbound_action', label: 'They did something (inbound)' },
+  { value: 'vertical_fit', label: 'We picked them (ICP match)' },
+  { value: 'no_signal', label: 'Nothing has happened yet (cold)' },
+];
+
+const STRENGTHS = [
+  { value: 'hot', label: 'Hot' },
+  { value: 'warm', label: 'Warm' },
+  { value: 'cold', label: 'Cold' },
+];
+---
+<PlatformLayout title="Campaign selection" requires="lead">
+  <div class="agent-page">
+    <div class="agent-page__column">
+      <header class="agent-page__head ds-arrive">
+        <p class="ds-eyebrow">Agent</p>
+        <h1 class="ds-heading ds-page__title">Campaign selection</h1>
+        <p class="ds-lead ds-page__intro">
+          The eligible campaign for a lead — which archetype, how many touches, over which
+          channels, in what order. Computed from the Campaign Playbook with no model involved,
+          so the same lead always gives the same plan. It proposes; you choose.
+        </p>
+      </header>
+
+      <div class="form ds-arrive" style="--arrive: var(--dur-step)">
+        <div class="form__row">
+          <div class="form__cell">
+            <label class="ds-label" for="signal-type">How did this lead arise?</label>
+            <select class="ds-select" id="signal-type">
+              {SIGNAL_TYPES.map((option) => (
+                <option value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <div class="form__cell">
+            <label class="ds-label" for="strength">How warm is it?</label>
+            <select class="ds-select" id="strength">
+              {STRENGTHS.map((option) => (
+                <option value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <label class="ds-choice">
+          <input class="ds-check" type="checkbox" id="named" />
+          <span class="ds-choice__text">Somebody specific is already identified</span>
+        </label>
+
+        <p class="ds-caption form__note">
+          Inside a path this is computed from the scored lead instead of asked — the archetype
+          turns on how the lead arose and the touch count on how warm it is, both of which
+          Lead scoring has already read.
+        </p>
+      </div>
+
+      <section class="result ds-arrive" id="result" hidden>
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow" id="result-title">Plan</h2>
+          <div class="result__actions">
+            <a class="ds-btn ds-btn--primary ds-btn--sm" id="compose" href="/work/agents/composer">Write the touches</a>
+          </div>
+        </div>
+
+        <div id="plan"></div>
+
+        <div class="mix">
+          <p class="ds-label">The mix you will work</p>
+          <div class="channels" id="channels"></div>
+          <p class="ds-caption mix__note">
+            The playbook sets the archetype and the sequence. The channels are yours — this is
+            what Composer writes for.
+          </p>
+        </div>
+      </section>
+
+      <span class="ds-error form__error" id="error"></span>
+    </div>
+  </div>
+
+  <AgentViewStyles />
+
+  <style>
+    /* Screen-level layout only. The page frame is the shared `.agent-page`
+       column; everything tonal and typographic comes from the design system. */
+    .form { max-width: var(--measure-form); }
+    .form__row { display: flex; gap: var(--space-4); }
+    .form__cell { flex: 1; min-width: 0; margin-bottom: var(--space-4); }
+    .form__note { color: rgb(var(--ink-muted)); margin-top: var(--space-4); max-width: var(--measure-read); }
+    .form__error { display: block; margin-top: var(--space-4); }
+
+    .result { margin-top: var(--space-12); }
+    .result__actions { display: flex; gap: var(--space-3); flex-shrink: 0; align-items: center; }
+
+    .mix { margin-top: var(--space-8); padding-top: var(--space-6); border-top: 1px solid rgb(var(--rule-hairline)); }
+    .mix__note { color: rgb(var(--ink-muted)); margin-top: var(--space-3); max-width: var(--measure-read); }
+
+    @media (max-width: 60rem) {
+      .form__row { flex-direction: column; gap: 0; }
+    }
+  </style>
+
+  <script>
+    import { archetypeName, hasContent, paintChannels, paintPlan, type Plan } from '../../../lib/planView';
+
+    const byId = (id: string) => document.getElementById(id)!;
+
+    /** Every channel the rules can propose, in the order they propose them. */
+    const ALL_CHANNELS = ['email', 'linkedin', 'call'];
+
+    let mix: string[] = [];
+
+    function updateComposeLink(): void {
+      const compose = byId('compose') as HTMLAnchorElement;
+      compose.href = mix.length
+        ? `/work/agents/composer?channels=${encodeURIComponent(mix.join(','))}`
+        : '/work/agents/composer';
+    }
+
+    function show(plan: Plan): void {
+      byId('result-title').textContent = archetypeName(plan.archetype);
+      paintPlan(byId('plan'), plan);
+
+      mix = plan.channels ?? [];
+      paintChannels(byId('channels'), ALL_CHANNELS, mix, (chosen) => {
+        mix = chosen;
+        updateComposeLink();
+      });
+      updateComposeLink();
+
+      byId('result').hidden = !hasContent(plan);
+    }
+
+    async function compute(): Promise<void> {
+      byId('error').textContent = '';
+      try {
+        const res = await fetch('/api/sales/campaign/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            signal_type: (byId('signal-type') as HTMLSelectElement).value,
+            signal_strength: (byId('strength') as HTMLSelectElement).value,
+            has_named_contact: (byId('named') as HTMLInputElement).checked,
+          }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        show(await res.json());
+      } catch {
+        byId('error').textContent = 'Could not compute the plan — is the backend running?';
+      }
+    }
+
+    for (const id of ['signal-type', 'strength', 'named']) {
+      byId(id).addEventListener('change', compute);
+    }
+
+    // Arriving from another surface that already knows how the lead arose.
+    const params = new URLSearchParams(window.location.search);
+    const arriving = params.get('signal_type');
+    if (arriving) (byId('signal-type') as HTMLSelectElement).value = arriving;
+
+    // Computed on load: it is deterministic and local, so there is nothing to
+    // withhold behind a button.
+    compute();
+  </script>
+</PlatformLayout>

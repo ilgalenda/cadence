@@ -1,0 +1,647 @@
+---
+/**
+ * Practice — test yourself against the calls the team has had.
+ *
+ * Rebuilt from `agents/calls/quiz.astro`. Two things changed beyond the styling.
+ *
+ * The state machine moved to `lib/quiz.ts` and is tested: scoring, the pass mark
+ * and the refusal to overwrite an answer were previously buried in DOM handlers
+ * with no coverage at all.
+ *
+ * The newsletter generator left. It produced marketing copy for publication, and
+ * it lived here only because it shares the `/api/learn/quiz/*` prefix — it is now an
+ * agent at `/work/agents/newsletter-quiz`, which is where output for other people
+ * belongs. Practice is for the reader testing themselves.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+---
+<PlatformLayout title="Practice" requires="calls">
+  <div class="ds-page pr">
+    <div class="pr__inner">
+    <header class="ds-page__head ds-arrive">
+      <p class="ds-eyebrow">Learn</p>
+      <h1 class="ds-heading ds-page__title">Practice</h1>
+      <p class="ds-lead ds-page__intro">
+        Questions drawn from real calls, anonymised. Every call the team analyses sharpens the
+        pool — so this tests what the company is actually meeting in the field.
+      </p>
+      <p class="ds-caption pr__pool" id="pool"></p>
+    </header>
+
+    <div class="start ds-arrive" id="start" style="--arrive: var(--dur-step)">
+      <button class="ds-btn ds-btn--accent" type="button" id="generate">Start a quiz</button>
+      <span class="ds-caption start__status" id="status" hidden></span>
+    </div>
+
+    <!-- Per-call tests: take the questions from one specific call. Hidden until
+         the pool answers, so its `ds-arrive` plays when it is revealed. -->
+    <section class="bank ds-arrive" id="bank" style="--arrive: calc(var(--dur-step) * 2)" hidden>
+      <div class="ds-sectionhead">
+        <h2 class="ds-eyebrow ds-sectionhead__title">By call</h2>
+        <span class="ds-mono" id="bank-count"></span>
+      </div>
+
+      <!-- Shown only once the list is long enough to be worth filtering; below
+           that it is furniture. Matches the title and the concepts, because
+           "the Northgate call" and "holdover" are both how you remember one. -->
+      <div class="ds-search bank__find" id="bank-find" hidden>
+        <span class="ds-search__icon" aria-hidden="true">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M8.5 8.5l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        </span>
+        <input class="ds-search__input" id="bank-query" type="search" placeholder="Filter by call or concept…" aria-label="Filter calls">
+      </div>
+
+      <ul class="ds-list ds-stagger" id="bank-list"></ul>
+    </section>
+
+    <!-- The quiz itself. -->
+    <section class="quiz" id="quiz" hidden>
+      <div class="quiz__progress">
+        <span class="ds-small" id="progress-label"></span>
+        <span class="ds-meter quiz__meter"><span class="ds-meter__fill" id="progress-fill" style="width: 0%"></span></span>
+        <span class="ds-caption" id="running"></span>
+        <button class="ds-btn ds-btn--ghost ds-btn--sm" type="button" id="leave">Leave</button>
+      </div>
+
+      <div class="ds-panel quiz__card">
+        <p class="ds-lead quiz__question" id="question"></p>
+        <!-- Choices are rebuilt for every question, so the stagger replays for
+             each genuinely new set — an arrival, not a loop. -->
+        <div class="quiz__options ds-stagger" id="options"></div>
+
+        <div class="quiz__feedback ds-arrive" id="feedback" hidden>
+          <p id="verdict"></p>
+          <p class="ds-small quiz__explanation" id="explanation"></p>
+        </div>
+
+        <div class="quiz__foot">
+          <!-- Stated rather than left to be discovered: the keys are the point
+               of answering with the keyboard at all. -->
+          <p class="ds-caption quiz__keys" id="keys" hidden></p>
+          <button class="ds-btn ds-btn--primary" type="button" id="next" hidden></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- The score, and what to look at again. Hidden until the quiz ends, so
+         the arrivals play when the section is revealed. -->
+    <section class="result" id="result" hidden>
+      <div class="ds-panel result__card ds-arrive">
+        <p class="ds-eyebrow">Result</p>
+        <p class="ds-display ds-numeric result__score" id="score"></p>
+        <p id="verdict-final"></p>
+        <div class="result__actions">
+          <button class="ds-btn ds-btn--secondary" type="button" id="retake">Take it again</button>
+          <button class="ds-btn ds-btn--ghost" type="button" id="back">Back to all calls</button>
+        </div>
+      </div>
+
+      <div class="ds-sectionhead ds-arrive" style="--arrive: var(--dur-step)">
+        <h2 class="ds-eyebrow ds-sectionhead__title">Review</h2>
+      </div>
+      <ul class="ds-list ds-stagger" id="review"></ul>
+    </section>
+    </div>
+  </div>
+
+  <style>
+    /* Screen-level layout only. Everything visual comes from the design system;
+       these rules place its parts. Anything the script paints at runtime is
+       reached through `:global(...)` under a static ancestor — scoped selectors
+       never match nodes made after the build. */
+
+    /* A task page chooses its column: the reading measure, centred on both
+       axes while the page is a single control and a short list — the /home
+       arrangement, not a corner and a dead field. Auto block margins collapse
+       to zero once a quiz grows the column, leaving it scrollable. */
+    .pr { flex: 1; width: 100%; display: flex; flex-direction: column; }
+    .pr__inner {
+      width: 100%; max-width: var(--measure-read);
+      margin-inline: auto; margin-block: auto;
+    }
+
+    .pr__pool { color: rgb(var(--ink-muted)); margin-top: var(--space-3); }
+
+    .start { display: flex; align-items: center; gap: var(--space-4); }
+    /* Guarded, because the flex display above outweighs the `[hidden]` rule
+       the quiz relies on when it takes the column. */
+    .start[hidden] { display: none; }
+    .start__status { color: rgb(var(--ink-muted)); }
+
+    .bank { margin-top: var(--space-12); }
+    .bank__find { margin-bottom: var(--space-4); }
+    .bank__find[hidden] { display: none; }
+    /* The whole row is the control, so it wears the pointer and answers to focus
+       the way a button does — the action is no longer parked behind a hover. */
+    /* A button has to be told to look like a row: the system's row styling
+       assumes a block, not a control with its own font and box. */
+    #bank-list :global(.bank__row) {
+      width: 100%; text-align: left; font: inherit; color: inherit;
+      border: 0; background: none; cursor: pointer;
+    }
+    #bank-list :global(.bank__what) { flex: 1; min-width: 0; }
+    #bank-list :global(.bank__name) { display: block; font-weight: var(--weight-medium); color: rgb(var(--ink)); }
+    #bank-list :global(.bank__meta) { display: block; color: rgb(var(--ink-muted)); margin-top: 2px; }
+    #bank-list :global(.bank__count) { flex: none; margin-left: var(--space-3); }
+
+    .quiz { margin-top: var(--space-10); }
+    .quiz__progress { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-4); }
+    .quiz__meter { flex: 1; }
+    .quiz__card { padding: var(--space-8); }
+    .quiz__question { margin: 0 0 var(--space-6); color: rgb(var(--ink)); }
+
+    /* One decision per line; the gap does the separating, not borders. */
+    .quiz__options { display: grid; gap: var(--space-4); justify-items: start; }
+    .quiz__options :global(.quiz__choice) { width: 100%; }
+    /* The key sits at the end of the line it answers for, and fades once the
+       choices freeze — it is still a label, but no longer a thing you can press. */
+    .quiz__options :global(.quiz__choicekey) { margin-left: auto; flex: none; }
+    .quiz__options :global(.quiz__choice:has(input:disabled) .quiz__choicekey) { opacity: 0.35; }
+    /* With a key already claiming the free space, the grade follows it. */
+    .quiz__options :global(.quiz__choicekey + .ds-mark) { margin-left: var(--space-3); }
+    /* The grade sits at the end of the line it grades. */
+    .quiz__options :global(.quiz__choice .ds-mark) { margin-left: auto; }
+    .quiz__options :global(.quiz__typed) { width: 100%; }
+    .quiz__options :global(.quiz__answer) { width: 100%; }
+    .quiz__options :global(.quiz__answer-text) { margin-top: var(--space-2); }
+    /* Guarded, because this glue outweighs the `[hidden]` rule it starts under. */
+    .quiz__options :global(.quiz__rate:not([hidden])) { display: flex; gap: var(--space-3); }
+
+    .quiz__feedback { margin-top: var(--space-6); padding-top: var(--space-6); border-top: 1px solid rgb(var(--rule-hairline)); }
+    .quiz__explanation { margin-top: var(--space-3); line-height: var(--leading-relaxed); }
+    /* The hint sits opposite the button it describes, and drops away on a narrow
+       column rather than wrapping under it. */
+    .quiz__foot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-top: var(--space-6); }
+    .quiz__keys { color: rgb(var(--ink-muted)); margin: 0; }
+    .quiz__keys[hidden] { display: none; }
+    .quiz__foot :global(#next) { margin-left: auto; }
+
+    .result { margin-top: var(--space-10); }
+    .result__card { padding: var(--space-8); margin-bottom: var(--space-12); }
+    .result__score { margin: var(--space-3) 0 var(--space-2); }
+    .result__actions { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-6); }
+
+    #review :global(.review__row) { padding: var(--space-5) var(--space-3); }
+    #review :global(.review__q) { display: flex; gap: var(--space-3); align-items: baseline; }
+    #review :global(.review__q p) { margin: 0; color: rgb(var(--ink)); }
+    #review :global(.review__lines) { margin-top: var(--space-3); }
+    #review :global(.review__lines p) { margin: 0 0 var(--space-1); color: rgb(var(--ink-secondary)); line-height: var(--leading-relaxed); }
+
+    @media (max-width: 60rem) {
+      .quiz__card, .result__card { padding: var(--space-5); }
+      /* Keyboard hints describe a keyboard that is not there. */
+      .quiz__keys { display: none; }
+    }
+  </style>
+
+  <script>
+    import {
+      advance, answerFlashcard, answerMcq, currentQuestion, isAnswered, isLastQuestion,
+      matchesCall, progress, review, score, startQuiz, tally, usableQuestions,
+      type FlashcardQuestion, type McqQuestion, type QuizState, type Source,
+    } from '../../../lib/quiz';
+
+    interface BankCall { id: string; title: string; timestamp: string; questions: unknown[]; concepts: string[] }
+
+    const byId = (id: string) => document.getElementById(id)!;
+    const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      return node;
+    };
+
+    /** A grade, worn as the system wears every state: a soft wash pill. */
+    const mark = (signal: 'locked' | 'fault', label: string) => {
+      const pill = el('span', `ds-mark ds-mark--${signal}`);
+      pill.textContent = label;
+      return pill;
+    };
+
+    let state: QuizState | null = null;
+    let bank: BankCall[] = [];
+
+    /**
+     * Re-grant the arrival to a node the quiz repaints in place. The class is
+     * one-shot by design; removing it and forcing a layout read is what lets
+     * the next question arrive rather than snap.
+     */
+    function arrive(node: HTMLElement): void {
+      node.classList.remove('ds-arrive');
+      void node.offsetWidth;
+      node.classList.add('ds-arrive');
+    }
+
+    // ── The question in hand ────────────────────────────────────────────────
+
+    function paintMcq(question: McqQuestion): void {
+      const host = byId('options');
+      host.replaceChildren();
+
+      question.options.forEach((option, i) => {
+        const row = el('label', 'ds-choice quiz__choice');
+        const pick = el('input', 'ds-radio');
+        pick.type = 'radio';
+        pick.name = 'mcq-option';
+        pick.dataset.option = String(i);
+        const text = el('span', 'ds-choice__text');
+        text.textContent = option;
+        row.append(pick, text);
+
+        // The number is shown because it is operable — a key you can press, not
+        // decoration. Only the first nine: past that, reaching for a digit is
+        // slower than reaching for the mouse.
+        if (i < 9) {
+          const key = el('kbd', 'ds-kbd quiz__choicekey');
+          key.textContent = String(i + 1);
+          row.append(key);
+        }
+
+        pick.addEventListener('change', () => {
+          if (!state || isAnswered(state)) return;
+          state = answerMcq(state, i);
+          const answer = state.answers[state.current];
+          if (answer?.kind !== 'mcq') return;
+
+          // The choices freeze, and marks say what happened where it happened:
+          // the right line is stated, and a wrong pick is named on its own line.
+          host.querySelectorAll('input').forEach((input, index) => {
+            input.disabled = true;
+            const line = input.closest('label');
+            if (index === question.correct) line?.append(mark('locked', 'correct'));
+            else if (index === answer.chosen) line?.append(mark('fault', 'your choice'));
+          });
+          showFeedback(answer.correct, question.explanation);
+        });
+        host.append(row);
+      });
+    }
+
+    function paintFlashcard(question: FlashcardQuestion): void {
+      const host = byId('options');
+      host.replaceChildren();
+
+      const typed = el('textarea', 'ds-field ds-textarea quiz__typed');
+      typed.placeholder = 'write your answer…';
+      typed.setAttribute('aria-label', 'Your answer');
+
+      const reveal = el('button', 'ds-btn ds-btn--secondary');
+      reveal.type = 'button';
+      reveal.textContent = 'Show the answer →';
+
+      const answerBlock = el('div', 'ds-well quiz__answer');
+      answerBlock.hidden = true;
+      const answerLabel = el('p', 'ds-eyebrow');
+      answerLabel.textContent = 'The answer';
+      const answerText = el('p', 'ds-small quiz__answer-text');
+      answerText.textContent = question.answer;
+      answerBlock.append(answerLabel, answerText);
+
+      const rate = el('div', 'quiz__rate');
+      rate.hidden = true;
+
+      // Self-rating is the honest mechanic for a written answer — but only after
+      // the answer has been seen, so it cannot be graded against nothing.
+      for (const [label, gotIt] of [['I missed it', false], ['I knew it', true]] as const) {
+        const btn = el('button', 'ds-btn ds-btn--secondary');
+        btn.type = 'button';
+        btn.textContent = label;
+        btn.addEventListener('click', () => {
+          if (!state || isAnswered(state)) return;
+          state = answerFlashcard(state, gotIt, typed.value);
+          typed.readOnly = true;
+          rate.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+          showFeedback(gotIt, '');
+        });
+        rate.append(btn);
+      }
+
+      reveal.addEventListener('click', () => {
+        answerBlock.hidden = false;
+        rate.hidden = false;
+        reveal.hidden = true;
+        paintKeys('answered');
+        // Straight to the self-rating, which is the only decision left.
+        (rate.querySelector('button') as HTMLButtonElement | null)?.focus();
+      });
+
+      host.append(typed, reveal, answerBlock, rate);
+    }
+
+    /** What the keys do right now — the hint changes as the question does. */
+    function paintKeys(kind: 'mcq' | 'flashcard' | 'answered' | null): void {
+      const keys = byId('keys');
+      if (kind === null) { keys.hidden = true; return; }
+      keys.textContent = kind === 'mcq' ? 'Press 1–9 to answer'
+        : kind === 'flashcard' ? 'Enter reveals the answer'
+        : 'Enter continues';
+      keys.hidden = false;
+    }
+
+    function showFeedback(right: boolean, explanation: string): void {
+      const verdict = byId('verdict');
+      verdict.className = `ds-mark ds-mark--${right ? 'locked' : 'fault'}`;
+      verdict.textContent = right ? 'correct' : 'not this time';
+
+      byId('explanation').textContent = explanation;
+      byId('feedback').hidden = false;
+
+      const next = byId('next') as HTMLButtonElement;
+      next.textContent = state && isLastQuestion(state) ? 'See the result →' : 'Next →';
+      next.hidden = false;
+      // Focused so Enter continues without the hand leaving the keyboard, and so
+      // a screen reader lands on the thing that moves the quiz forward.
+      next.focus();
+      paintKeys('answered');
+
+      paintProgress();
+    }
+
+    function paintProgress(): void {
+      if (!state) return;
+      const { label, fraction } = progress(state);
+      byId('progress-label').textContent = label;
+      (byId('progress-fill') as HTMLElement).style.width = `${fraction * 100}%`;
+
+      const { answered, correct } = tally(state);
+      byId('running').textContent = answered ? `${correct} of ${answered} right` : '';
+    }
+
+    function paintQuestion(): void {
+      if (!state) return;
+      const question = currentQuestion(state);
+      if (!question) return;
+
+      byId('question').textContent = question.question;
+      arrive(byId('question'));
+      byId('feedback').hidden = true;
+      byId('next').hidden = true;
+      paintProgress();
+
+      if (question.type === 'mcq') { paintMcq(question); paintKeys('mcq'); }
+      else { paintFlashcard(question); paintKeys('flashcard'); }
+    }
+
+    // ── The result ──────────────────────────────────────────────────────────
+
+    function paintResult(): void {
+      if (!state) return;
+      byId('quiz').hidden = true;
+
+      const { correct, total, pct, passed } = score(state);
+      byId('score').textContent = `${correct} / ${total}`;
+
+      const verdict = byId('verdict-final');
+      verdict.className = `ds-mark ds-mark--${passed ? 'locked' : 'fault'}`;
+      verdict.textContent = passed ? `passed · ${pct}%` : `not passed · ${pct}%`;
+
+      const list = byId('review');
+      list.replaceChildren();
+      for (const row of review(state)) {
+        const item = el('li', 'review__row');
+
+        const head = el('div', 'review__q');
+        head.append(mark(row.correct ? 'locked' : 'fault', row.correct ? 'right' : 'missed'));
+        const question = el('p');
+        question.textContent = row.question.question;
+        head.append(question);
+
+        const lines = el('div', 'review__lines');
+        if (row.given && !row.correct) {
+          const given = el('p', 'ds-small');
+          given.textContent = `You said: ${row.given}`;
+          lines.append(given);
+        }
+        const expected = el('p', 'ds-small');
+        expected.textContent = `Answer: ${row.expected}`;
+        lines.append(expected);
+
+        if (row.question.type === 'mcq' && row.question.explanation) {
+          const why = el('p', 'ds-small');
+          why.textContent = row.question.explanation;
+          lines.append(why);
+        }
+
+        item.append(head, lines);
+        list.append(item);
+      }
+
+      byId('result').hidden = false;
+      byId('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    /** True while the caret is in a field, where a digit is a digit. */
+    function isTyping(target: EventTarget | null): boolean {
+      const node = target as HTMLElement | null;
+      if (!node) return false;
+      return node.tagName === 'TEXTAREA' || node.tagName === 'INPUT'
+        || node.isContentEditable === true;
+    }
+
+    document.addEventListener('keydown', (event) => {
+      if (!state || byId('quiz').hidden) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      // Enter continues once the question is answered. The button is focused at
+      // that point, so this only matters when focus has wandered.
+      if (event.key === 'Enter' && !isTyping(event.target)) {
+        const next = byId('next') as HTMLButtonElement;
+        if (!next.hidden) { event.preventDefault(); next.click(); return; }
+        const reveal = byId('options').querySelector<HTMLButtonElement>('button:not([disabled]):not([hidden])');
+        if (reveal && !isAnswered(state)) { event.preventDefault(); reveal.click(); }
+        return;
+      }
+
+      if (isTyping(event.target) || isAnswered(state)) return;
+
+      const slot = Number(event.key);
+      if (!slot || slot < 1 || slot > 9) return;
+      const pick = byId('options').querySelector<HTMLInputElement>(`input[data-option="${slot - 1}"]`);
+      if (!pick || pick.disabled) return;
+      event.preventDefault();
+      pick.checked = true;
+      pick.dispatchEvent(new Event('change'));
+    });
+
+    byId('next').addEventListener('click', () => {
+      if (!state) return;
+      const stepped = advance(state);
+      state = stepped.state;
+      if (stepped.finished) paintResult();
+      else paintQuestion();
+    });
+
+    /** Put the column back the way it was before a quiz took it. */
+    function leaveQuiz(): void {
+      state = null;
+      byId('quiz').hidden = true;
+      byId('result').hidden = true;
+      byId('start').hidden = false;
+      paintKeys(null);
+      paintBank();
+      byId('start').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    byId('leave').addEventListener('click', leaveQuiz);
+    byId('back').addEventListener('click', leaveQuiz);
+
+    byId('retake').addEventListener('click', () => {
+      if (!state) return;
+      const source = state.source;
+      if (source.kind === 'call') takeCall(source.callId);
+      else generate();
+    });
+
+    // ── Starting ────────────────────────────────────────────────────────────
+
+    function begin(questions: unknown, source: Source): boolean {
+      const usable = usableQuestions(questions);
+      if (!usable.length) return false;
+
+      state = startQuiz(usable, source);
+      // Taking a quiz is a mode: the ways of starting one leave the column so
+      // the question is the only thing on it, centred at the reading measure.
+      byId('start').hidden = true;
+      byId('bank').hidden = true;
+      byId('result').hidden = true;
+      byId('quiz').hidden = false;
+      paintQuestion();
+      byId('quiz').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return true;
+    }
+
+    async function generate(): Promise<void> {
+      const button = byId('generate') as HTMLButtonElement;
+      const status = byId('status');
+      button.disabled = true;
+      status.hidden = false;
+      status.textContent = 'writing questions…';
+
+      try {
+        const res = await fetch('/api/learn/quiz/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ count: 10 }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const data = await res.json();
+
+        const usable = usableQuestions(data.questions);
+        if (begin(data.questions, { kind: 'generated' })) {
+          // A short batch is still a quiz. Saying so beats silently handing over
+          // six questions when ten were asked for, and beats the old behaviour
+          // of calling the whole thing unusable.
+          const asked = Number(data.requested) || 0;
+          if (asked && usable.length < asked) {
+            status.textContent = `${usable.length} of ${asked} questions came back`;
+          } else {
+            status.hidden = true;
+          }
+        } else {
+          // The questions are model-generated, so a malformed batch is a real
+          // possibility rather than a hypothetical. Say which kind it was — an
+          // empty answer and an unreadable one need different things from you.
+          status.textContent = Array.isArray(data.questions) && data.questions.length
+            ? 'the questions came back unreadable — try again'
+            : 'no questions came back — try again';
+        }
+      } catch {
+        status.textContent = 'could not generate — is the backend running?';
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function takeCall(callId: string): void {
+      const call = bank.find((c) => c.id === callId);
+      if (!call) return;
+      begin(call.questions, { kind: 'call', callId });
+    }
+
+    byId('generate').addEventListener('click', generate);
+
+    // Filtering repaints the list only — the pool itself is already in hand.
+    byId('bank-query').addEventListener('input', paintBank);
+
+    // ── The pool ────────────────────────────────────────────────────────────
+
+    /** Calls that actually have questions — the only ones worth listing. */
+    function takeableCalls(): BankCall[] {
+      return bank.filter((c) => usableQuestions(c.questions).length);
+    }
+
+    // Worth filtering, rather than furniture above a list you can already see.
+    const FILTER_WORTH_IT = 6;
+
+    function paintBank(): void {
+      const list = byId('bank-list');
+      list.replaceChildren();
+
+      const takeable = takeableCalls();
+      // The pool answers asynchronously: if a quiz began first, the bank stays
+      // out of the way — the quiz owns the column until it ends.
+      byId('bank').hidden = takeable.length === 0 || !byId('quiz').hidden;
+
+      const find = byId('bank-find');
+      find.hidden = takeable.length < FILTER_WORTH_IT;
+      const needle = find.hidden ? '' : (byId('bank-query') as HTMLInputElement).value;
+
+      const shown = takeable.filter((call) => matchesCall(call, needle));
+      byId('bank-count').textContent = needle.trim()
+        ? `${shown.length} of ${takeable.length}`
+        : `${takeable.length} call${takeable.length === 1 ? '' : 's'}`;
+
+      if (shown.length === 0) {
+        const empty = el('li');
+        empty.innerHTML = '<div class="ds-empty ds-empty--inline"><p class="ds-empty__body">no calls match that</p></div>';
+        list.append(empty);
+        return;
+      }
+
+      for (const call of shown) {
+        // The row IS the control, and it is a real <button> inside the list item
+        // rather than an <li> wearing a role — that keeps the list a list, and
+        // keyboard activation comes free instead of being hand-rolled. The action
+        // used to sit in `.ds-row__actions`, which the system hides until hover:
+        // right for a secondary menu, wrong for the one thing a row exists to do,
+        // and unreachable by touch.
+        const item = el('li');
+        const row = el('button', 'ds-row ds-row--record bank__row');
+        row.type = 'button';
+
+        const what = el('div', 'bank__what');
+        const name = el('span', 'bank__name');
+        name.textContent = call.title;
+        const meta = el('span', 'ds-small bank__meta');
+        meta.textContent = [call.timestamp, call.concepts.slice(0, 3).join(' · ')]
+          .filter(Boolean).join(' · ');
+        what.append(name, meta);
+
+        // The question count earns a tag: it is what you choose a call ON.
+        const count = usableQuestions(call.questions).length;
+        const tag = el('span', 'ds-tag bank__count');
+        tag.textContent = `${count} question${count === 1 ? '' : 's'}`;
+
+        row.addEventListener('click', () => takeCall(call.id));
+        row.setAttribute('aria-label', `Take the quiz for ${call.title}, ${count} question${count === 1 ? '' : 's'}`);
+
+        row.append(what, tag);
+        item.append(row);
+        list.append(item);
+      }
+    }
+
+    (async () => {
+      try {
+        const res = await fetch('/api/learn/quiz/pool');
+        if (!res.ok) throw new Error(String(res.status));
+        const data = await res.json();
+        const total = data.total_calls ?? 0;
+        byId('pool').textContent = `${total} call${total === 1 ? '' : 's'} in the pool`;
+        bank = Array.isArray(data.calls) ? data.calls : [];
+        paintBank();
+      } catch {
+        byId('pool').textContent = 'could not read the pool — is the backend running?';
+      }
+    })();
+  </script>
+</PlatformLayout>

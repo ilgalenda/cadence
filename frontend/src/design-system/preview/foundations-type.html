@@ -1,0 +1,126 @@
+<!-- @dsCard group="Foundations" name="Typography" subtitle="Big bold headlines, calm body; mono as a whisper" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Typography — Cadence Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../primitives.css">
+<link rel="stylesheet" href="preview.css">
+</head>
+<body class="ds-root">
+
+<header class="pv-head">
+  <p class="ds-eyebrow">Foundations · 02</p>
+  <h1>Typography</h1>
+  <p>
+    Two faces, both mandated by the brand. <strong>Roboto</strong> carries everything readable —
+    including eyebrows and labels, which are sans now. <strong>Kode Mono</strong> is a whisper:
+    timestamps, ids, counts, keyboard hints — short identifiers only, never a sentence.
+    Hierarchy comes from <strong>size and weight together</strong>: big, bold, tight headlines
+    over calm regular body.
+  </p>
+</header>
+
+<section class="pv-section">
+  <h2>Scale</h2>
+  <div class="pv-stack">
+    <div>
+      <p class="pv-spec">display · 56px / 700 / -0.03em</p>
+      <p class="ds-display">Timing solutions for the modern world</p>
+    </div>
+    <hr class="ds-rule">
+    <div>
+      <p class="pv-spec">heading · 32px / 700</p>
+      <p class="ds-heading">Precision, held across every surface</p>
+    </div>
+    <hr class="ds-rule">
+    <div>
+      <p class="pv-spec">title · 22px / 500</p>
+      <p class="ds-title">Conversation title</p>
+    </div>
+    <hr class="ds-rule">
+    <div>
+      <p class="pv-spec">lead · 17px / 400 / 1.65 — the user's question</p>
+      <p class="ds-lead">How does holdover behave when the GNSS antenna drops out mid-session?</p>
+    </div>
+    <hr class="ds-rule">
+    <div>
+      <p class="pv-spec">body · 15px / 400 / 1.5 — interface copy and Owl's prose</p>
+      <p class="ds-body" style="max-width: var(--measure-read);">
+        A grandmaster clock in holdover is running on its own oscillator, no longer disciplined
+        by an external reference. How long it stays within tolerance depends entirely on the
+        oscillator class — an OCXO will hold microsecond accuracy for hours; a rubidium
+        reference will hold it for days.
+      </p>
+    </div>
+    <hr class="ds-rule">
+    <div>
+      <p class="pv-spec">small · 13px — dense interface, table cells</p>
+      <p class="ds-small">Sixteen prospects matched · four ready for enrichment</p>
+    </div>
+    <hr class="ds-rule">
+    <div>
+      <p class="pv-spec">caption · 12px — helper text</p>
+      <p class="ds-caption">Phone numbers are revealed only when you ask, so credit spend stays deliberate.</p>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Kode Mono — the whisper</h2>
+  <div class="pv-stack">
+    <p class="ds-eyebrow">Eyebrow · sans · uppercase · 0.08em</p>
+    <p class="ds-mono">14:32 · sonnet · 1,284 tokens · 2.1s</p>
+    <p class="ds-mono">campaign_id 7f3a9c2e · step 3 of 5</p>
+    <div class="pv-row" style="gap: var(--space-4);">
+      <span class="pv-row" style="gap: var(--space-2);"><kbd class="ds-kbd">⌘</kbd><kbd class="ds-kbd">K</kbd><span class="ds-mono">search</span></span>
+      <span class="pv-row" style="gap: var(--space-2);"><kbd class="ds-kbd">↵</kbd><span class="ds-mono">send</span></span>
+      <span class="pv-row" style="gap: var(--space-2);"><kbd class="ds-kbd">⇧</kbd><kbd class="ds-kbd">↵</kbd><span class="ds-mono">new line</span></span>
+    </div>
+    <p class="ds-caption" style="max-width: var(--measure-read); margin:0">If a mono string reads as a sentence, it belongs in Roboto. Quotes, labels and section names are sans; mono is reserved for what the machine emits.</p>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Weights</h2>
+  <p class="ds-caption" style="margin-bottom: var(--space-4); max-width: var(--measure-read);">
+    Body sizes stay consistent and mix weights for emphasis; headlines are the exception —
+    they are big AND bold. Every line below is 15px.
+  </p>
+  <div class="pv-stack" style="gap: var(--space-2);">
+    <p style="font-size: var(--text-body); font-weight: 300;">Light 300 — rarely, for quiet large text</p>
+    <p style="font-size: var(--text-body); font-weight: 400;">Regular 400 — the default for everything</p>
+    <p style="font-size: var(--text-body); font-weight: 500;">Medium 500 — emphasis, active states, buttons</p>
+    <p style="font-size: var(--text-body); font-weight: 700;">Bold 700 — display and headings; in body, single words only</p>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Measure</h2>
+  <p class="ds-caption" style="margin-bottom: var(--space-3);">
+    Owl's answers are prose and must be typeset as prose. The reading column is capped at
+    42rem — roughly 68 characters, the length at which the eye tracks a line without effort.
+  </p>
+  <div class="pv-frame" style="padding: var(--space-6); max-width: var(--measure-read);">
+    <div class="ds-answer">
+      <p>
+        Precision Time Protocol distributes time by measuring the delay between a master and
+        a slave clock, then correcting for it. The accuracy you can achieve depends less on
+        the protocol than on whether every device in the path is aware of it.
+      </p>
+      <p>
+        A switch that timestamps packets in hardware adds nanoseconds of uncertainty. One that
+        does not can add hundreds of microseconds, and no amount of downstream correction will
+        recover that.
+      </p>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

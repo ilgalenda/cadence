@@ -1,0 +1,67 @@
+/* Chrome for the design-system preview pages only. Never shipped in the app.
+   Spec sheets in the system's own voice: white field, big bold masthead,
+   quiet sans section labels. */
+
+* { box-sizing: border-box; }
+body { margin: 0; padding: 0 0 var(--space-16); background: rgb(var(--canvas)); }
+
+.pv-head {
+  padding: var(--space-16) var(--space-10) var(--space-10);
+  margin-bottom: var(--space-6);
+  border-bottom: 1px solid rgb(var(--rule-hairline));
+}
+.pv-head h1 { margin: var(--space-3) 0 0; font-size: var(--text-display); font-weight: var(--weight-bold); letter-spacing: var(--tracking-display); line-height: var(--leading-tight); color: rgb(var(--ink)); }
+.pv-head p  { margin: var(--space-5) 0 0; max-width: 46rem; font-size: var(--text-body); color: rgb(var(--ink-secondary)); line-height: var(--leading-relaxed); text-wrap: pretty; }
+.pv-head strong { color: rgb(var(--ink)); font-weight: var(--weight-medium); }
+
+.pv-section { margin-top: var(--space-12); padding-inline: var(--space-10); }
+.pv-section > h2 {
+  display: flex; align-items: center; gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+  font-family: var(--font-sans);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: rgb(var(--ink-muted));
+}
+
+.pv-grid  { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--space-3); }
+.pv-row   { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.pv-stack { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* Colour swatch: the colour itself, then what it is for. */
+.pv-swatch { background: rgb(var(--surface)); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-raised); }
+.pv-swatch__chip { height: 4.5rem; }
+.pv-swatch__meta { padding: var(--space-3) var(--space-4); }
+.pv-swatch__name { font-size: var(--text-small); font-weight: var(--weight-medium); }
+.pv-swatch__token { font-family: var(--font-mono); font-size: var(--text-micro); color: rgb(var(--ink-muted)); margin-top: 2px; }
+.pv-swatch__use { font-size: var(--text-caption); color: rgb(var(--ink-secondary)); margin-top: var(--space-2); line-height: var(--leading-normal); }
+
+.pv-spec { font-family: var(--font-mono); font-size: var(--text-micro); color: rgb(var(--ink-muted)); letter-spacing: var(--tracking-mono); }
+
+/* A note is a soft gold-washed card, labelled. */
+.pv-note {
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  background: rgb(var(--field-gold) / 0.12);
+  font-size: var(--text-caption);
+  color: rgb(var(--ink-secondary));
+  line-height: var(--leading-relaxed);
+  max-width: 46rem;
+}
+.pv-note::before {
+  content: 'Note';
+  display: block;
+  font-family: var(--font-sans);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: rgb(var(--gold-deep));
+  margin-bottom: var(--space-1);
+}
+
+.pv-frame.ds-chrome { background: rgb(var(--chrome)); border-color: rgb(var(--chrome-rule)); }
+.pv-frame { background: rgb(var(--surface)); border: 1px solid rgb(var(--rule-hairline)); border-radius: var(--radius-lg); overflow: hidden; }
+
+a { color: rgb(var(--accent-ink)); text-underline-offset: 2px; }
+a:hover { color: rgb(var(--ink)); }

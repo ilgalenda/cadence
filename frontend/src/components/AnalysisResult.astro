@@ -1,486 +1,740 @@
 ---
-import LeadHandoffButton from './LeadHandoffButton.astro';
+/**
+ * A call, read.
+ *
+ * Three surfaces render this — `/work/agents/call-analysis`, `/learn/library/call`
+ * and `/admin/calls/call` — so it stays one component. Its **public surface is
+ * fixed** and callers depend on it:
+ *
+ *   - the `showClear` and `analysisId` props
+ *   - `window.renderAnalysisResult(result)`
+ *   - the `#ar-heading` element, which two pages overwrite with a title and date
+ *
+ * On the design system as of the uniformity pass. It was the last thing rendering
+ * legacy classes *inside* new pages: two design-system surfaces displayed a block
+ * styled like the old product. Reusing it untouched was right on duplication and
+ * wrong on coherence, and this fixes the second without breaking the first.
+ *
+ * The script stays `is:inline` because `renderAnalysisResult` has to be a global —
+ * the pages that call it do so from their own module scripts.
+ */
 interface Props {
-  /** When set, the component fetches /api/calls/{id} on mount and renders it. */
+  /** When set, the component fetches /api/sales/calls/{id} on mount and renders it. */
   analysisId?: string;
   /** Show the "Clear" button (hide on standalone detail pages). */
   showClear?: boolean;
 }
 const { analysisId, showClear = true } = Astro.props;
 ---
-<div id="analysis-result" data-analysis-id={analysisId ?? ''} class={analysisId ? '' : 'hidden'}>
+<div id="analysis-result" data-analysis-id={analysisId ?? ''} hidden={!analysisId}>
 
-  <div class="flex items-center justify-between pb-3 mb-2 border-b border-rule-strong">
-    <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary" id="ar-heading">Analysis</h2>
-    <div class="flex items-center gap-5">
-      <a id="download-transcript" href="#" class="hidden font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">Download transcript →</a>
-      <button id="ask-owl-call" class="hidden font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">Ask Owl about this call →</button>
-      <button id="download-report" class="font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">Download report →</button>
+  <header class="ar__head">
+    <h2 class="ds-eyebrow ar__title" id="ar-heading">Analysis</h2>
+    <div class="ar__actions">
+      <button id="ask-owl-call" class="ds-btn ds-btn--ghost ds-btn--sm" type="button" hidden>Ask Owl</button>
+      <button id="download-report" class="ds-btn ds-btn--ghost ds-btn--sm" type="button">Report</button>
       {showClear && (
-        <button id="clear-results" class="font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-signal-danger transition-colors">Clear</button>
+        <button id="clear-results" class="ds-btn ds-btn--ghost ds-btn--sm" type="button">Clear</button>
       )}
     </div>
-  </div>
+  </header>
 
-  <!-- Result tabs -->
-  <div class="border-b border-rule-subtle flex items-center gap-6 mb-6 overflow-x-auto">
-    <button class="result-tab active relative py-3 text-sm font-medium text-ink-primary transition-colors whitespace-nowrap" data-tab="summary">
-      <span>Summary</span>
-      <span class="tab-rule absolute left-0 right-0 -bottom-px h-[2px] bg-accent"></span>
-    </button>
-    <button class="result-tab relative py-3 text-sm font-medium text-ink-muted hover:text-ink-primary transition-colors whitespace-nowrap" data-tab="sales"><span>Sales intel</span></button>
-    <button class="result-tab relative py-3 text-sm font-medium text-ink-muted hover:text-ink-primary transition-colors whitespace-nowrap" data-tab="recommendation"><span>Recommendation</span></button>
-    <button class="result-tab relative py-3 text-sm font-medium text-ink-muted hover:text-ink-primary transition-colors whitespace-nowrap" data-tab="knowledge"><span>Learning</span></button>
-    <button class="result-tab relative py-3 text-sm font-medium text-ink-muted hover:text-ink-primary transition-colors whitespace-nowrap" data-tab="quiz"><span>Quiz</span></button>
+  <div class="ds-tabs ar__tabs" role="tablist">
+    <button class="ds-tab result-tab is-active" type="button" role="tab" data-tab="summary">Summary</button>
+    <button class="ds-tab result-tab" type="button" role="tab" data-tab="sales">Sales intel</button>
+    <button class="ds-tab result-tab" type="button" role="tab" data-tab="recommendation">Recommendation</button>
+    <button class="ds-tab result-tab" type="button" role="tab" data-tab="knowledge">Learning</button>
+    <button class="ds-tab result-tab" type="button" role="tab" data-tab="quiz">Quiz</button>
   </div>
 
   <!-- Summary -->
   <div id="tab-summary" class="result-panel">
-    <section class="mb-8">
-      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Summary</p>
-      <p id="result-summary" class="text-base text-ink-primary leading-relaxed max-w-2xl"></p>
+    <section class="ar__section">
+      <p class="ds-eyebrow ar__label">Summary</p>
+      <p id="result-summary" class="ds-body ar__prose"></p>
     </section>
-    <section class="mb-8">
-      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Concepts mentioned</p>
-      <div id="result-concepts" class="font-mono text-xs text-ink-secondary leading-loose"></div>
+    <section class="ar__section">
+      <p class="ds-eyebrow ar__label">Concepts mentioned</p>
+      <div id="result-concepts" class="ar__tags"></div>
     </section>
     <section>
-      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Next step</p>
-      <LeadHandoffButton source="call-analysis" label="Start outreach from this call" variant="primary" />
+      <p class="ds-eyebrow ar__label">Next step</p>
+      <!-- Into the new front half: Research prefills the company and deliberately
+           does not auto-run, so an imprecise call title costs nothing. This used to
+           hand off to the retiring campaign builder, which dropped you out of the
+           new product mid-task. -->
+      <a class="ds-btn ds-btn--primary" id="ar-next-step" href="/work/agents/research">
+        Research this account
+      </a>
     </section>
   </div>
 
   <!-- Sales intel -->
-  <div id="tab-sales" class="result-panel hidden space-y-8">
-    <section>
-      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Buying signals</p>
-      <ul id="result-signals" class="space-y-2"></ul>
+  <div id="tab-sales" class="result-panel" hidden>
+    <section class="ar__section">
+      <p class="ds-eyebrow ar__label">Buying signals</p>
+      <ul id="result-signals" class="ar__list"></ul>
+    </section>
+    <section class="ar__section">
+      <p class="ds-eyebrow ar__label">Objections</p>
+      <ul id="result-objections" class="ar__list"></ul>
     </section>
     <section>
-      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Objections</p>
-      <ul id="result-objections" class="space-y-2"></ul>
-    </section>
-    <section>
-      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Follow-up talking points</p>
-      <ul id="result-talking" class="space-y-2"></ul>
+      <p class="ds-eyebrow ar__label">Follow-up talking points</p>
+      <ul id="result-talking" class="ar__list"></ul>
     </section>
   </div>
 
-  <!-- Recommendation -->
-  <div id="tab-recommendation" class="result-panel hidden space-y-8">
-    <!-- Opt-in: not generated by default (the rep usually knows the product) -->
-    <section id="rec-generate" class="hidden relative bg-surface-1 border border-rule-subtle pl-5 pr-5 py-5">
-      <span class="absolute left-0 top-0 bottom-0 w-[2px] bg-ink-muted"></span>
-      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Product recommendation</p>
-      <p class="text-sm text-ink-secondary leading-relaxed max-w-2xl mb-4">Not generated for this call. Name the product if you already know it (optional) — otherwise Owl assesses fit across the catalogue.</p>
-      <div class="flex flex-wrap items-center gap-3">
-        <input id="rec-product-input" type="text" placeholder="Product (optional)" class="bg-surface-0 border border-rule-subtle px-3 py-2 text-sm text-ink-primary placeholder:text-ink-muted focus:border-accent outline-none" />
-        <button id="rec-generate-btn" class="font-mono text-[11px] uppercase tracking-label bg-accent text-surface-0 px-4 py-2 hover:opacity-90 transition-opacity">Generate recommendation →</button>
-        <span id="rec-generate-state" class="font-mono text-[11px] text-ink-muted"></span>
+  <!-- Recommendation. Opt-in: the rep usually knows the product already. -->
+  <div id="tab-recommendation" class="result-panel" hidden>
+    <section id="rec-generate" class="ds-well ar__well" hidden>
+      <p class="ds-eyebrow ar__label">Product recommendation</p>
+      <p class="ds-small ar__prose">
+        Not generated for this call. Name the product if you already know it — otherwise Owl
+        assesses fit across the catalogue.
+      </p>
+      <div class="ar__row">
+        <input id="rec-product-input" class="ds-field" type="text" placeholder="Product (optional)" autocomplete="off" />
+        <button id="rec-generate-btn" class="ds-btn ds-btn--accent" type="button">Assess fit</button>
+        <span id="rec-generate-state" class="ds-caption ar__state"></span>
       </div>
     </section>
-    <section id="result-primary-rec" class="hidden relative bg-surface-1 border border-rule-subtle pl-5 pr-5 py-5">
-      <span class="absolute left-0 top-0 bottom-0 w-[2px] bg-accent"></span>
-      <p class="font-mono text-[11px] uppercase tracking-label text-accent mb-2">Primary recommendation</p>
-      <p id="rec-product-name" class="text-xl font-semibold tracking-tightest text-ink-primary mb-2"></p>
-      <p id="rec-product-reasoning" class="text-sm text-ink-secondary leading-relaxed max-w-2xl"></p>
-      <button id="rec-ask-claude" class="mt-4 font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">ask owl more →</button>
+
+    <section id="result-primary-rec" class="ds-panel ar__panel" hidden>
+      <span class="ds-mark ds-mark--live">primary recommendation</span>
+      <p id="rec-product-name" class="ds-title ar__rec-name"></p>
+      <p id="rec-product-reasoning" class="ds-small ar__prose"></p>
+      <button id="rec-ask-claude" class="ds-btn ds-btn--secondary ds-btn--sm" type="button">Ask Owl more</button>
     </section>
-    <section id="rec-fits-section" class="hidden">
-      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">All product fits</p>
+
+    <section id="rec-fits-section" hidden>
+      <p class="ds-eyebrow ar__label">All product fits</p>
       <div id="result-all-fits"></div>
     </section>
   </div>
 
-  <!-- Learning -->
-  <div id="tab-knowledge" class="result-panel hidden">
-    <div id="result-knowledge" class="space-y-6"></div>
+  <!-- Learning. Two labelled halves rather than a sixth tab: the terms come
+       from the same extraction on the same call, and a tab that is empty on most
+       calls teaches people not to open it. -->
+  <div id="tab-knowledge" class="result-panel" hidden>
+    <section>
+      <p class="ds-eyebrow ar__label">What this call taught</p>
+      <div id="result-knowledge"></div>
+      <p class="ds-caption ar__filed" id="ar-extracts-filed" hidden>
+        Filed to the call record — these are not wiki pages.
+      </p>
+    </section>
+    <section id="ar-terms-section" hidden>
+      <p class="ds-eyebrow ar__label">Terms filed to the wiki</p>
+      <div id="result-terms"></div>
+    </section>
   </div>
 
   <!-- Quiz -->
-  <div id="tab-quiz" class="result-panel hidden">
-    <div id="quiz-container" class="space-y-6"></div>
-    <div id="quiz-score" class="hidden mt-8 relative bg-surface-1 border border-rule-subtle pl-5 pr-5 py-5">
-      <span class="absolute left-0 top-0 bottom-0 w-[2px] bg-signal-success"></span>
-      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Score</p>
-      <p class="font-mono text-2xl tabular text-ink-primary" id="score-text"></p>
-      <p class="text-sm text-ink-secondary mt-2">Keep practising to reinforce what you learned on this call.</p>
-      <button id="quiz-retry" class="mt-4 font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors">Retry quiz →</button>
+  <div id="tab-quiz" class="result-panel" hidden>
+    <div id="quiz-container"></div>
+    <div id="quiz-score" class="ds-panel ar__panel" hidden>
+      <p class="ds-eyebrow ar__label">Score</p>
+      <p class="ds-display ar__score" id="score-text"></p>
+      <p class="ds-small ar__prose">Keep practising to reinforce what you learned on this call.</p>
+      <button id="quiz-retry" class="ds-btn ds-btn--secondary ds-btn--sm" type="button">Retry</button>
     </div>
   </div>
-
-  <!-- Static safelist for JS-injected classes -->
-  <div class="hidden" aria-hidden="true">
-    <span class="border-signal-success text-signal-success bg-signal-success/10"></span>
-    <span class="border-signal-danger text-signal-danger bg-signal-danger/10"></span>
-    <span class="border-accent text-accent bg-accent/10"></span>
-    <span class="border-l-2"></span>
-    <span class="bg-accent-soft"></span>
-  </div>
 </div>
+
+<style is:global>
+  /* Layout only — every primitive above comes from the design system. */
+  .ar__head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);
+    padding-bottom: var(--space-3); border-bottom: 1px solid rgb(var(--rule));
+  }
+  .ar__title { color: rgb(var(--ink)); }
+  .ar__actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+  .ar__tabs { margin-bottom: var(--space-6); overflow-x: auto; }
+
+  .ar__section { margin-bottom: var(--space-8); }
+  .ar__label { color: rgb(var(--ink-muted)); margin-bottom: var(--space-3); }
+  .ar__prose {
+    color: rgb(var(--ink-secondary)); line-height: var(--leading-relaxed);
+    max-width: var(--measure-read); margin: 0 0 var(--space-3);
+  }
+  .ar__tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+  /* A finding per row, drawn — the mark carries the meaning, not a tinted box. */
+  .ar__list { list-style: none; margin: 0; padding: 0; }
+  .ar__item {
+    display: grid; grid-template-columns: auto 1fr; gap: var(--space-4);
+    align-items: baseline; padding-block: var(--space-3);
+    border-bottom: 1px solid rgb(var(--rule-hairline));
+  }
+  .ar__item:last-child { border-bottom: 0; }
+  .ar__item-body { color: rgb(var(--ink-secondary)); line-height: var(--leading-relaxed); }
+  .ar__none { color: rgb(var(--ink-muted)); padding-block: var(--space-4); }
+
+  .ar__well, .ar__panel { padding: var(--space-5); margin-bottom: var(--space-6); }
+  .ar__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+  .ar__state { color: rgb(var(--ink-muted)); }
+  .ar__rec-name { color: rgb(var(--ink)); margin: var(--space-3) 0 var(--space-2); }
+  .ar__score { margin: var(--space-2) 0; }
+
+  .ar__fit {
+    display: grid; grid-template-columns: 5rem 1fr; gap: var(--space-5);
+    padding-block: var(--space-4); border-bottom: 1px solid rgb(var(--rule-hairline));
+  }
+  .ar__fit:last-child { border-bottom: 0; }
+  .ar__fit-name { color: rgb(var(--ink)); font-weight: var(--weight-medium); margin: 0; }
+  .ar__fit-why { color: rgb(var(--ink-secondary)); margin: 2px 0 0; line-height: var(--leading-relaxed); }
+
+  .ar__know { padding-block: var(--space-5); border-bottom: 1px solid rgb(var(--rule-hairline)); }
+  .ar__know:last-child { border-bottom: 0; }
+
+  /* Said once under the extracts, not per row: an extract is filed to the call
+     record and is deliberately not a wiki page, so nothing here links out. The
+     terms below it do, which is the distinction the caption is drawing. */
+  .ar__filed { color: rgb(var(--ink-muted)); margin-top: var(--space-3); }
+  #ar-terms-section { margin-top: var(--space-10); }
+
+  .ar__card { padding-block: var(--space-6); border-bottom: 1px solid rgb(var(--rule-hairline)); }
+  .ar__card:last-child { border-bottom: 0; }
+  .ar__question {
+    color: rgb(var(--ink)); line-height: var(--leading-relaxed);
+    max-width: var(--measure-read); margin: 0 0 var(--space-4);
+  }
+  .ar__options { display: flex; flex-direction: column; gap: var(--space-2); max-width: var(--measure-read); }
+  /* An option is a soft well, not a drawn outline; the verdict arrives as the
+     same wash tints the status marks wear. Multi-line, so the card radius. */
+  .ar__option {
+    display: block; width: 100%; text-align: left;
+    padding: var(--space-3) var(--space-4);
+    border: 0; border-radius: var(--radius-md);
+    background: rgb(var(--surface-sunken)); cursor: pointer;
+    font-family: var(--font-sans); font-size: var(--text-small);
+    color: rgb(var(--ink-secondary));
+    transition: background-color var(--dur-tick) var(--ease-phase), color var(--dur-tick) var(--ease-phase);
+  }
+  .ar__option:hover:not(:disabled) { background: rgb(var(--ink) / 0.09); color: rgb(var(--ink)); }
+  .ar__option:disabled { cursor: default; }
+  .ar__option--right { background: rgb(var(--signal-locked-wash)); color: rgb(var(--signal-locked)); }
+  .ar__option--wrong { background: rgb(var(--signal-fault-wash)); color: rgb(var(--signal-fault)); }
+  .ar__option-key { color: rgb(var(--ink-muted)); margin-right: var(--space-3); }
+
+  .ar__feedback { margin-top: var(--space-3); line-height: var(--leading-relaxed); }
+  .ar__answer {
+    margin-top: var(--space-4); padding-left: var(--space-4);
+    border-left: 2px solid rgb(var(--accent));
+    max-width: var(--measure-read);
+    color: rgb(var(--ink-secondary)); line-height: var(--leading-relaxed);
+  }
+</style>
 
 <script is:inline>
   (function () {
     let currentAnalysis = null;
     let quizState = [];
 
-    function esc(s) {
-      return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
+    const byId = (id) => document.getElementById(id);
+    const el = (tag, className) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      return node;
+    };
 
-    function setTabActive(btn, isActive) {
-      btn.classList.toggle('text-ink-primary', isActive);
-      btn.classList.toggle('text-ink-muted', !isActive);
-      const existing = btn.querySelector('.tab-rule');
-      if (isActive && !existing) {
-        const rule = document.createElement('span');
-        rule.className = 'tab-rule absolute left-0 right-0 -bottom-px h-[2px] bg-accent';
-        btn.appendChild(rule);
-      } else if (!isActive && existing) {
-        existing.remove();
-      }
-    }
+    // ── Tabs ────────────────────────────────────────────────────────────────
 
-    document.querySelectorAll('.result-tab').forEach(btn => {
+    document.querySelectorAll('.result-tab').forEach((btn) => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.result-tab').forEach(b => setTabActive(b, false));
-        setTabActive(btn, true);
-        document.querySelectorAll('.result-panel').forEach(p => p.classList.add('hidden'));
-        document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+        document.querySelectorAll('.result-tab').forEach((b) => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        document.querySelectorAll('.result-panel').forEach((p) => { p.hidden = true; });
+        byId('tab-' + btn.dataset.tab).hidden = false;
       });
     });
 
-    function renderList(id, items, bullet) {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.innerHTML = (items && items.length)
-        ? items.map(item => `<li class="grid grid-cols-[auto_1fr] gap-3 text-sm text-ink-secondary leading-relaxed"><span class="font-mono text-ink-muted">${bullet}</span><span>${esc(item)}</span></li>`).join('')
-        : '<li class="font-mono text-xs text-ink-muted">// none identified</li>';
+    // ── Lists ───────────────────────────────────────────────────────────────
+
+    /**
+     * A findings list. `mark` is the design system's status vocabulary, so a
+     * signal, an objection and a talking point are told apart by the same colours
+     * the rest of the product uses for state.
+     */
+    function renderList(id, items, mark, label) {
+      const host = byId(id);
+      if (!host) return;
+      host.replaceChildren();
+
+      if (!items || !items.length) {
+        const none = el('li', 'ds-caption ar__none');
+        none.textContent = 'none identified';
+        host.append(none);
+        return;
+      }
+
+      items.forEach((item) => {
+        const row = el('li', 'ar__item');
+        const badge = el('span', 'ds-mark ds-mark--' + mark);
+        badge.textContent = label;
+        const body = el('span', 'ds-small ar__item-body');
+        body.textContent = item;
+        row.append(badge, body);
+        host.append(row);
+      });
     }
+
+    // ── The analysis ────────────────────────────────────────────────────────
 
     window.renderAnalysisResult = function (data) {
       currentAnalysis = data;
+      const callId = data._call_id || data.id;
 
-      // "Ask Owl about this call" — opens Owl grounded in this call (analysis-first,
-      // transcript fetched on demand). Only when we know the call id.
-      const askOwlBtn = document.getElementById('ask-owl-call');
-      if (askOwlBtn) {
-        const cid = data._call_id || data.id;
-        if (cid) {
-          askOwlBtn.classList.remove('hidden');
-          askOwlBtn.onclick = () => {
-            window.location.href = `/agents/owl?call_id=${encodeURIComponent(cid)}`;
+      // Owl, grounded in this call — analysis first, transcript on demand.
+      //
+      // `?call_id=` is sent again as of Stage 4, and now arrives: the workspace
+      // reads it and hands it to `/api/owl/stream`, which scopes the vault to this
+      // call and exposes its transcript through a tool. It had been dropped
+      // because nothing read it, which made the button a lie; the grounding was
+      // built server-side all along and simply unreachable.
+      //
+      // The question still names the call as well. It costs nothing and it is what
+      // the person sees in the composer before they press send.
+      const askOwl = byId('ask-owl-call');
+      if (askOwl) {
+        askOwl.hidden = !callId;
+        if (callId) {
+          askOwl.onclick = () => {
+            const title = (currentAnalysis && currentAnalysis._title) || 'this call';
+            const opener = `About my call "${title}" — `;
+            // Prefilled, not sent: the sentence is deliberately unfinished.
+            window.location.href = '/owl?q=' + encodeURIComponent(opener)
+              + '&call_id=' + encodeURIComponent(callId);
           };
-        } else {
-          askOwlBtn.classList.add('hidden');
         }
       }
 
-      // Show transcript download link for Meet-captured calls
-      const transcriptLink = document.getElementById('download-transcript');
-      if (transcriptLink) {
-        if (data._transcript_id) {
-          transcriptLink.setAttribute('href', `/api/meet/transcript/${encodeURIComponent(data._transcript_id)}`);
-          transcriptLink.setAttribute('download', '');
-          transcriptLink.classList.remove('hidden');
-        } else {
-          transcriptLink.classList.add('hidden');
-        }
+      byId('result-summary').textContent = data.summary || '—';
+
+      // Concepts link into the wiki, which resolves a term by title, alias or tag.
+      // They used to link into the retiring glossary page.
+      const concepts = byId('result-concepts');
+      concepts.replaceChildren();
+      if (data.concepts_mentioned && data.concepts_mentioned.length) {
+        data.concepts_mentioned.forEach((concept) => {
+          const tag = el('a', 'ds-tag');
+          tag.href = '/learn/knowledge?q=' + encodeURIComponent(concept);
+          tag.textContent = concept;
+          concepts.append(tag);
+        });
+      } else {
+        const none = el('p', 'ds-caption ar__none');
+        none.textContent = 'none identified';
+        concepts.append(none);
       }
 
-      document.getElementById('result-summary').textContent = data.summary || '—';
+      renderList('result-signals', data.buying_signals, 'live', 'signal');
+      renderList('result-objections', data.objections, 'drift', 'objection');
+      renderList('result-talking', data.talking_points, 'idle', 'point');
 
-      const conceptsEl = document.getElementById('result-concepts');
-      conceptsEl.innerHTML = (data.concepts_mentioned && data.concepts_mentioned.length)
-        ? data.concepts_mentioned.map((c, i) =>
-            `<a href="/agents/calls/glossary#${encodeURIComponent(c)}" class="text-ink-secondary hover:text-accent transition-colors">${esc(c)}</a>${i < data.concepts_mentioned.length - 1 ? '<span class="text-ink-muted"> · </span>' : ''}`
-          ).join('')
-        : '<p class="font-mono text-xs text-ink-muted">// none identified</p>';
+      renderRecommendation(data.product_recommendation);
 
-      renderList('result-signals', data.buying_signals, '→');
-      renderList('result-objections', data.objections, '⚠');
-      renderList('result-talking', data.talking_points, '·');
+      const knowledge = byId('result-knowledge');
+      knowledge.replaceChildren();
+      if (data.knowledge_extracts && data.knowledge_extracts.length) {
+        data.knowledge_extracts.forEach((k) => {
+          const card = el('div', 'ar__know');
+          const head = el('p', 'ds-eyebrow ar__label');
+          head.textContent = [k.category, k.title].filter(Boolean).join(' · ');
+          const body = el('p', 'ds-small ar__prose');
+          body.textContent = k.content;
+          card.append(head, body);
+          knowledge.append(card);
+        });
+      } else {
+        const none = el('p', 'ds-caption ar__none');
+        none.textContent = 'no learning extracts found';
+        knowledge.append(none);
+      }
+      byId('ar-extracts-filed').hidden = !(data.knowledge_extracts && data.knowledge_extracts.length);
 
-      renderRecommendation(data.product_recommendation, data.summary);
+      renderTerms(data.new_terms);
 
-      const knowledgeEl = document.getElementById('result-knowledge');
-      knowledgeEl.innerHTML = (data.knowledge_extracts && data.knowledge_extracts.length)
-        ? data.knowledge_extracts.map(k => `
-          <div class="py-5 border-b border-rule-subtle">
-            <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">${esc(k.category)} · ${esc(k.title)}</p>
-            <p class="text-sm text-ink-secondary leading-relaxed max-w-2xl">${esc(k.content)}</p>
-          </div>`).join('')
-        : '<p class="font-mono text-xs text-ink-muted py-8">// no learning extracts found</p>';
-
-      // Wire the lead-handoff button on the Summary tab with topic from recommendation.
-      const recForTopic = data.product_recommendation;
-      document.querySelectorAll('#tab-summary .lead-handoff-btn').forEach(btn => {
-        btn.dataset.topic = (recForTopic && recForTopic.primary) ? recForTopic.primary : (data._title || 'this call');
-      });
+      // The next step carries the account forward. Research prefills and waits, so
+      // a call title standing in for a company name is corrected before any spend.
+      const next = byId('ar-next-step');
+      if (next) {
+        const account = (data.product_recommendation && data.product_recommendation.account)
+          || data._company || data._title || '';
+        next.href = account
+          ? '/work/agents/research?company=' + encodeURIComponent(account)
+          : '/work/agents/research';
+      }
 
       buildQuiz(data.flashcards || []);
-      const root = document.getElementById('analysis-result');
-      if (root) root.classList.remove('hidden');
+      byId('analysis-result').hidden = false;
     };
 
-    // Product recommendation is opt-in: render it when present, otherwise show
-    // the Generate CTA (the rep usually already knows the product).
-    function renderRecommendation(rec, summary) {
-      const genEl = document.getElementById('rec-generate');
-      const primaryEl = document.getElementById('result-primary-rec');
-      const fitsSection = document.getElementById('rec-fits-section');
+    // ── Recommendation ──────────────────────────────────────────────────────
 
-      if (rec && rec.primary) {
-        genEl.classList.add('hidden');
-        primaryEl.classList.remove('hidden');
-        fitsSection.classList.remove('hidden');
-        document.getElementById('rec-product-name').textContent = rec.primary;
-        document.getElementById('rec-product-reasoning').textContent = rec.reasoning || '';
-        const askBtn = document.getElementById('rec-ask-claude');
-        if (askBtn) {
-          askBtn.onclick = () => {
-            const cid = currentAnalysis && (currentAnalysis._call_id || currentAnalysis.id);
-            const q = `Give me a full sales briefing on the ${rec.primary} based on this call.`;
-            const base = cid ? `/agents/owl?call_id=${encodeURIComponent(cid)}&q=` : `/agents/owl?q=`;
-            window.location.href = base + encodeURIComponent(q);
-          };
-        }
-        const fitsEl = document.getElementById('result-all-fits');
-        fitsEl.innerHTML = (rec.all_fits || []).map(f => {
-          const cls = f.fit === 'high' ? 'text-signal-success' : f.fit === 'medium' ? 'text-signal-warning' : 'text-ink-muted';
-          return `<div class="grid grid-cols-[auto_1fr] gap-6 py-4 border-b border-rule-subtle last:border-0">
-            <span class="font-mono text-[11px] uppercase tracking-label ${cls} w-16 pt-0.5">${esc(f.fit)}</span>
-            <div>
-              <p class="text-sm text-ink-primary font-medium">${esc(f.product)}</p>
-              <p class="text-xs text-ink-secondary mt-1 leading-relaxed">${esc(f.reason)}</p>
-            </div>
-          </div>`;
-        }).join('') || '<p class="font-mono text-xs text-ink-muted">// no fits identified</p>';
-      } else {
-        primaryEl.classList.add('hidden');
-        fitsSection.classList.add('hidden');
-        genEl.classList.remove('hidden');
+    /**
+     * The glossary terms this call put into the wiki.
+     *
+     * Rendered for the first time here — the analysis has always produced these
+     * and Knowledge Capture has always written them, but no screen ever said so.
+     *
+     * `page_slug` is resolved by the API, not slugified here: a term the company
+     * glossary already defines is skipped by the writer, so the page a term
+     * points at is often one this call did not create. A term with no slug is
+     * named without a link rather than pointed at a page that does not exist.
+     */
+    function renderTerms(terms) {
+      const section = byId('ar-terms-section');
+      const host = byId('result-terms');
+      host.replaceChildren();
+
+      if (!terms || !terms.length) {
+        section.hidden = true;
+        return;
       }
+
+      terms.forEach((term) => {
+        if (!term || !term.term) return;
+        const card = el('div', 'ar__know');
+        const head = el('p', 'ds-eyebrow ar__label');
+
+        if (term.page_slug) {
+          // The address rule belongs to lib/wiki.ts `hrefFor`; this script is
+          // `is:inline` and cannot import it, so it is restated once here.
+          const link = el('a', 'ds-tag ds-tag--accent');
+          link.href = '/learn/knowledge/page?slug=' + encodeURIComponent(term.page_slug);
+          link.textContent = term.term;
+          head.append(link);
+        } else {
+          head.textContent = term.term;
+        }
+
+        const body = el('p', 'ds-small ar__prose');
+        body.textContent = term.definition || '';
+        card.append(head, body);
+        host.append(card);
+      });
+
+      section.hidden = !host.childElementCount;
     }
 
-    document.getElementById('rec-generate-btn')?.addEventListener('click', async () => {
+    function renderRecommendation(rec) {
+      const generate = byId('rec-generate');
+      const primary = byId('result-primary-rec');
+      const fits = byId('rec-fits-section');
+
+      if (!rec || !rec.primary) {
+        primary.hidden = true;
+        fits.hidden = true;
+        generate.hidden = false;
+        return;
+      }
+
+      generate.hidden = true;
+      primary.hidden = false;
+      fits.hidden = false;
+      byId('rec-product-name').textContent = rec.primary;
+      byId('rec-product-reasoning').textContent = rec.reasoning || '';
+
+      byId('rec-ask-claude').onclick = () => {
+        // Self-contained: it names the product and the call, so it still makes
+        // sense in a conversation that has no other context.
+        const title = (currentAnalysis && currentAnalysis._title) || '';
+        const question = `Give me a full sales briefing on the ${rec.primary}`
+          + (title ? `, in the context of my call "${title}".` : '.');
+        window.location.href = '/owl?q=' + encodeURIComponent(question);
+      };
+
+      // `locked` / `drift` / `idle` is the same three-way state vocabulary the rest
+      // of the product uses, rather than a fourth palette for fit.
+      const FIT_MARK = { high: 'locked', medium: 'drift', low: 'idle' };
+      const host = byId('result-all-fits');
+      host.replaceChildren();
+
+      const all = rec.all_fits || [];
+      if (!all.length) {
+        const none = el('p', 'ds-caption ar__none');
+        none.textContent = 'no fits identified';
+        host.append(none);
+        return;
+      }
+
+      all.forEach((fit) => {
+        const row = el('div', 'ar__fit');
+        const mark = el('span', 'ds-mark ds-mark--' + (FIT_MARK[fit.fit] || 'idle'));
+        mark.textContent = fit.fit;
+        const body = el('div');
+        const name = el('p', 'ds-small ar__fit-name');
+        name.textContent = fit.product;
+        const why = el('p', 'ds-caption ar__fit-why');
+        why.textContent = fit.reason;
+        body.append(name, why);
+        row.append(mark, body);
+        host.append(row);
+      });
+    }
+
+    byId('rec-generate-btn')?.addEventListener('click', async () => {
       const callId = currentAnalysis && (currentAnalysis._call_id || currentAnalysis.id);
       if (!callId) return;
-      const btn = document.getElementById('rec-generate-btn');
-      const stateEl = document.getElementById('rec-generate-state');
-      const productName = document.getElementById('rec-product-input').value.trim();
-      btn.disabled = true;
-      stateEl.textContent = 'generating…';
+
+      const button = byId('rec-generate-btn');
+      const state = byId('rec-generate-state');
+      const product = byId('rec-product-input').value.trim();
+
+      button.disabled = true;
+      state.textContent = 'assessing…';
       try {
-        const res = await fetch(`/api/calls/${encodeURIComponent(callId)}/product-recommendation`, {
+        const res = await fetch('/api/sales/calls/' + encodeURIComponent(callId) + '/product-fit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ product_name: productName || null }),
+          body: JSON.stringify({ product_name: product || null }),
         });
         if (!res.ok) throw new Error('request failed');
         const rec = await res.json();
         currentAnalysis.product_recommendation = rec;
-        renderRecommendation(rec, currentAnalysis.summary);
-      } catch (e) {
-        stateEl.textContent = 'failed — try again';
+        state.textContent = '';
+        renderRecommendation(rec);
+      } catch {
+        state.textContent = 'failed — try again';
       } finally {
-        btn.disabled = false;
-        if (stateEl.textContent === 'generating…') stateEl.textContent = '';
+        button.disabled = false;
       }
     });
 
+    // ── Quiz ────────────────────────────────────────────────────────────────
+
+    const OPTION_KEYS = ['A', 'B', 'C', 'D'];
+
     function buildQuiz(cards) {
-      quizState = cards.map(c => ({ ...c, answered: false, correct: false }));
-      const container = document.getElementById('quiz-container');
-      document.getElementById('quiz-score').classList.add('hidden');
+      quizState = cards.map((c) => ({ ...c, answered: false, correct: false }));
+      const container = byId('quiz-container');
+      byId('quiz-score').hidden = true;
+      container.replaceChildren();
 
       if (!cards.length) {
-        container.innerHTML = '<p class="font-mono text-xs text-ink-muted py-8">// no quiz questions generated</p>';
+        const none = el('p', 'ds-caption ar__none');
+        none.textContent = 'no quiz questions generated';
+        container.append(none);
         return;
       }
 
-      container.innerHTML = cards.map((card, i) => {
+      cards.forEach((card, i) => {
+        const wrap = el('div', 'ar__card');
+        wrap.dataset.index = String(i);
+
+        const question = el('p', 'ds-body ar__question');
+        const number = el('span', 'ds-mono ar__option-key');
+        number.textContent = String(i + 1).padStart(2, '0');
+        question.append(number, document.createTextNode(card.question));
+        wrap.append(question);
+
         if (card.type === 'mcq') {
-          return `<div class="quiz-card py-6 border-b border-rule-subtle" data-index="${i}">
-            <p class="text-base text-ink-primary mb-4 leading-relaxed max-w-2xl"><span class="font-mono text-xs text-ink-muted mr-3">${String(i+1).padStart(2, '0')}</span>${esc(card.question)}</p>
-            <div class="space-y-2 max-w-2xl">
-              ${(card.options || []).map((opt, oi) =>
-                `<button class="mcq-option relative w-full text-left pl-5 pr-4 py-2.5 border border-rule-subtle text-sm text-ink-secondary hover:border-accent hover:text-ink-primary transition-colors duration-150" data-qi="${i}" data-oi="${oi}">
-                  <span class="font-mono text-[11px] text-ink-muted mr-3">${['A','B','C','D'][oi]}</span>${esc(opt)}
-                </button>`
-              ).join('')}
-            </div>
-            <div class="quiz-feedback hidden mt-3 font-mono text-xs leading-relaxed" data-qi="${i}"></div>
-          </div>`;
+          const options = el('div', 'ar__options');
+          (card.options || []).forEach((option, oi) => {
+            const button = el('button', 'ar__option mcq-option');
+            button.type = 'button';
+            const key = el('span', 'ds-mono ar__option-key');
+            key.textContent = OPTION_KEYS[oi] || String(oi + 1);
+            button.append(key, document.createTextNode(option));
+            button.addEventListener('click', () => handleMcqAnswer(i, oi));
+            options.append(button);
+          });
+          const feedback = el('p', 'ds-caption ar__feedback');
+          feedback.hidden = true;
+          feedback.dataset.qi = String(i);
+          wrap.append(options, feedback);
         } else {
-          return `<div class="quiz-card py-6 border-b border-rule-subtle" data-index="${i}">
-            <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Flashcard ${String(i+1).padStart(2, '0')}</p>
-            <p class="text-base text-ink-primary mb-3 leading-relaxed max-w-2xl">${esc(card.question)}</p>
-            <button class="reveal-btn font-mono text-[11px] uppercase tracking-label text-ink-muted hover:text-accent transition-colors" data-qi="${i}">Show answer →</button>
-            <div class="flashcard-answer hidden mt-4 pl-4 border-l-2 border-accent max-w-2xl text-sm text-ink-secondary leading-relaxed" data-qi="${i}">
-              ${esc(card.answer)}
-            </div>
-          </div>`;
+          const reveal = el('button', 'ds-btn ds-btn--secondary ds-btn--sm');
+          reveal.type = 'button';
+          reveal.textContent = 'Show answer';
+          const answer = el('p', 'ds-small ar__answer');
+          answer.hidden = true;
+          answer.textContent = card.answer;
+          reveal.addEventListener('click', () => {
+            answer.hidden = false;
+            reveal.disabled = true;
+            reveal.textContent = 'Revealed';
+            quizState[i].answered = true;
+            quizState[i].correct = true;
+            checkQuizComplete();
+          });
+          wrap.append(reveal, answer);
         }
-      }).join('');
 
-      document.querySelectorAll('.mcq-option').forEach(btn => {
-        btn.addEventListener('click', () => handleMcqAnswer(parseInt(btn.dataset.qi), parseInt(btn.dataset.oi)));
-      });
-
-      document.querySelectorAll('.reveal-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const qi = btn.dataset.qi;
-          document.querySelector(`.flashcard-answer[data-qi="${qi}"]`).classList.remove('hidden');
-          btn.textContent = '✓ Revealed';
-          btn.disabled = true;
-          const idx = Number(qi);
-          quizState[idx].answered = true;
-          quizState[idx].correct = true;
-          checkQuizComplete();
-        });
+        container.append(wrap);
       });
     }
 
     function handleMcqAnswer(qi, oi) {
       if (quizState[qi].answered) return;
       quizState[qi].answered = true;
-      const card = quizState[qi];
-      const isCorrect = oi === card.correct;
-      quizState[qi].correct = isCorrect;
 
-      const cardEl = document.querySelector(`.quiz-card[data-index="${qi}"]`);
-      cardEl.querySelectorAll('.mcq-option').forEach((btn, i) => {
-        btn.disabled = true;
-        if (i === card.correct) {
-          btn.classList.remove('border-rule-subtle', 'text-ink-secondary', 'hover:border-accent', 'hover:text-ink-primary');
-          btn.classList.add('border-signal-success', 'text-signal-success', 'bg-signal-success/10');
-        } else if (i === oi && !isCorrect) {
-          btn.classList.remove('border-rule-subtle', 'text-ink-secondary', 'hover:border-accent', 'hover:text-ink-primary');
-          btn.classList.add('border-signal-danger', 'text-signal-danger', 'bg-signal-danger/10');
-        }
+      const card = quizState[qi];
+      const right = oi === card.correct;
+      quizState[qi].correct = right;
+
+      const wrap = document.querySelector('.ar__card[data-index="' + qi + '"]');
+      wrap.querySelectorAll('.mcq-option').forEach((button, i) => {
+        button.disabled = true;
+        if (i === card.correct) button.classList.add('ar__option--right');
+        else if (i === oi) button.classList.add('ar__option--wrong');
       });
 
-      const feedback = document.querySelector(`.quiz-feedback[data-qi="${qi}"]`);
-      feedback.classList.remove('hidden');
-      if (isCorrect) {
-        feedback.classList.add('text-signal-success');
-        feedback.textContent = '// correct — ' + (card.explanation || '');
-      } else {
-        feedback.classList.add('text-signal-danger');
-        feedback.textContent = '// incorrect — ' + (card.explanation || `answer was ${card.options && card.options[card.correct]}`);
-      }
+      const feedback = wrap.querySelector('.ar__feedback');
+      feedback.hidden = false;
+      feedback.style.color = 'rgb(var(--signal-' + (right ? 'locked' : 'fault') + '))';
+      feedback.textContent = (right ? 'correct — ' : 'incorrect — ')
+        + (card.explanation || (card.options ? 'answer was ' + card.options[card.correct] : ''));
 
       checkQuizComplete();
     }
 
     function checkQuizComplete() {
-      if (quizState.every(q => q.answered)) {
-        const correct = quizState.filter(q => q.correct).length;
-        const total = quizState.length;
-        document.getElementById('score-text').textContent = `${String(correct).padStart(2, '0')} / ${String(total).padStart(2, '0')} correct`;
-        document.getElementById('quiz-score').classList.remove('hidden');
-      }
+      if (!quizState.every((q) => q.answered)) return;
+      const correct = quizState.filter((q) => q.correct).length;
+      byId('score-text').textContent = correct + ' / ' + quizState.length;
+      byId('quiz-score').hidden = false;
     }
 
-    document.getElementById('quiz-retry').addEventListener('click', () => {
+    byId('quiz-retry').addEventListener('click', () => {
       if (currentAnalysis && currentAnalysis.flashcards) buildQuiz(currentAnalysis.flashcards);
     });
 
-    // ── Report download ──
-    document.getElementById('download-report').addEventListener('click', () => {
+    // ── Report download ─────────────────────────────────────────────────────
+    // A standalone Acme artefact with no access to the app's stylesheet, so it
+    // carries its own palette. The adherence gate allows the brand palette here and
+    // nothing else; the values are the design system's own.
+
+    byId('download-report').addEventListener('click', () => {
       if (!currentAnalysis) return;
       const d = currentAnalysis;
       const title = d._title || 'Call Analysis';
-      const date = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+      const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      const list = (items) => items.map((s) => '<li>' + s + '</li>').join('');
 
       const html = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
   <meta charset="UTF-8"/>
-  <title>${title} — Timebeat</title>
+  <title>${title} — Acme</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Kode+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 24px; color: #1e293b; }
-    h1 { font-size: 24px; margin-bottom: 4px; }
-    .meta { color: #64748b; font-size: 13px; margin-bottom: 32px; }
-    h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; font-weight: 600; margin: 24px 0 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
-    .summary { background: #f8fafc; border-left: 3px solid #3b82f6; padding: 12px 16px; border-radius: 4px; font-size: 14px; line-height: 1.6; }
-    ul { margin: 0; padding-left: 20px; }
-    li { font-size: 14px; margin-bottom: 4px; line-height: 1.5; }
-    .rec-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin: 8px 0; }
-    .rec-name { font-size: 18px; font-weight: 700; color: #1d4ed8; margin-bottom: 8px; }
-    .tag { display: inline-block; background: #f1f5f9; border-radius: 999px; padding: 2px 10px; font-size: 12px; margin: 2px; }
-    .know-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; }
-    .know-cat { display: inline-block; font-size: 11px; font-weight: 600; text-transform: uppercase; background: #f1f5f9; padding: 2px 8px; border-radius: 999px; margin-bottom: 6px; }
-    .footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 12px; }
-    @media print { body { margin: 0; } }
+    :root { --measure: 42rem; }
+    body {
+      font-family: 'Roboto', system-ui, sans-serif;
+      max-width: var(--measure); margin: 4rem auto; padding: 0 1.5rem;
+      color: #121212; letter-spacing: -0.006em; line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    h1 { font-size: 1.75rem; font-weight: 400; letter-spacing: -0.022em; line-height: 1.15; margin: 0 0 0.25rem; }
+    .meta { font-family: 'Kode Mono', monospace; font-size: 0.6875rem; letter-spacing: 0.01em; color: #706d67; margin: 0 0 2rem; }
+    h2 {
+      font-family: 'Kode Mono', monospace; font-size: 0.6875rem; font-weight: 400;
+      text-transform: uppercase; letter-spacing: 0.11em; color: #706d67;
+      margin: 2rem 0 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid #dddbd6;
+    }
+    /* Structure is drawn, not floated: a signal rule, never a tinted box. */
+    .summary { border-left: 2px solid #0084ff; padding-left: 1rem; font-size: 0.9375rem; line-height: 1.7; }
+    ul { margin: 0; padding-left: 1.25rem; }
+    li { font-size: 0.9375rem; margin-bottom: 0.5rem; }
+    .rec-box { border-top: 2px solid #121212; padding-top: 0.75rem; margin: 1rem 0; }
+    .rec-name { font-size: 1.0625rem; font-weight: 500; letter-spacing: -0.014em; margin-bottom: 0.5rem; }
+    /* Tags are bordered legends, never filled pills. */
+    .tag, .know-cat {
+      display: inline-block; font-family: 'Kode Mono', monospace; font-size: 0.6875rem;
+      letter-spacing: 0.01em; color: #5c5a56;
+      border: 1px solid #dddbd6; border-radius: 3px; padding: 1px 0.5rem; margin: 2px 2px 2px 0;
+    }
+    .know-cat { text-transform: uppercase; letter-spacing: 0.11em; margin-bottom: 0.5rem; }
+    .know-card { border-top: 1px solid #ecebe8; padding-top: 0.75rem; margin-bottom: 1rem; }
+    .footer {
+      font-family: 'Kode Mono', monospace; font-size: 0.6875rem; letter-spacing: 0.01em;
+      color: #706d67; margin-top: 4rem; padding-top: 1rem; border-top: 1px solid #dddbd6;
+    }
+    @media print {
+      body { margin: 0; max-width: none; }
+      a { text-decoration: none; color: inherit; }
+    }
   </style>
 </head>
 <body>
   <h1>${title}</h1>
-  <p class="meta">Generated by Timebeat Onboarding Agent &nbsp;·&nbsp; ${date}</p>
+  <p class="meta">Generated by Cadence &nbsp;·&nbsp; ${date}</p>
 
   <h2>Summary</h2>
   <div class="summary">${d.summary || '–'}</div>
 
-  ${d.buying_signals && d.buying_signals.length ? `<h2>Buying Signals</h2><ul>${d.buying_signals.map(s => `<li>${s}</li>`).join('')}</ul>` : ''}
-  ${d.objections && d.objections.length ? `<h2>Objections</h2><ul>${d.objections.map(s => `<li>${s}</li>`).join('')}</ul>` : ''}
-  ${d.talking_points && d.talking_points.length ? `<h2>Follow-up Talking Points</h2><ul>${d.talking_points.map(s => `<li>${s}</li>`).join('')}</ul>` : ''}
+  ${d.buying_signals && d.buying_signals.length ? `<h2>Buying signals</h2><ul>${list(d.buying_signals)}</ul>` : ''}
+  ${d.objections && d.objections.length ? `<h2>Objections</h2><ul>${list(d.objections)}</ul>` : ''}
+  ${d.talking_points && d.talking_points.length ? `<h2>Follow-up talking points</h2><ul>${list(d.talking_points)}</ul>` : ''}
 
   ${d.product_recommendation && d.product_recommendation.primary ? `
-  <h2>Product Recommendation</h2>
+  <h2>Product recommendation</h2>
   <div class="rec-box">
-    <div class="rec-name">📦 ${d.product_recommendation.primary}</div>
-    <p style="font-size:14px;line-height:1.6;margin:0">${d.product_recommendation.reasoning || ''}</p>
+    <div class="rec-name">${d.product_recommendation.primary}</div>
+    <p style="font-size:0.875rem;line-height:1.6;margin:0">${d.product_recommendation.reasoning || ''}</p>
   </div>
   ${d.product_recommendation.all_fits && d.product_recommendation.all_fits.length ? `
-  <h2>All Product Fits</h2>
-  <ul>${d.product_recommendation.all_fits.map(f => `<li><strong>${f.product}</strong> (${f.fit}) — ${f.reason}</li>`).join('')}</ul>
+  <h2>All product fits</h2>
+  <ul>${d.product_recommendation.all_fits.map((f) => `<li><strong>${f.product}</strong> (${f.fit}) — ${f.reason}</li>`).join('')}</ul>
   ` : ''}` : ''}
 
   ${d.knowledge_extracts && d.knowledge_extracts.length ? `
-  <h2>Learning Points</h2>
-  ${d.knowledge_extracts.map(k => `<div class="know-card"><span class="know-cat">${k.category}</span><strong style="display:block;margin-bottom:4px;font-size:14px">${k.title}</strong><p style="font-size:14px;margin:0;line-height:1.6">${k.content}</p></div>`).join('')}
+  <h2>Learning points</h2>
+  ${d.knowledge_extracts.map((k) => `<div class="know-card"><span class="know-cat">${k.category}</span><strong style="display:block;margin-bottom:0.25rem;font-size:0.875rem">${k.title}</strong><p style="font-size:0.875rem;margin:0;line-height:1.6">${k.content}</p></div>`).join('')}
   ` : ''}
 
-  ${d.concepts_mentioned && d.concepts_mentioned.length ? `<h2>Concepts Mentioned</h2><p>${d.concepts_mentioned.map(c => `<span class="tag">${c}</span>`).join(' ')}</p>` : ''}
+  ${d.concepts_mentioned && d.concepts_mentioned.length ? `<h2>Concepts mentioned</h2><p>${d.concepts_mentioned.map((c) => `<span class="tag">${c}</span>`).join(' ')}</p>` : ''}
 
-  <div class="footer">Timebeat Onboarding Agent &nbsp;·&nbsp; For internal sales use only</div>
+  <div class="footer">Cadence &nbsp;·&nbsp; For internal sales use only</div>
 </body>
 </html>`;
 
       const blob = new Blob([html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = title.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '-report.html';
-      a.click();
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = title.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '-report.html';
+      link.click();
       URL.revokeObjectURL(url);
     });
 
-    const clearBtn = document.getElementById('clear-results');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', () => {
-        document.getElementById('analysis-result').classList.add('hidden');
+    const clear = byId('clear-results');
+    if (clear) {
+      clear.addEventListener('click', () => {
+        byId('analysis-result').hidden = true;
         currentAnalysis = null;
       });
     }
 
-    // Auto-load when analysisId is provided.
-    const root = document.getElementById('analysis-result');
+    // Auto-load when an id was given at render time.
+    const root = byId('analysis-result');
     const id = root && root.dataset.analysisId;
     if (id) {
-      fetch(`/api/calls/${encodeURIComponent(id)}`)
-        .then(r => { if (!r.ok) throw new Error('not found'); return r.json(); })
-        .then(session => {
+      fetch('/api/sales/calls/' + encodeURIComponent(id))
+        .then((r) => { if (!r.ok) throw new Error('not found'); return r.json(); })
+        .then((session) => {
           const result = session.result || {};
           result._title = session.title || 'Call Analysis';
+          result._call_id = session.id;
           window.renderAnalysisResult(result);
-          const heading = document.getElementById('ar-heading');
-          if (heading) heading.textContent = (session.title || 'Call Analysis') + ' · ' + (session.timestamp || '');
+          const heading = byId('ar-heading');
+          if (heading) {
+            heading.textContent = (session.title || 'Call Analysis')
+              + (session.timestamp ? ' · ' + session.timestamp : '');
+          }
         })
         .catch(() => {
-          root.innerHTML = '<p class="py-8 font-mono text-xs text-signal-danger">// analysis not found</p>';
+          root.replaceChildren();
+          const failed = el('p', 'ds-caption ar__none');
+          failed.style.color = 'rgb(var(--signal-fault))';
+          failed.textContent = 'analysis not found';
+          root.append(failed);
+          root.hidden = false;
         });
     }
   })();

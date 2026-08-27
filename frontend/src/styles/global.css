@@ -1,55 +1,50 @@
-@import '@fontsource-variable/instrument-sans';
-@import '@fontsource-variable/jetbrains-mono';
+/* The brand faces, declared under the names the design system uses.
+   See design-system/fonts.css for why this indirection exists. */
+@import '../design-system/fonts.css';
+
+/* The design system. tokens first, then the component layer (which itself
+   imports components.css). Loaded once here, so `.ds-*` classes and every
+   token are available on every page with no per-page wiring.
+   Source of truth: the Cadence Design System project on claude.ai/design. */
+@import '../design-system/tokens.css';
+@import '../design-system/primitives.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* The legacy token aliases (`--text-primary`, `--text-muted`, `--border-subtle`)
+   were deleted in Stage 3.3 with `pages/agents/lead/new.astro`, their only
+   referrer. The Tailwind config still carries legacy *class* names, which the
+   Calls and Learn pages use — those expire with those pages, not with this. */
+
 @layer base {
-  :root {
-    --surface-0: 247 246 242;
-    --surface-1: 255 255 255;
-    --surface-2: 239 238 232;
-    --surface-ink: 13 13 15;
-
-    --text-primary: 20 21 26;
-    --text-secondary: 74 76 84;
-    --text-muted: 138 141 148;
-    --text-on-ink: 244 243 238;
-
-    --border-subtle: 227 225 216;
-    --border-strong: 26 27 31;
-
-    --accent: 216 90 42;
-    --accent-soft: 247 225 213;
-
-    --signal-success: 47 125 79;
-    --signal-warning: 184 134 27;
-    --signal-danger: 179 64 46;
-  }
-
   html {
-    font-feature-settings: 'ss01', 'cv11';
+    /* Roboto ships no ss01/cv11; tabular figures are opted into per component
+       via .ds-mono / .ds-numeric rather than globally. */
+    -webkit-font-smoothing: antialiased;
   }
 
   body {
-    @apply bg-surface-0 text-ink-primary font-sans antialiased;
-    letter-spacing: -0.01em;
+    @apply bg-canvas text-ink font-sans;
+    font-size: var(--text-body);
+    line-height: var(--leading-normal);
+    letter-spacing: var(--tracking-body);
   }
 
   h1, h2, h3, h4, h5, h6 {
-    letter-spacing: -0.02em;
+    letter-spacing: var(--tracking-title);
+    font-weight: var(--weight-medium);
   }
 
   ::selection {
-    background-color: rgb(var(--accent) / 0.2);
-    color: rgb(var(--text-primary));
+    background-color: rgb(var(--accent) / 0.18);
+    color: rgb(var(--ink));
   }
 
   :focus-visible {
     outline: 2px solid rgb(var(--accent));
-    outline-offset: 2px;
-    border-radius: 2px;
+    outline-offset: 1px;
   }
 }
 
@@ -58,15 +53,203 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* The eyebrow, as a utility for markup that is not using .ds-eyebrow. */
   .label {
-    font-size: 0.6875rem;
-    font-weight: 600;
+    font-family: var(--font-mono);
+    font-size: var(--text-micro);
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: var(--tracking-label);
   }
 
   .rule-x {
     height: 1px;
-    background-color: rgb(var(--border-subtle));
+    background-color: rgb(var(--rule-hairline));
   }
+}
+
+/* ── The people list ─────────────────────────────────────────────────────────
+   `lib/peopleList.ts` builds this markup for two surfaces — the X-ray page and
+   a path's X-ray step — so its few app-level classes live here rather than being
+   scoped to either page. Everything else in it is a `.ds-*` primitive.
+
+   A `.ds-table`, which is what the design system specified all along
+   (`preview/components-data.html` draws this exact people table). It went table
+   → records → cards first: as the original table the argument for approaching
+   someone was squeezed into `.ds-table__sub` and ellipsised at 26ch; as a
+   full-width record it stopped being truncated and the page became a wireframe.
+   Cards fixed both and cost the thing a table is for — comparing fifteen people
+   down a column. The argument now opens underneath its own row instead, so
+   nothing is cut and nothing is flattened. */
+.pl__bulk { margin-bottom: var(--space-4); }
+
+/* The heading is the whole explanation of the group, which is why "Context only"
+   needs no warning banner beneath it. It sits in an `.agent-page__sect`, so the
+   hairline, the baseline and the mono count on the right all come from there. */
+.pl__grouphead {
+  display: flex; align-items: baseline; gap: var(--space-3);
+  padding: 0; background: none; border: 0;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.pl__groupnote { font-size: var(--text-caption); color: rgb(var(--ink-muted)); }
+
+/* The group heading is a full-width row inside the table, so it carries no cell
+   padding of its own — the `.agent-page__sect` in it draws the hairline. */
+.pl__grouprow > td { padding: var(--space-10) 0 0; border-bottom: 0; }
+.pl__band:first-of-type .pl__grouprow > td { padding-top: var(--space-4); }
+.pl__grouprow:hover { background: none; }
+
+/* Person takes every spare pixel, so the columns after it size to their content
+   and the row's actions sit beside the score rather than marooned at the far
+   edge of an 84rem table. */
+.pl__colwide { width: 100%; }
+/* The table sits in a plain `div`, which is what the group toggle hides. A bare
+   `div` obeys `[hidden]` without a guard, where `display: table` would have
+   outweighed it — the same trap this file used to patch per element. */
+.pl__tablewrap { min-width: 0; }
+
+/* Two affordances in the Person cell, kept apart on purpose: the twisty opens
+   the argument, the name opens the profile. They were one control while the name
+   was the disclosure, which meant the row could not both explain itself and go
+   where it was found. */
+.pl__who { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+.pl__whoname { min-width: 0; }
+.pl__twisty {
+  flex-shrink: 0; display: flex; padding: 0;
+  background: none; border: 0; color: rgb(var(--ink-muted)); cursor: pointer;
+}
+.pl__twisty:hover { color: rgb(var(--ink)); }
+
+/* The argument, given the reading measure the table cell could not give it.
+   It is the same person as the row above, so it carries that row's selection
+   wash and the hairline between the two is removed — a border there cut a
+   person off from their own argument, and an unwashed strip under a selected
+   row read as a gap in the selection. */
+.pl__whyrow > td { padding-top: 0; }
+.pl__row.is-open > td { border-bottom: 0; }
+.pl__whyrow.is-selected { background: rgb(var(--accent-wash)); }
+.pl__whybody { max-width: var(--measure-read); padding-bottom: var(--space-2); }
+.pl__why { margin: 0; font-size: var(--text-small); color: rgb(var(--ink-secondary)); }
+/* The evidence trail: the query that found this person, and their domain. The
+   machine's own words, so mono — and quiet, because it is there to be checked
+   rather than read. */
+.pl__found {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-mono); font-size: var(--text-micro);
+  letter-spacing: var(--tracking-mono);
+  color: rgb(var(--ink-muted)); overflow-wrap: anywhere;
+}
+
+/* The name is the way to the profile the search found. Underlined on the
+   hairline like every other identifier link, so it reads as a link without
+   competing with the name it is. */
+.pl__profile { color: inherit; text-decoration: none; border-bottom: 1px solid rgb(var(--rule)); }
+.pl__profile:hover { border-bottom-color: rgb(var(--ink)); }
+
+/* The automatic email reveal says what it is buying while it buys it. One bulk
+   request, so there is no denominator and no meter — a count is true, "7 of 12"
+   would not be. */
+.pl__auto { margin: 0 0 var(--space-3); }
+.pl__auto[hidden] { display: none; }
+
+/* Fit is `.ds-table__num` — the primitive already carries mono, tabular figures,
+   right alignment and the secondary ink. Two things it does not:
+   `.ds-table thead th` sets `text-align: left` and outweighs it on specificity,
+   so a numeric header sits left of the column it heads (the same trap
+   `scoring.astro` documents); and an unranked person needs a quieter dash than
+   a real score. */
+.pl__tablewrap th.ds-table__num { text-align: right; }
+.pl__fit--none { color: rgb(var(--ink-muted)); }
+
+/* Always visible, never hover-revealed: revealing a number and going on to
+   Research are the two things a row exists for, and `.ds-row__actions`-style
+   concealment would put both behind a gesture no touch device can make.
+   The flex box is a span *inside* the cell, never the cell itself: `display:
+   flex` on a `<td>` takes it out of table layout, and the row's hairline then
+   stops at the previous column and restarts at a different height under this
+   one. The same trap as `display: block` on a `<table>`. */
+.pl__actcell { white-space: nowrap; }
+.pl__acts { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); }
+
+/* Placeholder bars while a search runs, in the shape of the row that replaces
+   them so the page does not jump when the answer lands. */
+.pl__skeleton { display: block; height: var(--text-body); border-radius: var(--radius-xs); }
+.pl__skeleton--name { width: 70%; }
+.pl__skeleton--mark { width: 4rem; }
+.pl__skeleton--id { width: 90%; }
+.pl__skeleton--fit { width: 1.5rem; margin-left: auto; }
+
+/* Narrow: the table keeps its columns and scrolls sideways inside its own box
+   rather than reflowing, because a person compares down these columns and a
+   stacked table is no longer a table.
+
+   Only at this width. Turning on `overflow` makes the wrapper the scrollport for
+   both axes, which is where `.ds-table thead th`'s `position: sticky` would then
+   resolve against — so above 60rem it stays `visible` and the header still
+   sticks to the page as the primitive intends. */
+@media (max-width: 60rem) {
+  .pl__tablewrap { overflow-x: auto; }
+}
+
+/* ── The X-ray ask's two disclosures ────────────────────────────────────────
+   `lib/xrayRun.ts` (the grounding) and `lib/personaPicker.ts` (the personas)
+   each build a quiet trigger for the ask's minor row and a panel that opens
+   under it. Both used to be styled from inside `xray.astro`, which meant a page
+   holding the CSS for markup it does not write — the same reason the people
+   list's classes live here. */
+.xr__link {
+  background: none; border: 0; padding: 0;
+  font: inherit; font-size: var(--text-caption);
+  color: rgb(var(--accent-ink)); cursor: pointer;
+}
+.xr__link:disabled { color: rgb(var(--ink-muted)); cursor: default; }
+
+.xr__panel, .xr__personas { margin-top: var(--space-4); max-width: var(--measure-read); }
+.xr__tune {
+  display: grid; grid-template-columns: auto 1fr;
+  gap: var(--space-3); align-items: center;
+  margin-bottom: var(--space-3);
+}
+.xr__panel [data-rerun] { margin-top: var(--space-4); }
+/* Twenty-four checkboxes wrap across the width rather than scrolling in a
+   column, because the width is there and a scroller hides most of the list
+   behind a gesture. */
+.xr__personalist { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); }
+.xr__personaadd { margin-top: var(--space-3); max-width: var(--measure-form); }
+
+/* ── Agent pages ─────────────────────────────────────────────────────────────
+   The shared composition of the agent surfaces: one working column, centred in
+   the field. The auto inline margins centre it horizontally; the auto block
+   margins centre a sparse page vertically and collapse to nothing once results
+   grow past the viewport — the same construction as /home. The column reads at
+   `--measure-read`; a page whose results are genuinely wide (a table of
+   people, a run of steps) widens or anchors deliberately with the modifiers. */
+.agent-page {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  padding: var(--space-12) var(--space-8) var(--space-16);
+}
+.agent-page__column {
+  width: 100%; max-width: var(--measure-read);
+  margin-inline: auto; margin-block: auto;
+}
+.agent-page__column--wide { max-width: var(--measure-page); }
+.agent-page__column--top { margin-block: 0; }
+
+/* The head: eyebrow over big confident type over a relaxed lead, then one deep
+   breath before the first working region. */
+.agent-page__head { margin-bottom: var(--space-16); }
+
+/* Section heads on the launcher's grammar: eyebrow left, a hairline to sit on,
+   the count — the machine talking, so mono — or a quiet action on the right. */
+.agent-page__sect {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid rgb(var(--rule-hairline));
+  margin-bottom: var(--space-5);
+}
+.agent-page__sect .ds-mono { color: rgb(var(--ink-muted)); }
+
+@media (max-width: 60rem) {
+  .agent-page { padding: var(--space-8) var(--space-4) var(--space-10); }
 }

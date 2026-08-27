@@ -125,7 +125,7 @@ btnEnd.addEventListener('click', async () => {
     const title = `Google Meet — ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`;
     const backend = getBackend();
 
-    // Open the IvanOS analyse page, passing transcript via hash so no auth is needed for the extension
+    // Open the SamOS analyse page, passing transcript via hash so no auth is needed for the extension
     const payload = encodeURIComponent(JSON.stringify({ transcript, title, session_id: sessionId }));
     const analyseUrl = `${backend}/agents/calls/analyze#meet=${payload}`;
 

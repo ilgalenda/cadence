@@ -1,0 +1,404 @@
+---
+/**
+ * Signals — the watchlist that notices things.
+ *
+ * Watch the accounts you care about; Cadence looks for funding, build-outs, timing
+ * work and compliance deadlines at each, and reports only what it has not reported
+ * before.
+ *
+ * **It says plainly when the checking happens.** Cadence has no scheduler — no cron,
+ * no worker — so a check runs when this page is opened and something is due, in a
+ * background thread. Calling that "monitoring" without saying so would let someone
+ * believe their accounts were being watched overnight. They are not.
+ *
+ * Every finding carries a source and links onward to GTM or X-ray, because a monitor
+ * whose findings are a dead end is a newsletter.
+ *
+ * **Two shapes of question live here.** The watchlist asks "what happened at this
+ * named account". The sweep below it asks "who, anywhere, is showing this signal" —
+ * which was X-ray's signal mode until 2026-08-24. It never belonged there: X-ray
+ * answers *given an account and why it matters, who are the people*, and a sweep with
+ * no account has no grounding to work from. Here the signal is already the subject,
+ * and what the sweep finds is a person **and the account they point at** — which is a
+ * way onto the watchlist, and from there into a grounded X-ray.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import AgentViewStyles from '../../../components/AgentViewStyles.astro';
+---
+<PlatformLayout title="Signals" requires="lead">
+  <div class="agent-page">
+    <div class="agent-page__column">
+      <header class="agent-page__head ds-arrive">
+        <p class="ds-eyebrow">Agent</p>
+        <h1 class="ds-heading ds-page__title">Signals</h1>
+        <p class="ds-lead ds-page__intro">
+          The accounts you are watching, and what has changed at them — funding, contracts,
+          build-outs, timing work, compliance deadlines. Every finding carries a source, and
+          nothing is reported twice.
+        </p>
+      </header>
+
+      <div class="form ds-arrive" style="--arrive: var(--dur-step)">
+        <div class="form__row">
+          <div class="form__cell">
+            <label class="ds-label" for="company">Watch an account</label>
+            <input class="ds-field" id="company" placeholder="Halden Engineering" autocomplete="off" />
+          </div>
+          <button class="ds-btn ds-btn--accent form__add" type="button" id="add">Watch</button>
+        </div>
+
+        <div class="form__actions">
+          <button class="ds-btn ds-btn--secondary ds-btn--sm" type="button" id="check">Check now</button>
+          <span class="ds-mark ds-mark--live" id="running" hidden>checking</span>
+          <span class="ds-error" id="error"></span>
+        </div>
+
+        <p class="ds-caption form__note">
+          Checked when you open this page and an account is due — not overnight. Cadence has no
+          scheduler, so "Check now" is the only way to force one, and each account costs a web
+          search.
+        </p>
+      </div>
+
+      <section class="result ds-stagger" id="watchlist"></section>
+
+      <!-- The people-shaped question. Separate from the watchlist because it is
+           the way *onto* it, not a report from it. -->
+      <section class="sweep ds-arrive" style="--arrive: calc(var(--dur-step) * 2)">
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow">Who is showing a signal</h2>
+          <span class="ds-mono" id="sweep-count"></span>
+        </div>
+
+        <div class="form__row">
+          <div class="form__cell">
+            <label class="ds-label" for="signal">Buying signal</label>
+            <select class="ds-select" id="signal"></select>
+          </div>
+          <button class="ds-btn ds-btn--secondary form__add" type="button" id="sweep">Sweep</button>
+        </div>
+
+        <div class="form__actions">
+          <span class="ds-mark ds-mark--live" id="sweep-running" hidden>sweeping</span>
+          <span class="ds-error" id="sweep-error"></span>
+        </div>
+
+        <p class="ds-caption form__note">
+          Searches the open web for people showing this signal, at any company — so it has no
+          account to narrow it and costs a web-search turn on the wider model. Watch an account
+          it turns up, or X-ray it, and the search after that is a grounded one.
+        </p>
+
+        <div id="sweep-results"></div>
+      </section>
+    </div>
+  </div>
+
+  <style>
+    /* The people-shaped sweep. Records, the same shape X-ray uses, because the
+       thing being read is the same: who this is and why they matter. */
+    .sweep { margin-top: var(--space-12); }
+    .sweep__banner { margin-bottom: var(--space-4); }
+    .sweep__none { color: rgb(var(--ink-muted)); margin-top: var(--space-4); }
+    .sweep__person { padding: var(--space-4) 0; border-bottom: 1px solid rgb(var(--rule-hairline)); }
+    .sweep__line { display: flex; align-items: baseline; gap: var(--space-3); }
+    .sweep__name { font-weight: var(--weight-medium); color: rgb(var(--ink)); }
+    .sweep__role { margin: var(--space-px) 0 0; font-size: var(--text-small); color: rgb(var(--ink-secondary)); }
+    .sweep__why { margin: var(--space-2) 0 0; max-width: var(--measure-read); font-size: var(--text-small); color: rgb(var(--ink-secondary)); }
+    .sweep__acts { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
+  </style>
+
+  <AgentViewStyles />
+
+  <style is:global>
+    /* Screen-level layout only. The page frame is the shared `.agent-page`
+       column; everything tonal and typographic comes from the design system. */
+    .form { max-width: var(--measure-form); }
+    .form__row { display: flex; align-items: flex-end; gap: var(--space-3); }
+    .form__cell { flex: 1; min-width: 0; }
+    .form__add { flex-shrink: 0; }
+    .form__actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-5); }
+    .form__note { color: rgb(var(--ink-muted)); margin-top: var(--space-4); max-width: var(--measure-read); }
+
+    .result { margin-top: var(--space-12); }
+
+    /* One hairline between accounts, none above the first or below the last —
+       the run of rules used to close with a line hanging under nothing. */
+    .watch { padding-block: var(--space-6); }
+    .watch + .watch { border-top: 1px solid rgb(var(--rule-hairline)); }
+    .watch__head {
+      display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+    .watch__name { color: rgb(var(--ink)); margin: 0; }
+    .watch__state { color: rgb(var(--ink-muted)); }
+    .watch__actions { display: flex; gap: var(--space-2); margin-left: auto; flex-shrink: 0; }
+    .watch__quiet { color: rgb(var(--ink-muted)); }
+
+    @media (max-width: 60rem) {
+      .watch__actions { margin-left: 0; }
+    }
+  </style>
+
+  <script>
+    import { paintWatchlist, type Watched } from '../../../lib/signalsView';
+    import { signalLabel } from '../../../lib/signals';
+
+    const byId = (id: string) => document.getElementById(id)!;
+
+    function fail(message: string): void {
+      byId('error').textContent = message;
+    }
+
+    /** Errors from the backend carry a `detail` worth showing verbatim. */
+    async function reasonFor(res: Response, fallback: string): Promise<string> {
+      try {
+        return (await res.json()).detail || fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function render(watched: Watched[]): void {
+      paintWatchlist(byId('watchlist'), watched, {
+        onUnwatch: unwatch,
+        // A signal has somewhere to go: target the account, or find people at it.
+        onTarget: (company) => {
+          window.location.href = `/work/agents/gtm?seed_company=${encodeURIComponent(company)}`;
+        },
+        onFindPeople: (company) => {
+          window.location.href = `/work/agents/xray?company=${encodeURIComponent(company)}`;
+        },
+      });
+    }
+
+    async function load(): Promise<void> {
+      try {
+        const res = await fetch('/api/sales/signals/watchlist');
+        if (!res.ok) throw new Error(String(res.status));
+        const data = await res.json();
+        render(data.watched ?? []);
+
+        // Opening the page may have started a sweep. Say so, and reload once it has
+        // had time — rather than leaving a stale list that looks like "nothing found".
+        if (data.sweeping) {
+          byId('running').hidden = false;
+          window.setTimeout(async () => {
+            byId('running').hidden = true;
+            await load();
+          }, 20000);
+        }
+      } catch {
+        fail('Could not load the watchlist — is the backend running?');
+      }
+    }
+
+    /**
+     * Start watching an account.
+     *
+     * Extracted so the sweep can reuse it: a person the sweep found is a reason
+     * to watch where they work, and two ways of adding an account would be two
+     * places for the reload and the error handling to drift apart.
+     */
+    async function addCompany(company: string): Promise<boolean> {
+      if (!company.trim()) { fail('Name the account to watch.'); return false; }
+      fail('');
+      try {
+        const res = await fetch('/api/sales/signals/watch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company: company.trim() }),
+        });
+        if (!res.ok) throw new Error(await reasonFor(res, 'Could not watch that account.'));
+        await load();
+        return true;
+      } catch (err: any) {
+        fail(err?.message || 'Could not watch that account.');
+        return false;
+      }
+    }
+
+    byId('add').addEventListener('click', async () => {
+      const field = byId('company') as HTMLInputElement;
+      const button = byId('add') as HTMLButtonElement;
+      button.disabled = true;
+      try {
+        if (await addCompany(field.value)) field.value = '';
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    async function unwatch(id: string): Promise<void> {
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/sales/signals/watch/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        await load();
+      } catch {
+        fail('Could not stop watching that account.');
+      }
+    }
+
+    byId('check').addEventListener('click', async () => {
+      const button = byId('check') as HTMLButtonElement;
+      fail('');
+      button.disabled = true;
+      byId('running').hidden = false;
+
+      try {
+        const res = await fetch('/api/sales/signals/sweep', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ force: true }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const out = await res.json();
+
+        // Failures are named, never folded into the count — a quiet report must not
+        // be mistaken for quiet accounts.
+        if ((out.failures ?? []).length) {
+          const named = out.failures.map((f: any) => f.company).join(', ');
+          fail(`Could not check: ${named}.`);
+        }
+        await load();
+      } catch {
+        fail('Could not run the check.');
+      } finally {
+        button.disabled = false;
+        byId('running').hidden = true;
+      }
+    });
+
+
+    // ── Who is showing a signal ─────────────────────────────────────────────
+    // The people-shaped question, moved here from X-ray. What it returns is a
+    // person and the account they point at, so every row's way onward is to
+    // watch that account or to X-ray it — which is the grounded search X-ray is
+    // for, and the reason this could never usefully live there.
+
+    (async function loadSignalTypes(): Promise<void> {
+      const select = byId('signal') as HTMLSelectElement;
+      const option = (value: string, label: string) => {
+        const node = document.createElement('option');
+        node.value = value;
+        node.textContent = label;
+        return node;
+      };
+      try {
+        const types: string[] = await (await fetch('/api/sales/signals/signal-types')).json();
+        select.innerHTML = '';
+        types.forEach((type) => select.appendChild(option(type, signalLabel(type))));
+      } catch {
+        select.appendChild(option('', 'could not load signals'));
+      }
+    })();
+
+    byId('sweep').addEventListener('click', async () => {
+      const select = byId('signal') as HTMLSelectElement;
+      const signalType = select.value;
+      const button = byId('sweep') as HTMLButtonElement;
+      const errorEl = byId('sweep-error');
+      const results = byId('sweep-results');
+
+      errorEl.textContent = '';
+      if (!signalType) { errorEl.textContent = 'Choose a buying signal to sweep for.'; return; }
+
+      button.disabled = true;
+      byId('sweep-running').hidden = false;
+      results.innerHTML = '';
+      byId('sweep-count').textContent = '';
+      try {
+        const res = await fetch('/api/sales/signals/detect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signal_type: signalType }),
+        });
+        if (!res.ok) throw new Error(await reasonFor(res, `Sweep failed (${res.status})`));
+
+        const data = await res.json();
+        const found: any[] = data.results ?? [];
+        byId('sweep-count').textContent = `${found.length} found`;
+
+        // Honesty fields travel with the sweep as they do with a search: a
+        // truncated answer that looks whole is the failure they exist to prevent.
+        if (data.truncated || (data.provider_errors ?? []).length) {
+          const notes = [
+            ...(data.truncated ? ['the answer was cut short, so this may be partial'] : []),
+            ...(data.provider_errors ?? []),
+          ];
+          const banner = document.createElement('div');
+          banner.className = 'ds-banner ds-banner--drift sweep__banner';
+          const label = document.createElement('span');
+          label.className = 'ds-banner__label';
+          label.textContent = 'Incomplete';
+          banner.append(label, document.createTextNode(notes.join(' · ')));
+          results.appendChild(banner);
+        }
+
+        if (!found.length) {
+          const none = document.createElement('p');
+          none.className = 'ds-caption sweep__none';
+          none.textContent = `Nobody found showing ${signalLabel(signalType)}${data.error ? ` — ${data.error}` : '.'}`;
+          results.appendChild(none);
+          return;
+        }
+        found.forEach((person) => results.appendChild(sweepRow(person)));
+      } catch (err: any) {
+        errorEl.textContent = err?.message || 'The sweep failed.';
+      } finally {
+        button.disabled = false;
+        byId('sweep-running').hidden = true;
+      }
+    });
+
+    function sweepRow(person: any): HTMLElement {
+      const company = String(person.company || '').trim();
+      const row = document.createElement('article');
+      row.className = 'sweep__person';
+      row.innerHTML = `
+        <div class="sweep__body">
+          <div class="sweep__line">
+            <span class="sweep__name" data-name></span>
+            <span class="ds-mark" data-conf></span>
+          </div>
+          <p class="sweep__role" data-role></p>
+          <p class="sweep__why" data-why></p>
+          <div class="sweep__acts" data-acts></div>
+        </div>`;
+
+      // Every value came from a web search — set as text, never as markup.
+      row.querySelector('[data-name]')!.textContent = person.full_name || '—';
+      row.querySelector('[data-role]')!.textContent =
+        [person.job_title, company].filter(Boolean).join(' · ');
+      row.querySelector('[data-why]')!.textContent = person.signal_context || '';
+
+      const confidence = String(person.confidence || 'low').toLowerCase();
+      const mark = row.querySelector('[data-conf]')!;
+      mark.classList.add(confidence === 'high' ? 'ds-mark--locked'
+        : confidence === 'medium' ? 'ds-mark--drift' : 'ds-mark--idle');
+      mark.textContent = confidence;
+
+      // The account is the point: a person showing a signal is a reason to start
+      // watching where they work, and then to run the grounded search at it.
+      const acts = row.querySelector('[data-acts]')!;
+      if (company) {
+        const watch = document.createElement('button');
+        watch.type = 'button';
+        watch.className = 'ds-btn ds-btn--ghost ds-btn--sm';
+        watch.textContent = 'Watch this account';
+        watch.addEventListener('click', () => addCompany(company));
+        const xray = document.createElement('a');
+        xray.className = 'ds-btn ds-btn--ghost ds-btn--sm';
+        xray.href = `/work/agents/xray?company=${encodeURIComponent(company)}`;
+        xray.textContent = 'X-ray it';
+        acts.append(watch, xray);
+      }
+      return row;
+    }
+
+    load();
+  </script>
+</PlatformLayout>

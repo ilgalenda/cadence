@@ -98,14 +98,15 @@ def append_user_turn(
     title: str,
     model_used: str,
     topics: list[str],
+    project_id: Optional[str] = None,
 ) -> None:
     """Persist the conversation row (creating it on the first turn) and append
     the user message.
 
     Called at stream *start* so the conversation id the client receives is
     always backed by a real row, and the user's message is never lost even if
-    generation errors or returns empty. The title and model are locked on the
-    first turn.
+    generation errors or returns empty. The title, model and project are locked
+    on the first turn.
     """
     now = _now_iso()
     with connect() as conn:
@@ -116,10 +117,10 @@ def append_user_turn(
         if existing is None:
             conn.execute(
                 """INSERT INTO conversations
-                   (id, username, title, model_used, topics, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                   (id, username, title, model_used, topics, project_id, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (conv_id, username, title or "Chat", model_used,
-                 json.dumps(topics[:3]), now, now),
+                 json.dumps(topics[:3]), project_id, now, now),
             )
             _prune_user(conn, username)
         else:
@@ -179,33 +180,69 @@ def _row_to_summary(row) -> dict:
         "topics": topics,
         "timestamp": format_timestamp(row["updated_at"]),
         "ts": row["updated_at"],
+        "project_id": row["project_id"],
+        "folder_id": row["folder_id"],
+        "pinned": row["pinned_at"] is not None,
+        "archived": row["archived_at"] is not None,
     }
+
+
+# Distinguishes "caller did not filter on this" from "caller asked for NULL",
+# which is a real query: unfiled conversations, or a project's root.
+UNFILTERED = object()
+
+
+def _placement_clause(project_id, folder_id) -> tuple[str, list]:
+    """SQL fragment + params for the project/folder filter."""
+    clause, params = "", []
+    if project_id is not UNFILTERED:
+        clause += " AND project_id IS ?" if project_id is None else " AND project_id = ?"
+        params.append(project_id)
+    if folder_id is not UNFILTERED:
+        clause += " AND folder_id IS ?" if folder_id is None else " AND folder_id = ?"
+        params.append(folder_id)
+    return clause, params
 
 
 def list_conversations(
     username: str,
     query: Optional[str] = None,
     limit: int = SESSION_CAP,
+    *,
+    project_id=UNFILTERED,
+    folder_id=UNFILTERED,
+    include_archived: bool = False,
 ) -> list[dict]:
-    """Newest-first summaries (no message bodies) for a user, optional search."""
+    """Summaries (no message bodies) for a user, pinned first then newest.
+
+    ``project_id``/``folder_id`` default to unfiltered. Passing ``None`` is a
+    real filter meaning "not filed" — an unfiled conversation, or one at a
+    project's root — which is how the workspace asks for each part of the tree.
+    """
+    where = "username = ? AND deleted_at IS NULL"
+    params: list = [username]
+
+    if not include_archived:
+        where += " AND archived_at IS NULL"
+
+    placement, placement_params = _placement_clause(project_id, folder_id)
+    where += placement
+    params += placement_params
+
+    if query:
+        like = f"%{query}%"
+        where += """ AND (title LIKE ? OR id IN (
+                       SELECT conversation_id FROM messages WHERE content LIKE ?))"""
+        params += [like, like]
+
+    params.append(limit)
     with connect() as conn:
-        if query:
-            like = f"%{query}%"
-            rows = conn.execute(
-                """SELECT * FROM conversations
-                   WHERE username = ? AND deleted_at IS NULL
-                     AND (title LIKE ? OR id IN (
-                       SELECT conversation_id FROM messages WHERE content LIKE ?))
-                   ORDER BY updated_at DESC LIMIT ?""",
-                (username, like, like, limit),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                """SELECT * FROM conversations
-                   WHERE username = ? AND deleted_at IS NULL
-                   ORDER BY updated_at DESC LIMIT ?""",
-                (username, limit),
-            ).fetchall()
+        rows = conn.execute(
+            f"""SELECT * FROM conversations WHERE {where}
+                 ORDER BY pinned_at IS NULL, pinned_at DESC, updated_at DESC
+                 LIMIT ?""",
+            params,
+        ).fetchall()
         return [_row_to_summary(r) for r in rows]
 
 
@@ -240,6 +277,10 @@ def get_conversation(conv_id: str, username: str) -> Optional[dict]:
             "topics": topics,
             "timestamp": format_timestamp(row["updated_at"]),
             "ts": row["updated_at"],
+            "project_id": row["project_id"],
+            "folder_id": row["folder_id"],
+            "pinned": row["pinned_at"] is not None,
+            "archived": row["archived_at"] is not None,
             "messages": [{"role": m["role"], "content": m["content"]} for m in msgs],
             "pending_correction_draft": draft,
         }
@@ -252,6 +293,158 @@ def rename_conversation(conv_id: str, username: str, title: str) -> bool:
             (title, conv_id, username),
         )
         return cur.rowcount > 0
+
+
+def project_of(conv_id: str, username: str) -> Optional[str]:
+    """The project a conversation is filed under, or None when unfiled."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT project_id FROM conversations WHERE id = ? AND username = ? AND deleted_at IS NULL",
+            (conv_id, username),
+        ).fetchone()
+    return row["project_id"] if row else None
+
+
+def move_conversation(
+    conv_id: str,
+    username: str,
+    project_id: Optional[str],
+    folder_id: Optional[str],
+) -> bool:
+    """File a conversation under a project/folder, or unfile it with both None.
+
+    The destination is validated by the caller (``projects.assert_destination``)
+    so an invalid move is rejected before anything is written.
+    """
+    with connect() as conn:
+        cur = conn.execute(
+            """UPDATE conversations SET project_id = ?, folder_id = ?
+                WHERE id = ? AND username = ? AND deleted_at IS NULL""",
+            (project_id, folder_id, conv_id, username),
+        )
+        return cur.rowcount > 0
+
+
+def set_pinned(conv_id: str, username: str, pinned: bool) -> bool:
+    """Pin a conversation to the top of its list, or unpin it."""
+    with connect() as conn:
+        cur = conn.execute(
+            """UPDATE conversations SET pinned_at = ?
+                WHERE id = ? AND username = ? AND deleted_at IS NULL""",
+            (_now_iso() if pinned else None, conv_id, username),
+        )
+        return cur.rowcount > 0
+
+
+def set_archived(conv_id: str, username: str, archived: bool) -> bool:
+    """Archive a conversation out of the default lists, or restore it.
+
+    Distinct from deletion: an archived conversation keeps its messages and can
+    be brought back. Deletion destroys the transcript.
+    """
+    with connect() as conn:
+        cur = conn.execute(
+            """UPDATE conversations SET archived_at = ?
+                WHERE id = ? AND username = ? AND deleted_at IS NULL""",
+            (_now_iso() if archived else None, conv_id, username),
+        )
+        return cur.rowcount > 0
+
+
+_SNIPPET_RADIUS = 90
+
+
+def _snippet(content: str, query: str) -> str:
+    """The matching phrase with a little context either side, for the results list."""
+    at = content.lower().find(query.lower())
+    if at == -1:
+        return content[:_SNIPPET_RADIUS * 2].strip()
+    start = max(0, at - _SNIPPET_RADIUS)
+    end = min(len(content), at + len(query) + _SNIPPET_RADIUS)
+    return ("…" if start else "") + content[start:end].strip() + ("…" if end < len(content) else "")
+
+
+def search_messages(
+    username: str,
+    query: str,
+    *,
+    project_id=UNFILTERED,
+    limit: int = 40,
+) -> list[dict]:
+    """Search message bodies across conversations, newest match first.
+
+    Returns one row per matching *message* — the conversation it belongs to plus
+    a snippet — so the workspace can show where the hit actually is rather than
+    only which conversation contained it.
+
+    LIKE rather than FTS5: a user holds at most ``SESSION_CAP`` conversations, so
+    the scan is cheap and the store needs no shadow index to keep in step. If the
+    cap ever rises materially, this is the place to introduce FTS.
+    """
+    term = (query or "").strip()
+    if not term:
+        return []
+
+    where = "c.username = ? AND c.deleted_at IS NULL AND m.content LIKE ?"
+    params: list = [username, f"%{term}%"]
+    if project_id is not UNFILTERED:
+        where += " AND c.project_id IS ?" if project_id is None else " AND c.project_id = ?"
+        params.append(project_id)
+    params.append(limit)
+
+    with connect() as conn:
+        rows = conn.execute(
+            f"""SELECT m.content, m.role, m.created_at,
+                       c.id AS conversation_id, c.title, c.project_id, c.folder_id
+                  FROM messages m JOIN conversations c ON c.id = m.conversation_id
+                 WHERE {where}
+                 ORDER BY m.created_at DESC
+                 LIMIT ?""",
+            params,
+        ).fetchall()
+
+    return [{
+        "conversation_id": r["conversation_id"],
+        "title": r["title"],
+        "project_id": r["project_id"],
+        "folder_id": r["folder_id"],
+        "role": r["role"],
+        "snippet": _snippet(r["content"], term),
+        "ts": r["created_at"],
+    } for r in rows]
+
+
+def delete_all_conversations(username: str) -> int:
+    """Delete every one of this user's conversations. Returns how many went.
+
+    Same contract as :func:`delete_conversation`, applied in bulk and in one
+    transaction: the rows are soft-deleted so any correction provenance pointing
+    at them survives, and the message bodies are hard-deleted because the vault
+    already snapshots whatever text a correction relies on.
+
+    Archived conversations are included — they are conversations, and this is
+    the control that says "all". Already-deleted rows are skipped, so calling it
+    twice is harmless and the second call reports zero.
+    """
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id FROM conversations WHERE username = ? AND deleted_at IS NULL",
+            (username,),
+        ).fetchall()
+        ids = [r["id"] for r in rows]
+        if not ids:
+            return 0
+
+        placeholders = ",".join("?" for _ in ids)
+        conn.execute(
+            f"UPDATE conversations SET deleted_at = ? WHERE id IN ({placeholders})",
+            [_now_iso(), *ids],
+        )
+        conn.execute(
+            f"DELETE FROM messages WHERE conversation_id IN ({placeholders})",
+            ids,
+        )
+        return len(ids)
 
 
 def delete_conversation(conv_id: str, username: str) -> bool:

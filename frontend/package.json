@@ -1,18 +1,25 @@
 {
-  "name": "timebeat-agent-frontend",
+  "name": "cadence-frontend",
   "type": "module",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "scripts": {
     "dev": "astro dev --port 4321",
-    "build": "astro build",
+    "test": "vitest run",
+    "check:design": "node scripts/check-adherence.mjs",
+    "build": "npm run test && npm run check:design && astro build",
     "build:watch": "astro build --watch",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "check:symbols": "node scripts/check-symbols.mjs"
   },
   "dependencies": {
     "@astrojs/tailwind": "^5.1.0",
-    "@fontsource-variable/instrument-sans": "^5.2.8",
-    "@fontsource-variable/jetbrains-mono": "^5.2.8",
+    "@fontsource-variable/kode-mono": "^5.3.0",
+    "@fontsource-variable/roboto": "^5.3.0",
     "astro": "^4.16.0",
+    "motion": "^13.1.0",
     "tailwindcss": "^3.4.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
   }
 }

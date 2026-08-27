@@ -1,0 +1,52 @@
+---
+/**
+ * The way back, in the sheet header: an arrow one step up, then the trail.
+ *
+ * The two do different jobs and that is why both are here. The arrow is the
+ * reflex — one target, always in the same spot, no reading required. The trail
+ * answers where you are and offers the longer jumps the arrow cannot.
+ *
+ * This replaces the bare page title the header used to show, and the twelve
+ * hand-rolled "← home" links that used to sit inside pages. Those were absent on
+ * half the platform and pointed at the wrong place on most of the rest, and a way
+ * out that is only sometimes there is one you cannot rely on.
+ *
+ * Every page has a trail and every trail starts at Home, so the way back is in
+ * the same place on every surface. `/home` is the exception and the honest one:
+ * it is the root, so it shows its name and no arrow, because there is nowhere up
+ * from there and a control that goes nowhere teaches people to distrust it.
+ *
+ * The last crumb is the page itself: plain text, `aria-current`, not a link to
+ * where you already are. Pages whose subject is only known at runtime — a wiki
+ * page, a call — pass a placeholder and rewrite `#crumb-here` once they know it.
+ */
+import { ancestorsOf } from '../lib/platform';
+import { icon } from '../lib/icons';
+
+interface Props {
+  /** The current page's own name — the last crumb. */
+  title?: string;
+  /**
+   * An optional crumb between the ancestors and the page, for a level that only
+   * exists at runtime — the Owl workspace's project, which a conversation may or
+   * may not belong to. Rendered hidden and filled by the page.
+   */
+  middleId?: string;
+}
+const { title, middleId } = Astro.props;
+const ancestors = ancestorsOf(Astro.url.pathname);
+/** One step up is the nearest ancestor, which is the last one in the trail. */
+const up = ancestors.at(-1);
+---
+{up && (
+  <a class="ds-icon-btn ds-crumb__up" href={up.href} aria-label={`Back to ${up.label}`}>
+    <Fragment set:html={icon('back')} />
+  </a>
+)}
+<nav class="ds-crumb" aria-label="Breadcrumb">
+  {ancestors.map((crumb) => (
+    <a class="ds-crumb__link" href={crumb.href}>{crumb.label}</a>
+  ))}
+  {middleId && <span class="ds-crumb__link" id={middleId} hidden />}
+  {title && <span class="ds-crumb__here" id="crumb-here" aria-current="page">{title}</span>}
+</nav>

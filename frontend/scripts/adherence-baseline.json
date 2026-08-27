@@ -1,0 +1,5 @@
+{
+  "note": "Raw-px debt per file, ratcheted by scripts/check-adherence.mjs. Counts may only go down. Regenerate with: npm run check:design -- --update-baseline",
+  "total": 0,
+  "rawPx": {}
+}

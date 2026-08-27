@@ -1,0 +1,583 @@
+---
+/**
+ * The call library — every analysed call.
+ *
+ * Moved from `agents/calls/analysed.astro` onto the platform shell. It keeps every
+ * job that page did: search across title, summary and product fit, open one call,
+ * and delete one with a confirmation. Deleting is destructive and stays behind
+ * `confirmAction`, the same dialog the rest of the product uses.
+ *
+ * This is the corpus the other two Learn surfaces grow from — Practice draws its
+ * questions from these calls, and the terms in Knowledge tagged "grown from calls"
+ * came from them too.
+ *
+ * Recomposed 2026-08-21 onto the studio language. The first pass mapped the old
+ * markup onto `.ds-*` names, which is not adoption: a corpus of ninety records was
+ * an undifferentiated column of titles, its one action was hidden until hover, and
+ * it read the reading off a field the index never sent. This composes the screen
+ * from the system instead — a standing picture, a control line, and a record grid
+ * whose columns hold their positions whether the rail is open or closed.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import Toast from '../../../components/Toast.astro';
+---
+<PlatformLayout title="Call library" requires="calls">
+  <Toast />
+  <div class="ds-page lib">
+    <header class="ds-page__head ds-arrive">
+      <p class="ds-eyebrow">Learn</p>
+      <h1 class="ds-heading ds-page__title">Call library</h1>
+      <p class="ds-lead ds-page__intro">
+        Every call the team has analysed. Each one opens the full reading Owl took from it —
+        signals, objections, product fit and what to do next.
+      </p>
+    </header>
+
+    <!-- The standing picture: the one colour field this view is allowed. Sky
+         rather than blue because the stats beside the figure are small text, and
+         only the field's charcoal-ink variants carry small text legibly. -->
+    <section class="ds-card ds-card--field-sky standing ds-arrive" style="--arrive: var(--dur-step)"
+             id="standing" aria-label="What the library holds" hidden>
+      <div class="standing__figure">
+        <span class="ds-display ds-numeric" id="stat-total">—</span>
+        <span class="ds-caption standing__unit">calls read</span>
+      </div>
+      <dl class="standing__stats">
+        <div class="standing__stat">
+          <dt class="ds-caption">Most recent</dt>
+          <dd class="ds-small ds-mono" id="stat-recent">—</dd>
+        </div>
+        <div class="standing__stat">
+          <dt class="ds-caption">Buying signals</dt>
+          <dd class="ds-small ds-numeric" id="stat-signals">—</dd>
+        </div>
+        <div class="standing__stat">
+          <dt class="ds-caption">Knowledge extracted</dt>
+          <dd class="ds-small ds-numeric" id="stat-extracts">—</dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- One control line: the search pill on the reading measure, the lens beside
+         it. Both act on the same list, so they belong on the same line rather
+         than stacked into two separate-looking regions. -->
+    <div class="controls ds-arrive" style="--arrive: calc(var(--dur-step) * 2)" id="controls" hidden>
+      <div class="ds-search find">
+        <span class="ds-search__icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="6" cy="6" r="4.25" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M9.2 9.2L12.5 12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <input class="ds-search__input" id="find" type="search" autocomplete="off"
+               placeholder="Search calls…" aria-label="Search analysed calls" />
+        <kbd class="ds-kbd find__hint" aria-hidden="true">/</kbd>
+      </div>
+
+      <div class="ds-segment lens" role="group" aria-label="Filter the library">
+        <button class="ds-segment__item is-active" type="button" data-lens="all" aria-pressed="true">All</button>
+        <button class="ds-segment__item" type="button" data-lens="signals" aria-pressed="false">Signals</button>
+        <button class="ds-segment__item" type="button" data-lens="objections" aria-pressed="false">Objections</button>
+        <button class="ds-segment__item" type="button" data-lens="product" aria-pressed="false">Product fit</button>
+      </div>
+    </div>
+
+    <!-- The launcher's section-head grammar: label left, mono count right, on a
+         hairline. The corpus is the section; the count is the machine talking. -->
+    <div class="ds-sectionhead corpus-head ds-arrive" style="--arrive: calc(var(--dur-step) * 3)" id="corpus-head" hidden>
+      <h2 class="ds-eyebrow ds-sectionhead__title">Analysed calls</h2>
+      <span class="ds-mono corpus-head__count" id="count"></span>
+    </div>
+
+    <div id="calls" aria-live="polite" aria-busy="true"></div>
+  </div>
+
+  <style>
+    /* Screen-level layout only. Everything visual comes from the design system.
+       The rows are painted by the script below, so their glue is reached through
+       `#calls :global(...)` — scoped selectors never match nodes made at runtime.
+
+       The whole screen is built so that the rail opening and closing changes the
+       width of exactly one thing: the body column of a record. Every other
+       column is fixed, and the summary is capped at the reading measure, so the
+       list keeps its rhythm at both rail widths instead of re-flowing into long
+       lines the moment the rail collapses. */
+
+    .lib { width: 100%; }
+    .lib .ds-page__head { margin-bottom: var(--space-10); }
+
+    /* A record measure, narrower than the 84rem page.
+       A list of records is not a canvas to fill: run it to the full page and the
+       summary caps at the reading measure while its track does not, which opens
+       a void between the text and the tag beside it. Everything on this screen
+       shares one measure and stays left-anchored to the head, so opening the
+       rail slides the column rather than re-proportioning it. */
+    .lib > * { max-width: 68rem; }
+
+    /* ── The standing picture ─────────────────────────────────────────────── */
+
+    .standing {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: var(--space-8);
+      flex-wrap: wrap;
+      padding: var(--space-6) var(--space-8);
+      margin-bottom: var(--space-10);
+    }
+    .standing__figure { display: flex; align-items: baseline; gap: var(--space-3); }
+    .standing__figure .ds-display { line-height: var(--leading-tight); }
+    .standing__unit { opacity: 0.7; }
+
+    .standing__stats {
+      display: flex; gap: var(--space-8); flex-wrap: wrap;
+      margin: 0;
+    }
+    .standing__stat dt { opacity: 0.7; margin-bottom: var(--space-1); }
+    .standing__stat dd { margin: 0; font-weight: var(--weight-medium); }
+
+    /* ── The control line ─────────────────────────────────────────────────── */
+
+    [hidden] { display: none !important; }
+
+    .controls {
+      display: flex; align-items: center; gap: var(--space-4);
+      flex-wrap: wrap;
+      margin-bottom: var(--space-8);
+    }
+    /* A control, not a region: the search stays on the reading measure however
+       wide the field gets. */
+    .find { flex: 1 1 20rem; max-width: var(--measure-form); }
+    .find__hint { flex-shrink: 0; opacity: 0.6; }
+    .lens { flex-shrink: 0; }
+
+    .corpus-head {
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid rgb(var(--rule-hairline));
+      margin-bottom: var(--space-2);
+    }
+    .corpus-head__count { color: rgb(var(--ink-muted)); flex-shrink: 0; }
+
+    /* ── The month bands ──────────────────────────────────────────────────── */
+
+    /* Ninety records in one column is a wall. Grouping by the month they were
+       read gives the eye a place to rest and makes "the recent ones" findable
+       without a date filter nobody would set. */
+    #calls :global(.band + .band) { margin-top: var(--space-8); }
+    /* Sticky, so the month you are reading in stays named while you scroll it.
+       This is what earns the band head its place beside the section head above:
+       without it, the two would simply be saying the same thing twice. */
+    #calls :global(.band__head) {
+      position: sticky; top: 0; z-index: 2;
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--space-4);
+      padding: var(--space-3) var(--space-3) var(--space-2);
+      background: rgb(var(--canvas));
+    }
+    #calls :global(.band__name) { color: rgb(var(--ink-secondary)); }
+    #calls :global(.band__count) { color: rgb(var(--ink-muted)); }
+
+    /* ── The record ───────────────────────────────────────────────────────── */
+
+    /* A grid, not a flex row: the date and the product tag hold the same
+       position down the whole list, so the column reads as a column. Only the
+       body track is fluid, which is the track that should absorb the rail. */
+    #calls :global(.call) {
+      display: grid;
+      grid-template-columns: 4.5rem minmax(0, 1fr) 13rem 2rem;
+      align-items: start;
+      gap: var(--space-5);
+    }
+    #calls :global(.call__when) {
+      color: rgb(var(--ink-muted));
+      white-space: nowrap;
+      /* Sits on the title's line box rather than the top of the grid cell. */
+      line-height: 1.5rem;
+    }
+    #calls :global(.call__body) { min-width: 0; }
+
+    /* The title stretches over the whole row, so the target is the record rather
+       than a few words of it. The actions sit above it on the z axis so the
+       menu is still reachable. */
+    #calls :global(.call__title) {
+      font-size: var(--text-body); font-weight: var(--weight-medium);
+      color: rgb(var(--ink)); text-decoration: none;
+    }
+    #calls :global(.call__title::after) { content: ''; position: absolute; inset: 0; }
+    #calls :global(.call:hover .call__title) { color: rgb(var(--accent-ink)); }
+
+    /* Two lines, capped at the reading measure. This is the rule that keeps an
+       84rem page from producing 180-character summaries when the rail closes. */
+    #calls :global(.call__summary) {
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+      overflow: hidden;
+      margin-top: var(--space-1);
+      max-width: var(--measure-read);
+      color: rgb(var(--ink-secondary));
+      line-height: var(--leading-snug);
+    }
+    /* What the reading yielded, as a quiet line rather than a row of chips —
+       three tags per record across ninety records is noise, not information. */
+    #calls :global(.call__yield) {
+      display: block;
+      margin-top: var(--space-2);
+      color: rgb(var(--ink-muted));
+    }
+
+    /* The right column carries what the reading found: the product it points at,
+       and what it produced. Stacked, so the column has weight and the row has no
+       empty middle. */
+    #calls :global(.call__fit) {
+      display: flex; flex-direction: column; align-items: flex-start;
+      gap: var(--space-1);
+      min-width: 0;
+    }
+    #calls :global(.call__fit .ds-tag) {
+      max-width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      display: block; line-height: 1.5rem;
+    }
+
+    /* The one action a record has must not be hover-only: on a touch screen
+       there is no hover, and a delete nobody can reach is not a safe delete —
+       it is an absent one. The menu button is always present and quiet. */
+    #calls :global(.call__acts) {
+      position: relative; z-index: 1; justify-self: end;
+      /* Centred on the title's line box: the button is taller than the line. */
+      margin-top: -0.25rem;
+    }
+
+    /* ── Loading ──────────────────────────────────────────────────────────── */
+
+    .skeleton__row {
+      display: grid;
+      grid-template-columns: 4.5rem minmax(0, 1fr) 12rem 2rem;
+      gap: var(--space-5);
+      padding: var(--space-4) var(--space-3);
+    }
+    .skeleton__bar { height: 0.75rem; }
+    .skeleton__bar + .skeleton__bar { margin-top: var(--space-2); }
+
+    /* ── Compact ──────────────────────────────────────────────────────────── */
+
+    /* At the narrow end the shell has already collapsed the rail, and the four
+       columns no longer fit: the record becomes a stack, and the product tag
+       joins the yield line where it reads as one more fact about the call. */
+    @media (max-width: 60rem) {
+      .standing { gap: var(--space-6); padding: var(--space-5) var(--space-6); }
+      .standing__stats { gap: var(--space-6); }
+      .find { max-width: none; }
+      .lens { overflow-x: auto; max-width: 100%; }
+
+      #calls :global(.call),
+      .skeleton__row {
+        grid-template-columns: minmax(0, 1fr) 2rem;
+        gap: var(--space-2) var(--space-4);
+      }
+      #calls :global(.call__when) { grid-column: 1; order: -1; }
+      #calls :global(.call__acts) { grid-row: 1; grid-column: 2; }
+      #calls :global(.call__body) { grid-column: 1 / -1; }
+      #calls :global(.call__fit) { grid-column: 1 / -1; }
+    }
+  </style>
+
+  <script>
+    import { confirmAction, menu } from '../../../lib/overlays';
+
+    /**
+     * A record as the index sends it — the reading flattened to what a row shows.
+     * The nested `result` the endpoint used to ship is gone; anything needing the
+     * whole reading fetches the call itself.
+     */
+    interface Call {
+      id: string;
+      title: string;
+      timestamp: string;
+      summary: string;
+      product: string;
+      signals: number;
+      objections: number;
+      extracts: number;
+    }
+
+    type Lens = 'all' | 'signals' | 'objections' | 'product';
+
+    const find = document.getElementById('find') as HTMLInputElement;
+    const lensGroup = document.querySelector('.lens') as HTMLElement;
+    const countSlot = document.getElementById('count')!;
+    const host = document.getElementById('calls')!;
+
+    let calls: Call[] = [];
+    let lens: Lens = 'all';
+
+    const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      return node;
+    };
+
+    const text = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, value: string) => {
+      const node = el(tag, className);
+      node.textContent = value;
+      return node;
+    };
+
+    /** "1 signal", "5 signals", and nothing at all for none. */
+    const count = (n: number, noun: string) => (n ? `${n} ${noun}${n === 1 ? '' : 's'}` : '');
+
+    // ── Filtering ────────────────────────────────────────────────────────────
+
+    function matchesQuery(call: Call, query: string): boolean {
+      if (!query) return true;
+      return [call.title, call.summary, call.product].join(' ').toLowerCase().includes(query);
+    }
+
+    function matchesLens(call: Call): boolean {
+      if (lens === 'signals') return call.signals > 0;
+      if (lens === 'objections') return call.objections > 0;
+      if (lens === 'product') return Boolean(call.product);
+      return true;
+    }
+
+    // ── The month bands ──────────────────────────────────────────────────────
+
+    /**
+     * The month a call was read, from the stored stamp ("31 Jul 2026, 15:48").
+     *
+     * Parsed by shape rather than by `Date`, which reads that string as invalid
+     * in Safari and would have silently dropped every record into one band.
+     * Anything unparseable gets its own band rather than being hidden.
+     */
+    function band(timestamp: string): string {
+      const parts = timestamp.split(' ');
+      return parts.length >= 3 ? `${parts[1]} ${parts[2].replace(',', '')}` : 'Undated';
+    }
+
+    /** The day, for the record's own date column — the month is on the band. */
+    function day(timestamp: string): string {
+      const parts = timestamp.split(' ');
+      return parts.length >= 2 ? `${parts[0]} ${parts[1]}` : '';
+    }
+
+    function groupByMonth(shown: Call[]): Array<[string, Call[]]> {
+      const bands = new Map<string, Call[]>();
+      for (const call of shown) {
+        const name = band(call.timestamp);
+        const existing = bands.get(name);
+        if (existing) existing.push(call);
+        else bands.set(name, [call]);
+      }
+      return [...bands];
+    }
+
+    // ── Painting ─────────────────────────────────────────────────────────────
+
+    /** Call titles and summaries are user content — set as text, never as markup. */
+    function row(call: Call): HTMLLIElement {
+      const wrap = el('li', 'ds-row ds-row--record call');
+
+      const when = text('span', 'ds-mono ds-caption call__when', day(call.timestamp));
+      when.title = call.timestamp;
+
+      const body = el('div', 'call__body');
+      const link = text('a', 'call__title', call.title);
+      link.href = `/learn/library/call?id=${encodeURIComponent(call.id)}`;
+      body.append(link);
+
+      if (call.summary) body.append(text('span', 'ds-small call__summary', call.summary));
+
+      // What the reading found, in one column: the product it points at, then
+      // what it produced. A record with nothing to show gets no line at all
+      // rather than a row of zeroes.
+      const fit = el('div', 'call__fit');
+      if (call.product) {
+        const tag = text('span', 'ds-tag ds-tag--accent', call.product);
+        tag.title = call.product;
+        fit.append(tag);
+      }
+
+      const yields = [
+        count(call.signals, 'signal'),
+        count(call.objections, 'objection'),
+        count(call.extracts, 'extract'),
+      ].filter(Boolean);
+      if (yields.length) fit.append(text('span', 'ds-caption call__yield', yields.join(' · ')));
+
+      const acts = el('div', 'call__acts');
+      const more = el('button', 'ds-icon-btn');
+      more.type = 'button';
+      more.setAttribute('aria-label', `Actions for ${call.title}`);
+      more.setAttribute('aria-haspopup', 'menu');
+      more.innerHTML =
+        '<svg width="15" height="15" viewBox="0 0 15 15" fill="currentColor" aria-hidden="true">' +
+        '<circle cx="7.5" cy="3.5" r="1.2"/><circle cx="7.5" cy="7.5" r="1.2"/><circle cx="7.5" cy="11.5" r="1.2"/></svg>';
+      more.addEventListener('click', () => {
+        menu(more, [
+          { label: 'Open the reading', run: () => { window.location.href = link.href; } },
+          'separator',
+          { label: 'Delete analysis', danger: true, run: () => { void destroy(call); } },
+        ]);
+      });
+      acts.append(more);
+
+      wrap.append(when, body, fit, acts);
+      return wrap;
+    }
+
+    function empty(title: string, body: string, action?: { label: string; run: () => void }): void {
+      const block = el('div', 'ds-empty');
+      block.append(text('p', 'ds-empty__title', title), text('p', 'ds-empty__body', body));
+      if (action) {
+        const button = text('button', 'ds-btn ds-btn--secondary ds-btn--sm', action.label);
+        button.type = 'button';
+        button.addEventListener('click', action.run);
+        block.append(button);
+      }
+      host.replaceChildren(block);
+    }
+
+    /** Rows in outline while the corpus loads, so the page has its shape first. */
+    function skeleton(): void {
+      const block = el('div');
+      for (let index = 0; index < 6; index += 1) {
+        const line = el('div', 'skeleton__row');
+        const when = el('div', 'ds-skeleton skeleton__bar');
+        when.style.width = '3.5rem';
+        const body = el('div');
+        const title = el('div', 'ds-skeleton skeleton__bar');
+        title.style.width = `${55 + ((index * 7) % 30)}%`;
+        const summary = el('div', 'ds-skeleton skeleton__bar');
+        summary.style.width = '90%';
+        body.append(title, summary);
+        const fit = el('div', 'ds-skeleton skeleton__bar');
+        fit.style.width = '7rem';
+        line.append(when, body, fit);
+        block.append(line);
+      }
+      host.replaceChildren(block);
+    }
+
+    function paint(): void {
+      const query = find.value.trim().toLowerCase();
+      const shown = calls.filter((call) => matchesLens(call) && matchesQuery(call, query));
+      const narrowed = Boolean(query) || lens !== 'all';
+
+      countSlot.textContent = calls.length
+        ? (narrowed ? `${shown.length} of ${calls.length}` : `${calls.length}`)
+        : '';
+
+      if (!calls.length) {
+        empty('No calls yet', 'Analyse a call and it will appear here, with everything Owl read from it.');
+        return;
+      }
+      if (!shown.length) {
+        empty('Nothing found', 'No call matches what you are looking for.', {
+          label: 'Clear the filters',
+          run: () => {
+            find.value = '';
+            setLens('all');
+          },
+        });
+        return;
+      }
+
+      const frame = document.createDocumentFragment();
+      for (const [name, records] of groupByMonth(shown)) {
+        const group = el('section', 'band');
+        const head = el('div', 'ds-sectionhead band__head');
+        head.append(
+          text('h3', 'ds-eyebrow band__name', name),
+          text('span', 'ds-mono ds-caption band__count', String(records.length)),
+        );
+        const list = el('ul', 'ds-list ds-stagger');
+        records.forEach((call) => list.append(row(call)));
+        group.append(head, list);
+        frame.append(group);
+      }
+      host.replaceChildren(frame);
+    }
+
+    // ── Acting ───────────────────────────────────────────────────────────────
+
+    async function destroy(call: Call): Promise<void> {
+      const go = await confirmAction({
+        title: 'Delete this call analysis?',
+        body: 'The analysis and everything drawn from it are destroyed. This cannot be undone.',
+        confirm: 'Delete analysis',
+      });
+      if (!go) return;
+      try {
+        const res = await fetch(`/api/sales/calls/${encodeURIComponent(call.id)}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error(String(res.status));
+        calls = calls.filter((c) => c.id !== call.id);
+        standing();
+        paint();
+      } catch {
+        (window as any).toast?.('danger', 'Could not delete — is the backend running?');
+      }
+    }
+
+    function setLens(next: Lens): void {
+      lens = next;
+      for (const item of lensGroup.querySelectorAll<HTMLButtonElement>('.ds-segment__item')) {
+        const active = item.dataset.lens === next;
+        item.classList.toggle('is-active', active);
+        item.setAttribute('aria-pressed', String(active));
+      }
+      paint();
+    }
+
+    /**
+     * The standing picture, derived from the corpus rather than fetched.
+     *
+     * It and the control line only exist once there is a corpus to stand on: a
+     * library of nothing was showing a "0 calls read" banner over a filter bar
+     * with nothing to filter, which is furniture pretending to be information.
+     */
+    function standing(): void {
+      const has = calls.length > 0;
+      for (const id of ['standing', 'controls', 'corpus-head']) {
+        (document.getElementById(id) as HTMLElement).hidden = !has;
+      }
+      if (!has) return;
+
+      const total = (key: 'signals' | 'extracts') =>
+        calls.reduce((sum, call) => sum + (call[key] || 0), 0);
+      document.getElementById('stat-total')!.textContent = String(calls.length);
+      document.getElementById('stat-recent')!.textContent = day(calls[0].timestamp);
+      document.getElementById('stat-signals')!.textContent = String(total('signals'));
+      document.getElementById('stat-extracts')!.textContent = String(total('extracts'));
+    }
+
+    find.addEventListener('input', paint);
+
+    lensGroup.addEventListener('click', (event) => {
+      const item = (event.target as HTMLElement).closest<HTMLButtonElement>('.ds-segment__item');
+      if (item?.dataset.lens) setLens(item.dataset.lens as Lens);
+    });
+
+    // Search from anywhere on the page, the way the palette is reached. Guarded
+    // so typing a slash into a field is still typing a slash.
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey) return;
+      const active = document.activeElement;
+      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+      event.preventDefault();
+      find.focus();
+    });
+
+    (async () => {
+      skeleton();
+      try {
+        const res = await fetch('/api/sales/calls');
+        if (!res.ok) throw new Error(String(res.status));
+        calls = await res.json();
+        standing();
+        paint();
+      } catch {
+        standing();
+        empty('Could not load', 'The call library did not answer. Is the backend running?');
+      } finally {
+        host.setAttribute('aria-busy', 'false');
+      }
+    })();
+  </script>
+</PlatformLayout>

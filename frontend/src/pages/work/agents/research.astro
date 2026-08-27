@@ -1,0 +1,260 @@
+---
+/**
+ * Research — the brief you read before writing anything.
+ *
+ * The company is all this needs; a person is optional and makes the brief sharper.
+ * Run by hand there is no scored verdict, so the brief is more generic than the same
+ * agent produces inside a path — where Lead scoring's whole verdict is handed over
+ * and the research starts from why the company is warm. That difference is stated
+ * on the page rather than left for someone to wonder about.
+ *
+ * The brief renders through `lib/briefView.ts`, shared with the path runner.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import AgentViewStyles from '../../../components/AgentViewStyles.astro';
+---
+<PlatformLayout title="Research" requires="lead">
+  <div class="agent-page">
+    <div class="agent-page__column">
+      <header class="agent-page__head ds-arrive">
+        <p class="ds-eyebrow">Agent</p>
+        <h1 class="ds-heading ds-page__title">Research</h1>
+        <p class="ds-lead ds-page__intro">
+          One brief on the company and, when you name them, the decision-maker: what they do, why
+          timing matters to them now, the angle from our portfolio, and how to approach the person.
+          Every claim carries a source.
+        </p>
+      </header>
+
+      <div class="form ds-arrive" style="--arrive: var(--dur-step)">
+        <div class="form__row">
+          <div class="form__cell">
+            <label class="ds-label" for="company">Company</label>
+            <input class="ds-field" id="company" placeholder="Northgate Nordics" autocomplete="off" />
+          </div>
+          <div class="form__cell">
+            <label class="ds-label" for="person">Decision-maker <span class="form__optional">optional</span></label>
+            <input class="ds-field" id="person" placeholder="Lena Ohlsson" autocomplete="off" />
+          </div>
+        </div>
+        <div class="form__cell form__cell--wide">
+          <label class="ds-label" for="notes">Anything else it should know <span class="form__optional">optional</span></label>
+          <input class="ds-field" id="notes" placeholder="They mentioned White Rabbit on the last call" autocomplete="off" />
+        </div>
+
+        <div class="form__actions">
+          <button class="ds-btn ds-btn--accent" type="button" id="run">Research</button>
+          <span class="ds-mark ds-mark--live" id="running" hidden>searching</span>
+          <span class="ds-error" id="error"></span>
+        </div>
+
+        <p class="ds-caption form__note">
+          Runs a handful of web searches, so it takes a moment. Inside a path this agent also receives
+          the scored verdict for the lead, which makes the brief noticeably sharper than running it here.
+        </p>
+      </div>
+
+      <section class="result ds-arrive" id="result" hidden>
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow" id="result-title">Brief</h2>
+          <div class="result__actions">
+            <button class="ds-btn ds-btn--secondary ds-btn--sm" type="button" id="ask">Ask Owl about this</button>
+            <button class="ds-btn ds-btn--primary ds-btn--sm" type="button" id="save">Keep this brief</button>
+          </div>
+        </div>
+        <div id="brief"></div>
+      </section>
+
+      <section class="saved ds-arrive" id="saved" hidden>
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow">Kept briefs</h2>
+          <span class="ds-mono" id="saved-count"></span>
+        </div>
+        <ul class="saved__list ds-stagger" id="saved-list"></ul>
+      </section>
+    </div>
+  </div>
+
+  <AgentViewStyles />
+
+  <style is:global>
+    /* Screen-level layout only. The page frame is the shared `.agent-page`
+       column; everything tonal and typographic comes from the design system. */
+    .form { max-width: var(--measure-form); }
+    .form__row { display: flex; gap: var(--space-4); }
+    .form__cell { flex: 1; min-width: 0; margin-bottom: var(--space-4); }
+    .form__cell--wide { width: 100%; }
+    .form__optional { color: rgb(var(--ink-muted)); font-weight: var(--weight-regular); }
+    .form__actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-2); }
+    .form__note { color: rgb(var(--ink-muted)); margin-top: var(--space-4); max-width: var(--measure-read); }
+
+    .result { margin-top: var(--space-12); }
+    .result__actions { display: flex; gap: var(--space-3); flex-shrink: 0; }
+
+    .saved { margin-top: var(--space-16); }
+    .saved__list { list-style: none; margin: 0; padding: 0; }
+    .saved__list button {
+      display: flex; align-items: baseline; gap: var(--space-4); width: 100%; text-align: left;
+      padding: var(--space-3); background: none; border: 0; cursor: pointer;
+      border-radius: var(--radius-md);
+      color: inherit; transition: background-color var(--dur-tick) var(--ease-phase);
+    }
+    .saved__list button:hover { background: rgb(var(--ink) / 0.05); }
+    .saved__what { flex: 1; min-width: 0; color: rgb(var(--ink)); }
+
+    @media (max-width: 60rem) {
+      .form__row { flex-direction: column; gap: 0; }
+    }
+  </style>
+
+  <script>
+    import { hasContent, paintBrief, type Brief } from '../../../lib/briefView';
+
+    const byId = (id: string) => document.getElementById(id)!;
+    let current: Brief | null = null;
+    let currentId: string | null = null;
+
+    function fail(message: string): void {
+      byId('error').textContent = message;
+    }
+
+    function show(brief: Brief, savedId: string | null = null): void {
+      current = brief;
+      currentId = savedId;
+
+      const subject = brief.subject ?? {};
+      byId('result-title').textContent = [subject.company, subject.person]
+        .filter(Boolean).join(' · ') || 'Brief';
+      paintBrief(byId('brief'), brief);
+      byId('result').hidden = false;
+      (byId('save') as HTMLButtonElement).textContent = savedId ? 'Update this brief' : 'Keep this brief';
+      byId('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    byId('run').addEventListener('click', async () => {
+      const company = (byId('company') as HTMLInputElement).value.trim();
+      if (!company) { fail('Name the company to research.'); return; }
+
+      const button = byId('run') as HTMLButtonElement;
+      fail('');
+      button.disabled = true;
+      byId('running').hidden = false;
+
+      try {
+        const res = await fetch('/api/sales/research/brief', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company,
+            person: (byId('person') as HTMLInputElement).value.trim() || null,
+            notes: (byId('notes') as HTMLInputElement).value.trim(),
+          }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        const brief = await res.json();
+
+        if (!hasContent(brief) && brief.error) {
+          fail(`Nothing usable came back (${brief.error}).`);
+        }
+        show(brief);
+      } catch {
+        fail('Could not run the research — is the backend running?');
+      } finally {
+        button.disabled = false;
+        byId('running').hidden = true;
+      }
+    });
+
+    byId('save').addEventListener('click', async () => {
+      if (!current) return;
+      const button = byId('save') as HTMLButtonElement;
+      button.disabled = true;
+      try {
+        const res = await fetch('/api/sales/research/briefs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ brief: current, id: currentId }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        currentId = (await res.json()).id;
+        button.textContent = 'Kept ✓';
+        await loadSaved();
+        window.setTimeout(() => { button.textContent = 'Update this brief'; }, 1500);
+      } catch {
+        fail('Could not keep the brief.');
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    byId('ask').addEventListener('click', () => {
+      if (!current) return;
+      const subject = current.subject ?? {};
+      // Handed to the workspace unsent, as it was when this opened a drawer:
+      // the wording is a starting point and the question is the person's to
+      // finish. `send=1` is deliberately absent.
+      const question = encodeURIComponent(
+        `I have researched ${subject.company}. ${(current.timing ?? {}).why_now ?? ''} `
+          + 'What should I be careful about in the approach?',
+      );
+      window.location.href = `/owl?q=${question}`;
+    });
+
+    async function loadSaved(): Promise<void> {
+      try {
+        const res = await fetch('/api/sales/research/briefs');
+        if (!res.ok) throw new Error(String(res.status));
+        const briefs = await res.json();
+
+        byId('saved').hidden = briefs.length === 0;
+        byId('saved-count').textContent = `${briefs.length}`;
+
+        const list = byId('saved-list');
+        list.replaceChildren();
+        for (const record of briefs) {
+          const item = document.createElement('li');
+          const button = document.createElement('button');
+          button.type = 'button';
+
+          const what = document.createElement('span');
+          what.className = 'saved__what';
+          what.textContent = [record.company, record.person].filter(Boolean).join(' · ');
+          const when = document.createElement('span');
+          when.className = 'ds-mono';
+          when.textContent = record.updated_at || '';
+
+          button.append(what, when);
+          button.addEventListener('click', () => reopen(record.id));
+          item.append(button);
+          list.append(item);
+        }
+      } catch {
+        // The list is a convenience; failing to load it must not block researching.
+      }
+    }
+
+    async function reopen(id: string): Promise<void> {
+      try {
+        const res = await fetch(`/api/sales/research/briefs/${encodeURIComponent(id)}`);
+        if (!res.ok) throw new Error(String(res.status));
+        const record = await res.json();
+        (byId('company') as HTMLInputElement).value = (record.subject ?? {}).company ?? '';
+        (byId('person') as HTMLInputElement).value = (record.subject ?? {}).person ?? '';
+        show(record, record.id);
+      } catch {
+        fail('Could not open that brief.');
+      }
+    }
+
+    // Arriving from another surface with a company already in mind.
+    const params = new URLSearchParams(window.location.search);
+    const arriving = params.get('company');
+    if (arriving) {
+      (byId('company') as HTMLInputElement).value = arriving;
+      // Deliberately not auto-run: a brief spends provider budget.
+      byId('run').focus();
+    }
+
+    loadSaved();
+  </script>
+</PlatformLayout>

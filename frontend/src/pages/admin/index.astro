@@ -1,457 +1,665 @@
 ---
-import DashboardLayout from '../../layouts/DashboardLayout.astro';
-import Tabs from '../../components/Tabs.astro';
+/**
+ * Admin — the system-wide view.
+ *
+ * On the platform shell as of the uniformity pass. It was the last large surface
+ * still on `DashboardLayout` and legacy classes, and it had **no link in the new
+ * rail at all** — an admin who moved to the new shell simply lost access to it.
+ * `PlatformLayout` now carries the slot and `bootShell` reveals it for admins.
+ *
+ * `components/Tabs.astro` is gone with it: the design system has `.ds-tabs`, and
+ * carrying a second tab implementation for one page was the kind of duplication
+ * the system exists to end.
+ *
+ * Six panels, each loaded on first visit rather than up front — the overview is
+ * cheap, the others are not, and an admin rarely opens all six.
+ */
+import PlatformLayout from '../../layouts/PlatformLayout.astro';
 ---
-<DashboardLayout title="Admin">
-  <div class="px-10 py-12 max-w-6xl mx-auto">
-
-    <!-- Heading -->
-    <div class="mb-10">
-      <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-3">Admin · System</p>
-      <h1 class="text-3xl font-semibold tracking-tightest leading-tight mb-3">Admin Dashboard.</h1>
-      <p class="text-base text-ink-secondary max-w-xl leading-relaxed">
-        System-wide view across all users, calls, and campaigns.
+<PlatformLayout title="Admin">
+  <div class="ds-page adm">
+    <header class="ds-page__head ds-arrive">
+      <p class="ds-eyebrow">Admin</p>
+      <h1 class="ds-heading ds-page__title">System</h1>
+      <p class="ds-lead ds-page__intro">
+        Every user, call and campaign across the workspace — plus the corrections waiting on a
+        decision, and the documents Owl is given to read.
       </p>
+    </header>
+
+    <!-- A real tablist: each tab names the panel it controls, selection is
+         stated to assistive tech, and one Tab stop serves the whole strip —
+         the arrow keys walk it (roving tabindex, wired in the script below). -->
+    <div class="ds-tabs page__tabs ds-arrive" style="--arrive: var(--dur-step)" role="tablist" aria-label="Admin sections">
+      <button class="ds-tab is-active" type="button" role="tab" id="tab-overview"
+        aria-selected="true" aria-controls="panel-overview" data-tab="overview">Overview</button>
+      <button class="ds-tab" type="button" role="tab" id="tab-approvals"
+        aria-selected="false" aria-controls="panel-approvals" tabindex="-1" data-tab="approvals">
+        Approvals <span class="ds-mark ds-mark--fault tab__badge" id="approvals-badge" hidden></span>
+      </button>
+      <button class="ds-tab" type="button" role="tab" id="tab-calls"
+        aria-selected="false" aria-controls="panel-calls" tabindex="-1" data-tab="calls">Calls</button>
+      <button class="ds-tab" type="button" role="tab" id="tab-campaigns"
+        aria-selected="false" aria-controls="panel-campaigns" tabindex="-1" data-tab="campaigns">Campaigns</button>
+      <button class="ds-tab" type="button" role="tab" id="tab-users"
+        aria-selected="false" aria-controls="panel-users" tabindex="-1" data-tab="users">Users</button>
+      <button class="ds-tab" type="button" role="tab" id="tab-knowledge"
+        aria-selected="false" aria-controls="panel-knowledge" tabindex="-1" data-tab="knowledge">Owl’s files</button>
     </div>
 
-    <!-- Tabs -->
-    <Tabs
-      group="admin"
-      tabs={[
-        { id: 'overview',   label: 'Overview'   },
-        { id: 'approvals',  label: 'Approvals'  },
-        { id: 'calls',      label: 'Calls'      },
-        { id: 'campaigns',  label: 'Campaigns'  },
-        { id: 'users',      label: 'Users'      },
-      ]}
-    />
-
-    <!-- Overview panel -->
-    <div id="panel-overview" class="tab-panel mt-8">
-      <!-- Stat strip -->
-      <div class="grid grid-cols-4 border-y border-rule-strong mb-10">
-        <div class="px-5 py-5 border-r border-rule-subtle">
-          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Total users</p>
-          <p class="font-mono text-2xl tabular text-ink-primary" id="stat-users">—</p>
+    <!-- Overview -->
+    <section class="tab-panel ds-arrive" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" style="--arrive: calc(var(--dur-step) * 2)">
+      <div class="stats ds-stagger">
+        <div class="stat">
+          <p class="ds-eyebrow stat__label">Users</p>
+          <p class="ds-display stat__value" id="stat-users">—</p>
         </div>
-        <div class="px-5 py-5 border-r border-rule-subtle">
-          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Total calls</p>
-          <p class="font-mono text-2xl tabular text-ink-primary" id="stat-calls">—</p>
+        <div class="stat">
+          <p class="ds-eyebrow stat__label">Calls</p>
+          <p class="ds-display stat__value" id="stat-calls">—</p>
         </div>
-        <div class="px-5 py-5 border-r border-rule-subtle">
-          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Total campaigns</p>
-          <p class="font-mono text-2xl tabular text-ink-primary" id="stat-campaigns">—</p>
+        <div class="stat">
+          <p class="ds-eyebrow stat__label">Campaigns</p>
+          <p class="ds-display stat__value" id="stat-campaigns">—</p>
         </div>
-        <div class="px-5 py-5">
-          <p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mb-2">Active today</p>
-          <p class="font-mono text-2xl tabular text-ink-primary" id="stat-active">—</p>
+        <div class="stat">
+          <p class="ds-eyebrow stat__label">Active today</p>
+          <p class="ds-display stat__value" id="stat-active">—</p>
         </div>
       </div>
 
-      <!-- Recent activity -->
-      <div class="flex items-baseline justify-between pb-3 border-b border-rule-strong mb-1">
-        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Recent activity</h2>
-        <span id="activity-count" class="font-mono text-[11px] tabular text-ink-muted"></span>
+      <div class="ds-sectionhead">
+        <h2 class="ds-eyebrow ds-sectionhead__title">Recent activity</h2>
+        <span class="ds-mono" id="activity-count"></span>
       </div>
-      <ul id="activity-list">
-        <li class="py-8 font-mono text-xs text-ink-muted">// loading…</li>
-      </ul>
-    </div>
+      <ul class="ds-list rows ds-stagger" id="activity-list"></ul>
+    </section>
 
-    <!-- Approvals panel (Added Knowledge — Pillar 3) -->
-    <div id="panel-approvals" class="tab-panel mt-8 hidden">
-      <div class="mb-6">
-        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary mb-2">Pending Added-Knowledge submissions</h2>
-        <p class="text-sm text-ink-secondary">User-submitted corrections to Owl. Approved entries are loaded into Owl's context on the next turn. Rejected entries are archived and never loaded.</p>
+    <!-- Approvals — the Added Knowledge pillar's review gate -->
+    <section class="tab-panel ds-arrive" id="panel-approvals" role="tabpanel" aria-labelledby="tab-approvals" hidden>
+      <p class="ds-small page__note">
+        Corrections users have submitted to Owl. An approved entry is loaded into Owl’s context on
+        the next turn; a rejected one is archived and never loaded.
+      </p>
+      <div class="ds-sectionhead">
+        <h2 class="ds-eyebrow ds-sectionhead__title">Pending</h2>
+        <span class="ds-mono" id="approvals-count"></span>
       </div>
-      <div class="flex items-baseline justify-between pb-3 border-b border-rule-strong mb-1">
-        <h3 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">Pending</h3>
-        <span id="approvals-count" class="font-mono text-[11px] tabular text-ink-muted"></span>
-      </div>
-      <ul id="approvals-list">
-        <li class="py-8 font-mono text-xs text-ink-muted">// loading…</li>
-      </ul>
-    </div>
+      <ul class="ds-list rows ds-stagger" id="approvals-list"></ul>
+    </section>
 
-    <!-- Calls panel -->
-    <div id="panel-calls" class="tab-panel mt-8 hidden">
-      <div class="mb-4 pb-3 border-b border-rule-strong">
-        <input
-          id="calls-search"
-          type="text"
-          placeholder="search calls…"
-          class="w-full bg-transparent border-0 focus:outline-none focus:ring-0 py-1 text-sm font-mono text-ink-primary placeholder-ink-muted"
-        />
+    <!-- Calls -->
+    <section class="tab-panel ds-arrive" id="panel-calls" role="tabpanel" aria-labelledby="tab-calls" hidden>
+      <div class="ds-search page__search">
+        <span class="ds-search__icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="6" cy="6" r="4.25" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M9.2 9.2L12.5 12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <input class="ds-search__input" id="calls-search" type="search" autocomplete="off"
+               placeholder="Search calls…" aria-label="Search all calls" />
       </div>
-      <div class="flex items-baseline justify-between pb-3 border-b border-rule-strong mb-1">
-        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">All calls</h2>
-        <span id="calls-count" class="font-mono text-[11px] tabular text-ink-muted"></span>
+      <div class="ds-sectionhead">
+        <h2 class="ds-eyebrow ds-sectionhead__title">All calls</h2>
+        <span class="ds-mono" id="calls-count"></span>
       </div>
-      <ul id="calls-list">
-        <li class="py-8 font-mono text-xs text-ink-muted">// loading…</li>
-      </ul>
-    </div>
+      <ul class="ds-list rows ds-stagger" id="calls-list"></ul>
+    </section>
 
-    <!-- Campaigns panel -->
-    <div id="panel-campaigns" class="tab-panel mt-8 hidden">
-      <div class="flex items-baseline justify-between pb-3 border-b border-rule-strong mb-1">
-        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">All campaigns</h2>
-        <span id="campaigns-count" class="font-mono text-[11px] tabular text-ink-muted"></span>
+    <!-- Campaigns -->
+    <section class="tab-panel ds-arrive" id="panel-campaigns" role="tabpanel" aria-labelledby="tab-campaigns" hidden>
+      <div class="ds-sectionhead">
+        <h2 class="ds-eyebrow ds-sectionhead__title">All campaigns</h2>
+        <span class="ds-mono" id="campaigns-count"></span>
       </div>
-      <ul id="campaigns-list">
-        <li class="py-8 font-mono text-xs text-ink-muted">// loading…</li>
-      </ul>
-    </div>
+      <ul class="ds-list rows ds-stagger" id="campaigns-list"></ul>
+    </section>
 
-    <!-- Users panel -->
-    <div id="panel-users" class="tab-panel mt-8 hidden">
-      <div class="flex items-baseline justify-between pb-3 border-b border-rule-strong mb-1">
-        <h2 class="font-mono text-[11px] uppercase tracking-label text-ink-primary">All users</h2>
-        <span id="users-count" class="font-mono text-[11px] tabular text-ink-muted"></span>
+    <!-- Users -->
+    <section class="tab-panel ds-arrive" id="panel-users" role="tabpanel" aria-labelledby="tab-users" hidden>
+      <div class="ds-sectionhead">
+        <h2 class="ds-eyebrow ds-sectionhead__title">All users</h2>
+        <span class="ds-mono" id="users-count"></span>
       </div>
-      <!-- Column headers -->
-      <div class="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-6 py-2 border-b border-rule-subtle mb-1">
-        <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted">User</span>
-        <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted w-14">Access</span>
-        <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted w-32">Agents</span>
-        <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted w-10 text-right">Calls</span>
-        <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted w-20 text-right">Campaigns</span>
-        <span class="font-mono text-[10px] uppercase tracking-label text-ink-muted w-36 text-right">Last active</span>
+      <div class="users__head ds-caption font-medium" style="--cols: 1fr 5rem 10rem 4rem 6rem 8rem">
+        <span>User</span>
+        <span>Access</span>
+        <span>Agents</span>
+        <span class="users__num">Calls</span>
+        <span class="users__num">Campaigns</span>
+        <span class="users__num">Last active</span>
       </div>
-      <ul id="users-list">
-        <li class="py-8 font-mono text-xs text-ink-muted">// loading…</li>
-      </ul>
-    </div>
+      <ul class="ds-list rows ds-stagger" id="users-list"></ul>
+    </section>
 
+    <!-- Owl's files.
+         Moved here from the Learn section in R3c, where it sat beside the glossary
+         as "Knowledge base". It is not something a person reads to get better — it
+         is the set of documents *Owl* is given, which is a system setting. -->
+    <section class="tab-panel ds-arrive" id="panel-knowledge" role="tabpanel" aria-labelledby="tab-knowledge" hidden>
+      <p class="ds-small page__note">
+        Loaded into Owl’s context on every chat and every analysis. Markdown or plain text.
+        <code class="ds-mono">company-overview.md</code> is protected and cannot be deleted.
+      </p>
+      <div class="ds-sectionhead">
+        <h2 class="ds-eyebrow ds-sectionhead__title">Documents Owl reads</h2>
+        <span class="ds-mono" id="kb-count"></span>
+      </div>
+
+      <div class="kb__actions">
+        <label class="ds-btn ds-btn--primary ds-btn--sm kb__upload">
+          Add a file
+          <input id="kb-input" type="file" accept=".md,.txt" hidden />
+        </label>
+        <span class="ds-caption kb__status" id="kb-status" hidden></span>
+      </div>
+
+      <ul class="ds-list rows ds-stagger" id="kb-list"></ul>
+    </section>
   </div>
 
-  <script>
-    // -----------------------------------------------------------------------
-    // Access guard
-    // -----------------------------------------------------------------------
-    (async () => {
-      const user = (window as any).__cadenceUser;
-      if (user) {
-        if (user.access !== 'admin') { window.location.href = '/dashboard'; return; }
-      } else {
-        // DashboardLayout script is async — fallback fetch
-        try {
-          const res = await fetch('/api/auth/status');
-          const data = await res.json();
-          if (!data.authed || data.access !== 'admin') { window.location.href = '/dashboard'; return; }
-        } catch {
-          window.location.href = '/dashboard';
-          return;
-        }
-      }
-    })();
+  <style>
+    /* The console composes the wide canvas: full-width quiet tables between
+       rules, not a ribbon sized to its own intro. */
+    .adm { width: 100%; }
+    .adm .ds-page__head { margin-bottom: var(--space-10); }
 
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
-    function esc(str: string): string {
-      return String(str ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+    /* The launcher's section-head grammar: label left, mono count right, seated
+       on a hairline so each region of the console reads as a shelf. */
+    .tab-panel .ds-sectionhead {
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid rgb(var(--rule-hairline));
     }
 
-    // -----------------------------------------------------------------------
-    // Tab switching
-    // -----------------------------------------------------------------------
-    let overviewLoaded  = false;
-    let approvalsLoaded = false;
-    let callsLoaded     = false;
-    let campaignsLoaded = false;
-    let usersLoaded     = false;
+    .page__note { color: rgb(var(--ink-secondary)); max-width: var(--measure-read); margin: 0 0 var(--space-6); line-height: var(--leading-relaxed); }
+    .page__tabs { margin-bottom: var(--space-10); overflow-x: auto; }
+    .page__search { margin-bottom: var(--space-6); }
+    .tab__badge { margin-left: var(--space-1); }
 
-    document.addEventListener('tab-change', (e: Event) => {
-      const id = (e as CustomEvent).detail?.id as string;
-      document.querySelectorAll('.tab-panel').forEach(p => {
-        (p as HTMLElement).classList.toggle('hidden', p.id !== `panel-${id}`);
+    /* Four numbers, drawn between rules rather than boxed. */
+    .stats {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      border-block: 1px solid rgb(var(--rule));
+      margin-bottom: var(--space-10);
+    }
+    .stat { padding: var(--space-5); border-right: 1px solid rgb(var(--rule-hairline)); }
+    .stat:last-child { border-right: 0; }
+    .stat__label { color: rgb(var(--ink-muted)); }
+    .stat__value { margin: var(--space-2) 0 0; }
+
+
+    .rows :global(.row) {
+      display: grid; grid-template-columns: var(--cols);
+      gap: var(--space-4); align-items: baseline;
+      padding: var(--space-4) var(--space-3);
+      transition: background-color var(--dur-tick) var(--ease-phase);
+    }
+    .rows :global(a.row) { text-decoration: none; color: inherit; }
+    .rows :global(a.row:hover) { background: rgb(var(--ink) / 0.05); }
+    .rows :global(.row__when) { color: rgb(var(--ink-muted)); white-space: nowrap; }
+    .rows :global(.row__who) { color: rgb(var(--ink-muted)); white-space: nowrap; }
+    .rows :global(.row__body) { min-width: 0; }
+    .rows :global(.row__title) { color: rgb(var(--ink)); font-weight: var(--weight-medium); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rows :global(.row__sub) { color: rgb(var(--ink-secondary)); margin: 2px 0 0; line-height: var(--leading-snug); }
+    .rows :global(.row__num) { color: rgb(var(--ink-muted)); text-align: right; white-space: nowrap; }
+    .rows :global(.none) { color: rgb(var(--ink-muted)); padding: var(--space-6) var(--space-3); }
+    .rows :global(.failed) { color: rgb(var(--signal-fault)); padding: var(--space-6) var(--space-3); }
+
+    /* Approvals carry a decision, so they are panels rather than rows. */
+    .rows :global(.approval) { padding: var(--space-5); margin-top: var(--space-4); }
+    .rows :global(.approval__head) { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
+    .rows :global(.approval__title) { color: rgb(var(--ink)); font-weight: var(--weight-medium); margin: 0; }
+    .rows :global(.approval__facts) { display: grid; grid-template-columns: 8rem 1fr; gap: var(--space-1) var(--space-4); margin: var(--space-4) 0; }
+    .rows :global(.approval__facts dt) { color: rgb(var(--ink-muted)); }
+    .rows :global(.approval__facts dd) { color: rgb(var(--ink-secondary)); margin: 0; line-height: var(--leading-relaxed); }
+    .rows :global(.approval__decide) { display: flex; align-items: center; gap: var(--space-3); }
+    .rows :global(.approval__notes) { flex: 1; min-width: 0; }
+
+    .users__head {
+      display: grid; grid-template-columns: var(--cols);
+      gap: var(--space-4); padding: var(--space-2) var(--space-3);
+      border-bottom: 1px solid rgb(var(--rule-hairline));
+      color: rgb(var(--ink-muted));
+    }
+    .users__num { text-align: right; }
+    .rows :global(.row__agents) { color: rgb(var(--ink-muted)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .kb__actions { display: flex; align-items: center; gap: var(--space-4); margin: var(--space-5) 0; }
+    .kb__upload { cursor: pointer; }
+    .kb__status { color: rgb(var(--ink-muted)); }
+
+    @media (max-width: 60rem) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .users__head { display: none; }
+    }
+  </style>
+
+  <script>
+    import { confirmAction, notify } from '../../lib/overlays';
+    import { isAdmin, requireSession } from '../../lib/session';
+
+    const byId = (id: string) => document.getElementById(id)!;
+    /**
+     * `cols` sets the row's grid template. The five row kinds used to be five CSS
+     * selectors that differed by exactly one property, and the users header
+     * repeated the user row's template verbatim — two places to change, certain
+     * to drift. The template now travels with the row that uses it.
+     */
+    const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, cols?: string) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (cols) node.style.setProperty('--cols', cols);
+      return node;
+    };
+
+    /** A cell whose text comes from the API — always assigned, never interpolated. */
+    function cell(tag: keyof HTMLElementTagNameMap, className: string, text: string): HTMLElement {
+      const node = el(tag, className);
+      node.textContent = text;
+      return node;
+    }
+
+    function placeholder(host: HTMLElement, text: string, failed = false): void {
+      const line = el('li', `ds-caption ${failed ? 'failed' : 'none'}`);
+      line.textContent = text;
+      host.replaceChildren(line);
+    }
+
+    // ── Access ──────────────────────────────────────────────────────────────
+    // The shell resolves the session; admin is this page's own bar, so it checks.
+    (async () => {
+      const user = await requireSession();
+      if (!user) return;
+      if (!isAdmin(user)) window.location.href = '/home';
+    })();
+
+    // ── Tabs ────────────────────────────────────────────────────────────────
+
+    const loaded = new Set<string>();
+    const loaders: Record<string, () => void> = {
+      overview: loadOverview,
+      approvals: loadApprovals,
+      calls: loadCalls,
+      campaigns: loadCampaigns,
+      users: loadUsers,
+      knowledge: loadKnowledge,
+    };
+
+    const tabs = [...document.querySelectorAll<HTMLButtonElement>('[data-tab]')];
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const id = tab.dataset.tab!;
+        // Selection is stated three ways at once — the class for the eye, the
+        // aria for assistive tech, and the tabindex so the strip stays one
+        // Tab stop with focus parked on the active tab.
+        tabs.forEach((t) => {
+          const active = t === tab;
+          t.classList.toggle('is-active', active);
+          t.setAttribute('aria-selected', String(active));
+          t.tabIndex = active ? 0 : -1;
+        });
+        document.querySelectorAll<HTMLElement>('.tab-panel').forEach((p) => {
+          p.hidden = p.id !== `panel-${id}`;
+          // The arrival is one-shot: a panel being left has already played it,
+          // and stripping the classes here keeps a return visit still. CSS
+          // animations replay on every display change; this is what stops that.
+          if (p.hidden) {
+            p.classList.remove('ds-arrive');
+            p.querySelectorAll('.ds-stagger').forEach((list) => list.classList.remove('ds-stagger'));
+          }
+        });
+        // Each panel costs a request, so it is fetched the first time it is opened.
+        if (!loaded.has(id)) { loaded.add(id); loaders[id]?.(); }
       });
-      if (id === 'overview'  && !overviewLoaded)   loadOverview();
-      if (id === 'approvals' && !approvalsLoaded)  loadApprovals();
-      if (id === 'calls'     && !callsLoaded)      loadCalls();
-      if (id === 'campaigns' && !campaignsLoaded)  loadCampaigns();
-      if (id === 'users'     && !usersLoaded)      loadUsers();
+
+      // The arrow keys walk the strip, wrapping at the ends, and activate as
+      // they move — a tablist is one control, not six.
+      tab.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        const step = event.key === 'ArrowRight' ? 1 : -1;
+        const next = tabs[(tabs.indexOf(tab) + step + tabs.length) % tabs.length];
+        next.focus();
+        next.click();
+      });
     });
 
-    // Load overview on page init
+    loaded.add('overview');
     loadOverview();
 
-    // -----------------------------------------------------------------------
-    // Overview
-    // -----------------------------------------------------------------------
-    async function loadOverview() {
-      overviewLoaded = true;
-      const activityList  = document.getElementById('activity-list')!;
-      const activityCount = document.getElementById('activity-count')!;
+    // ── Overview ────────────────────────────────────────────────────────────
+
+    async function loadOverview(): Promise<void> {
+      const list = byId('activity-list');
       try {
-        const res  = await fetch('/api/admin/overview');
+        const res = await fetch('/api/admin/overview');
         if (!res.ok) throw new Error(String(res.status));
         const data = await res.json();
 
-        const setEl = (id: string, val: string | number) => {
-          const el = document.getElementById(id);
-          if (el) el.textContent = String(val);
-        };
-        setEl('stat-users',     data.total_users     ?? 0);
-        setEl('stat-calls',     data.total_calls     ?? 0);
-        setEl('stat-campaigns', data.total_campaigns ?? 0);
-        setEl('stat-active',    data.active_today    ?? 0);
-
-        // Update the Approvals tab label with a pending-count badge
-        const pendingCount = Number(data.pending_added_count ?? 0);
-        const approvalsBtn = document.querySelector<HTMLButtonElement>('[data-tab="approvals"] span:first-child');
-        if (approvalsBtn) {
-          approvalsBtn.innerHTML = pendingCount > 0
-            ? `Approvals <span class="ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-signal-danger text-white">${pendingCount}</span>`
-            : 'Approvals';
+        for (const [id, value] of [
+          ['stat-users', data.total_users], ['stat-calls', data.total_calls],
+          ['stat-campaigns', data.total_campaigns], ['stat-active', data.active_today],
+        ] as const) {
+          byId(id).textContent = String(value ?? 0);
         }
+
+        // A mark, not a filled pill — the system's own rule for status.
+        const pending = Number(data.pending_added_count ?? 0);
+        const badge = byId('approvals-badge');
+        badge.hidden = pending === 0;
+        badge.textContent = String(pending);
 
         const activity: any[] = data.recent_activity ?? [];
-        activityCount.textContent = `${activity.length} events`;
+        byId('activity-count').textContent = `${activity.length} events`;
+        if (!activity.length) { placeholder(list, 'no activity yet'); return; }
 
-        if (!activity.length) {
-          activityList.innerHTML = '<li class="py-8 font-mono text-xs text-ink-muted">// no activity yet</li>';
-          return;
-        }
-
-        const typeLabel = (type: string) => {
-          if (type === 'call_analysis') return 'Call';
-          if (type === 'campaign')      return 'Campaign';
-          return type;
-        };
-
-        activityList.innerHTML = activity.map(item => `
-          <li>
-            <div class="grid grid-cols-[140px_80px_1fr_80px] gap-4 items-start py-4 border-b border-rule-subtle">
-              <span class="font-mono text-[11px] tabular text-ink-muted pt-0.5 truncate">${esc(item.timestamp)}</span>
-              <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted pt-0.5">${esc(item.username)}</span>
-              <div class="min-w-0">
-                <p class="text-sm text-ink-primary truncate">${esc(item.title)}</p>
-                ${item.meta ? `<p class="font-mono text-[11px] text-ink-muted mt-0.5">${esc(item.meta)}</p>` : ''}
-              </div>
-              <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted pt-0.5 text-right">${esc(typeLabel(item.type))}</span>
-            </div>
-          </li>`).join('');
+        const KIND = { call_analysis: 'call', campaign: 'campaign' } as Record<string, string>;
+        list.replaceChildren(...activity.map((item) => {
+          const row = el('li', 'row', '9rem 6rem 1fr 5rem');
+          const body = el('div', 'row__body');
+          body.append(cell('p', 'ds-small row__title', item.title ?? ''));
+          if (item.meta) body.append(cell('p', 'ds-mono row__sub', item.meta));
+          row.append(
+            cell('span', 'ds-mono row__when', item.timestamp ?? ''),
+            cell('span', 'ds-mono row__who', item.username ?? ''),
+            body,
+            cell('span', 'ds-mono row__num', KIND[item.type] ?? item.type ?? ''),
+          );
+          return row;
+        }));
       } catch {
-        activityList.innerHTML = '<li class="py-8 font-mono text-xs text-signal-danger">// could not load — is the backend running?</li>';
+        placeholder(list, 'could not load — is the backend running?', true);
       }
     }
 
-    // -----------------------------------------------------------------------
-    // Approvals (Added Knowledge — Pillar 3)
-    // -----------------------------------------------------------------------
-    async function loadApprovals() {
-      approvalsLoaded = true;
-      const list  = document.getElementById('approvals-list')!;
-      const count = document.getElementById('approvals-count')!;
+    // ── Approvals ───────────────────────────────────────────────────────────
+
+    async function loadApprovals(): Promise<void> {
+      const list = byId('approvals-list');
       try {
         const res = await fetch('/api/admin/added/pending');
         if (!res.ok) throw new Error(String(res.status));
         const items: any[] = await res.json();
-        count.textContent = `${items.length} pending`;
 
-        if (!items.length) {
-          list.innerHTML = '<li class="py-8 font-mono text-xs text-ink-muted">// no pending submissions</li>';
-          return;
-        }
+        const setCount = (n: number) => { byId('approvals-count').textContent = `${n} pending`; };
+        setCount(items.length);
+        if (!items.length) { placeholder(list, 'no pending submissions'); return; }
 
-        list.innerHTML = items.map(it => {
-          const entryId = String(it.id || '').slice(0, 8);
-          const date = String(it.created_at || '').slice(0, 19).replace('T', ' ');
-          return `
-            <li data-entry="${esc(entryId)}">
-              <div class="py-5 border-b border-rule-subtle">
-                <div class="flex items-baseline justify-between mb-2">
-                  <p class="text-sm font-semibold text-ink-primary">${esc(it.title || 'Untitled')}</p>
-                  <span class="font-mono text-[11px] tabular text-ink-muted">${esc(date)}</span>
-                </div>
-                ${it.description ? `<p class="text-sm text-ink-secondary mb-3">${esc(it.description)}</p>` : ''}
-                <dl class="grid grid-cols-[120px_1fr] gap-y-1 gap-x-4 text-sm mb-3">
-                  <dt class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Submitted by</dt>
-                  <dd class="text-ink-secondary">${esc(it.submitted_by || '')}</dd>
-                  <dt class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Topic</dt>
-                  <dd class="text-ink-secondary">${esc(it.topic || '')}</dd>
-                  ${it.what_owl_said ? `<dt class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Owl said</dt><dd class="text-ink-secondary">${esc(it.what_owl_said)}</dd>` : ''}
-                  ${it.user_correction ? `<dt class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Correction</dt><dd class="text-ink-secondary">${esc(it.user_correction)}</dd>` : ''}
-                  ${it.suggested_source ? `<dt class="font-mono text-[11px] uppercase tracking-label text-ink-muted">Source</dt><dd class="text-ink-secondary">${esc(it.suggested_source)}</dd>` : ''}
-                </dl>
-                <div class="flex items-center gap-3">
-                  <input type="text" placeholder="optional review notes…" class="approval-notes flex-1 bg-transparent border border-rule-subtle rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-accent" />
-                  <button type="button" class="approval-approve px-3 py-1.5 text-xs font-mono bg-accent text-white rounded hover:opacity-90">Approve</button>
-                  <button type="button" class="approval-reject px-3 py-1.5 text-xs font-mono border border-rule-strong rounded hover:bg-surface-1">Reject</button>
-                </div>
-              </div>
-            </li>`;
-        }).join('');
+        list.replaceChildren(...items.map((item) => {
+          const entryId = String(item.id || '').slice(0, 8);
+          const card = el('li', 'ds-panel approval');
 
-        // Wire approve/reject buttons
-        list.querySelectorAll<HTMLLIElement>('li[data-entry]').forEach(li => {
-          const entryId = li.dataset.entry!;
-          const notesEl = li.querySelector<HTMLInputElement>('.approval-notes')!;
-          const onAction = async (action: 'approve' | 'reject') => {
+          const head = el('div', 'approval__head');
+          head.append(
+            cell('p', 'approval__title', item.title || 'Untitled'),
+            cell('span', 'ds-mono row__when', String(item.created_at || '').slice(0, 19).replace('T', ' ')),
+          );
+          card.append(head);
+
+          const facts = el('dl', 'ds-small approval__facts');
+          for (const [label, value] of [
+            ['Submitted by', item.submitted_by], ['Topic', item.topic],
+            ['Owl said', item.what_owl_said], ['Correction', item.user_correction],
+            ['Source', item.suggested_source],
+          ] as const) {
+            if (!value) continue;
+            facts.append(cell('dt', 'ds-mono', label), cell('dd', '', String(value)));
+          }
+          card.append(facts);
+
+          const decide = el('div', 'approval__decide');
+          const notes = el('input', 'ds-field approval__notes') as HTMLInputElement;
+          notes.type = 'text';
+          notes.placeholder = 'review notes (optional)';
+          const approve = el('button', 'ds-btn ds-btn--accent ds-btn--sm') as HTMLButtonElement;
+          approve.type = 'button';
+          approve.textContent = 'Approve';
+          const reject = el('button', 'ds-btn ds-btn--ghost ds-btn--sm') as HTMLButtonElement;
+          reject.type = 'button';
+          reject.textContent = 'Reject';
+          decide.append(notes, approve, reject);
+          card.append(decide);
+
+
+          const decideOn = async (action: 'approve' | 'reject') => {
             try {
               const r = await fetch(`/api/admin/added/${encodeURIComponent(entryId)}/${action}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notes: notesEl.value.trim() }),
+                body: JSON.stringify({ notes: notes.value.trim() }),
               });
               if (!r.ok) throw new Error(String(r.status));
               li.remove();
-              const remaining = list.querySelectorAll('li[data-entry]').length;
-              count.textContent = `${remaining} pending`;
-              if (!remaining) {
-                list.innerHTML = '<li class="py-8 font-mono text-xs text-ink-muted">// no pending submissions</li>';
-              }
-              // Refresh overview badge
-              overviewLoaded = false;
+              const left = list.querySelectorAll('li').length;
+              setCount(left);
+              if (!left) placeholder(list, 'no pending submissions');
+              // The overview's badge is now stale.
               loadOverview();
             } catch (e) {
-              alert(`Failed to ${action}: ${e}`);
+              notify({ title: `Could not ${action}`, body: String(e) });
             }
           };
-          li.querySelector<HTMLButtonElement>('.approval-approve')!.addEventListener('click', () => onAction('approve'));
-          li.querySelector<HTMLButtonElement>('.approval-reject')!.addEventListener('click', () => onAction('reject'));
-        });
+          approve.addEventListener('click', () => decideOn('approve'));
+          reject.addEventListener('click', () => decideOn('reject'));
+
+          return card;
+        }));
       } catch {
-        list.innerHTML = '<li class="py-8 font-mono text-xs text-signal-danger">// could not load</li>';
+        placeholder(list, 'could not load', true);
       }
     }
 
-    // -----------------------------------------------------------------------
-    // Calls
-    // -----------------------------------------------------------------------
+    // ── Calls ───────────────────────────────────────────────────────────────
+
     let allCalls: any[] = [];
 
-    async function loadCalls() {
-      callsLoaded = true;
-      const callsList  = document.getElementById('calls-list')!;
-      const callsCount = document.getElementById('calls-count')!;
+    function renderCalls(calls: any[]): void {
+      const list = byId('calls-list');
+      if (!calls.length) { placeholder(list, 'no calls yet'); return; }
+
+      list.replaceChildren(...calls.map((c) => {
+        const row = el('a', 'row', '9rem 5rem 1fr auto') as HTMLAnchorElement;
+        row.href = `/admin/calls/call?id=${encodeURIComponent(c.id)}`;
+
+        const body = el('div', 'row__body');
+        body.append(cell('p', 'ds-small row__title', c.title ?? ''));
+        if (c.summary) body.append(cell('p', 'ds-caption row__sub', c.summary));
+        if (c.product_fit?.length) {
+          body.append(cell('p', 'ds-mono row__sub', c.product_fit.slice(0, 2).join(' · ')));
+        }
+
+        row.append(
+          cell('span', 'ds-mono row__when', c.timestamp ?? ''),
+          cell('span', 'ds-mono row__who', c.username ?? ''),
+          body,
+          cell('span', 'ds-mono row__num', '→'),
+        );
+        return row;
+      }));
+    }
+
+    async function loadCalls(): Promise<void> {
+      const count = byId('calls-count');
       try {
         const res = await fetch('/api/admin/calls');
         if (!res.ok) throw new Error(String(res.status));
         allCalls = await res.json();
+        count.textContent = `${allCalls.length} total`;
         renderCalls(allCalls);
-        callsCount.textContent = `${allCalls.length} total`;
 
-        document.getElementById('calls-search')?.addEventListener('input', (e) => {
-          const q = (e.target as HTMLInputElement).value.trim().toLowerCase();
-          const filtered = q
-            ? allCalls.filter(c =>
-                (c.title || '').toLowerCase().includes(q) ||
-                (c.username || '').toLowerCase().includes(q) ||
-                (c.summary || '').toLowerCase().includes(q)
-              )
+        byId('calls-search').addEventListener('input', (event) => {
+          const q = (event.target as HTMLInputElement).value.trim().toLowerCase();
+          const shown = q
+            ? allCalls.filter((c) => [c.title, c.username, c.summary]
+                .some((f) => String(f ?? '').toLowerCase().includes(q)))
             : allCalls;
-          callsCount.textContent = `${filtered.length} of ${allCalls.length}`;
-          renderCalls(filtered);
+          count.textContent = q ? `${shown.length} of ${allCalls.length}` : `${allCalls.length} total`;
+          renderCalls(shown);
         });
       } catch {
-        callsList.innerHTML = '<li class="py-8 font-mono text-xs text-signal-danger">// could not load</li>';
+        placeholder(byId('calls-list'), 'could not load', true);
       }
     }
 
-    function renderCalls(calls: any[]) {
-      const callsList = document.getElementById('calls-list')!;
-      if (!calls.length) {
-        callsList.innerHTML = '<li class="py-8 font-mono text-xs text-ink-muted">// no calls yet</li>';
-        return;
-      }
-      callsList.innerHTML = calls.map(c => `
-        <li>
-          <div class="group relative grid grid-cols-[140px_64px_1fr_16px] gap-4 items-start py-5 border-b border-rule-subtle hover:bg-surface-1 transition-colors -mx-4 px-4">
-            <a href="/admin/calls/call?id=${encodeURIComponent(c.id)}" class="absolute inset-0" aria-label="${esc(c.title)}"></a>
-            <span class="font-mono text-[11px] tabular text-ink-muted pt-1 truncate">${esc(c.timestamp)}</span>
-            <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted pt-1">${esc(c.username)}</span>
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-ink-primary group-hover:text-accent transition-colors truncate">${esc(c.title)}</p>
-              ${c.summary ? `<p class="text-sm text-ink-secondary mt-1 line-clamp-2">${esc(c.summary)}</p>` : ''}
-              ${c.product_fit?.length
-                ? `<p class="font-mono text-[11px] uppercase tracking-label text-ink-muted mt-2">${esc(c.product_fit.slice(0, 2).join(' · '))}</p>`
-                : ''}
-            </div>
-            <span class="font-mono text-sm text-ink-muted group-hover:text-accent pt-1 transition-colors">→</span>
-          </div>
-        </li>`).join('');
-    }
+    // ── Campaigns ───────────────────────────────────────────────────────────
 
-    // -----------------------------------------------------------------------
-    // Campaigns
-    // -----------------------------------------------------------------------
-    async function loadCampaigns() {
-      campaignsLoaded = true;
-      const campaignsList  = document.getElementById('campaigns-list')!;
-      const campaignsCount = document.getElementById('campaigns-count')!;
+    async function loadCampaigns(): Promise<void> {
+      const list = byId('campaigns-list');
       try {
-        const res  = await fetch('/api/admin/campaigns');
+        const res = await fetch('/api/admin/campaigns');
         if (!res.ok) throw new Error(String(res.status));
         const data: any[] = await res.json();
-        campaignsCount.textContent = `${data.length} total`;
+        byId('campaigns-count').textContent = `${data.length} total`;
+        if (!data.length) { placeholder(list, 'no campaigns yet'); return; }
 
-        if (!data.length) {
-          campaignsList.innerHTML = '<li class="py-8 font-mono text-xs text-ink-muted">// no campaigns yet</li>';
-          return;
-        }
+        list.replaceChildren(...data.map((c) => {
+          const row = el('li', 'row', '9rem 5rem 1fr 5rem 5rem');
+          const body = el('div', 'row__body');
+          body.append(cell('p', 'ds-small row__title', c.title || 'Untitled'));
+          const sub = [c.company, c.signal_strength].filter(Boolean).join(' · ');
+          if (sub) body.append(cell('p', 'ds-mono row__sub', sub));
 
-        campaignsList.innerHTML = data.map(c => `
-          <li>
-            <div class="grid grid-cols-[140px_64px_1fr_64px_48px] gap-4 items-start py-5 border-b border-rule-subtle hover:bg-surface-1 transition-colors -mx-4 px-4">
-              <span class="font-mono text-[11px] tabular text-ink-muted pt-1 truncate">${esc(c.updated_at || c.created_at)}</span>
-              <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted pt-1">${esc(c.username)}</span>
-              <div class="min-w-0">
-                <h3 class="text-sm font-semibold text-ink-primary truncate">${esc(c.title || 'Untitled')}</h3>
-                ${(c.company || c.signal_strength)
-                  ? `<p class="font-mono text-[11px] text-ink-muted mt-1">${esc([c.company, c.signal_strength].filter(Boolean).join(' · '))}</p>`
-                  : ''}
-              </div>
-              <span class="font-mono text-[11px] uppercase tracking-label text-ink-muted pt-1">${esc(c.status || 'draft')}</span>
-              <span class="font-mono text-[11px] tabular text-ink-muted pt-1 text-right">Step ${c.current_step ?? 0}</span>
-            </div>
-          </li>`).join('');
+          row.append(
+            cell('span', 'ds-mono row__when', c.updated_at || c.created_at || ''),
+            cell('span', 'ds-mono row__who', c.username ?? ''),
+            body,
+            cell('span', 'ds-mono row__num', c.status || 'draft'),
+            cell('span', 'ds-mono row__num', `step ${c.current_step ?? 0}`),
+          );
+          return row;
+        }));
       } catch {
-        campaignsList.innerHTML = '<li class="py-8 font-mono text-xs text-signal-danger">// could not load</li>';
+        placeholder(list, 'could not load', true);
       }
     }
 
-    // -----------------------------------------------------------------------
-    // Users
-    // -----------------------------------------------------------------------
-    async function loadUsers() {
-      usersLoaded = true;
-      const usersList  = document.getElementById('users-list')!;
-      const usersCount = document.getElementById('users-count')!;
+    // ── Users ───────────────────────────────────────────────────────────────
+
+    async function loadUsers(): Promise<void> {
+      const list = byId('users-list');
       try {
-        const res  = await fetch('/api/admin/users');
+        const res = await fetch('/api/admin/users');
         if (!res.ok) throw new Error(String(res.status));
         const data: any[] = await res.json();
-        usersCount.textContent = `${data.length} total`;
+        byId('users-count').textContent = `${data.length} total`;
+        if (!data.length) { placeholder(list, 'no users'); return; }
 
-        if (!data.length) {
-          usersList.innerHTML = '<li class="py-8 font-mono text-xs text-ink-muted">// no users found</li>';
-          return;
-        }
+        list.replaceChildren(...data.map((u) => {
+          const row = el('li', 'row', '1fr 5rem 10rem 4rem 6rem 8rem');
 
-        usersList.innerHTML = data.map(u => `
-          <li>
-            <div class="grid grid-cols-[1fr_auto_auto_auto_auto_auto] gap-6 items-center py-4 border-b border-rule-subtle hover:bg-surface-1 transition-colors -mx-4 px-4">
-              <div class="min-w-0">
-                <p class="text-sm font-semibold text-ink-primary">${esc(u.name || u.username)}</p>
-                <p class="font-mono text-[11px] text-ink-muted">${esc(u.role || '')}</p>
-              </div>
-              <span class="font-mono text-[11px] uppercase tracking-label w-14 ${u.access === 'admin' ? 'text-accent' : 'text-ink-muted'}">${esc(u.access)}</span>
-              <span class="font-mono text-[11px] text-ink-muted w-32 truncate">${esc((u.agents || []).join(', '))}</span>
-              <span class="font-mono text-[11px] tabular text-ink-primary w-10 text-right">${u.call_count ?? 0}</span>
-              <span class="font-mono text-[11px] tabular text-ink-primary w-20 text-right">${u.campaign_count ?? 0}</span>
-              <span class="font-mono text-[11px] tabular text-ink-muted w-36 text-right">${esc(u.last_active || '—')}</span>
-            </div>
-          </li>`).join('');
+          const who = el('div', 'row__body');
+          who.append(cell('p', 'ds-small row__title', u.name || u.username || ''));
+          if (u.role) who.append(cell('p', 'ds-mono row__sub', u.role));
+
+          const access = el('span', `ds-mark ds-mark--${u.access === 'admin' ? 'live' : 'idle'}`);
+          access.textContent = u.access ?? '';
+
+          row.append(
+            who,
+            access,
+            cell('span', 'ds-mono row__agents', (u.agents || []).join(', ')),
+            cell('span', 'ds-mono row__num', String(u.call_count ?? 0)),
+            cell('span', 'ds-mono row__num', String(u.campaign_count ?? 0)),
+            cell('span', 'ds-mono row__num', u.last_active || '—'),
+          );
+          return row;
+        }));
       } catch {
-        usersList.innerHTML = '<li class="py-8 font-mono text-xs text-signal-danger">// could not load</li>';
+        placeholder(list, 'could not load', true);
       }
     }
+
+    // ── Owl's files ─────────────────────────────────────────────────────────
+
+    interface KnowledgeFile { name: string; size_kb: number; modified: string; protected: boolean }
+    let files: KnowledgeFile[] = [];
+
+    const sizeLabel = (kb: number) =>
+      kb < 1 ? '< 1 KB' : kb < 1024 ? `${kb} KB` : `${(kb / 1024).toFixed(1)} MB`;
+
+    function kbStatus(message: string): void {
+      const slot = byId('kb-status');
+      slot.textContent = message;
+      slot.hidden = !message;
+    }
+
+    function renderKnowledge(): void {
+      const list = byId('kb-list');
+      byId('kb-count').textContent = `${files.length} file${files.length === 1 ? '' : 's'}`;
+      if (!files.length) { placeholder(list, 'no files yet'); return; }
+
+      list.replaceChildren(...files.map((file) => {
+        const row = el('li', 'row', '1fr auto auto');
+        row.append(
+          cell('span', 'ds-small row__title', file.name),
+          cell('span', 'ds-mono row__num', `${sizeLabel(file.size_kb)} · ${file.modified}`),
+        );
+
+        if (file.protected) {
+          const locked = el('span', 'ds-mark ds-mark--locked');
+          locked.textContent = 'protected';
+          row.append(locked);
+        } else {
+          const remove = el('button', 'ds-btn ds-btn--ghost ds-btn--sm') as HTMLButtonElement;
+          remove.type = 'button';
+          remove.textContent = 'Delete';
+          remove.addEventListener('click', () => deleteKnowledge(file.name));
+          row.append(remove);
+        }
+        return row;
+      }));
+    }
+
+    async function loadKnowledge(): Promise<void> {
+      try {
+        const res = await fetch('/api/admin/knowledge');
+        if (!res.ok) throw new Error(String(res.status));
+        files = await res.json();
+        renderKnowledge();
+      } catch {
+        placeholder(byId('kb-list'), 'could not load the file list', true);
+      }
+    }
+
+    async function deleteKnowledge(name: string): Promise<void> {
+      const go = await confirmAction({
+        title: `Delete “${name}”?`,
+        body: 'Owl stops reading it on the next chat and analysis. This cannot be undone.',
+        confirm: 'Delete file',
+      });
+      if (!go) return;
+      try {
+        const res = await fetch(`/api/admin/knowledge/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { kbStatus(data.detail || 'delete failed'); return; }
+        files = files.filter((f) => f.name !== name);
+        kbStatus('');
+        renderKnowledge();
+      } catch {
+        kbStatus('delete failed');
+      }
+    }
+
+    byId('kb-input').addEventListener('change', async (event) => {
+      const input = event.target as HTMLInputElement;
+      const file = input.files?.[0];
+      if (!file) return;
+      input.value = '';
+
+      kbStatus(`uploading ${file.name}…`);
+      const form = new FormData();
+      form.append('file', file);
+      try {
+        const res = await fetch('/api/admin/knowledge/upload', { method: 'POST', body: form });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { kbStatus(data.detail || 'upload failed'); return; }
+        kbStatus('');
+        await loadKnowledge();
+      } catch {
+        kbStatus('upload failed');
+      }
+    });
   </script>
-</DashboardLayout>
+</PlatformLayout>

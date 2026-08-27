@@ -1,0 +1,293 @@
+<!-- @dsCard group="Screens" name="Cadence home — new conversation" subtitle="What opens when Cadence launches: Owl, empty, ready" viewport="1440x900" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cadence home — Cadence Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../primitives.css">
+<style>
+*{box-sizing:border-box}
+body{margin:0;height:100vh;overflow:hidden}
+a{color:rgb(var(--accent-ink))}a:hover{color:rgb(var(--ink))}
+.ws{display:grid;grid-template-columns:15.5rem 1fr;height:100vh;background:rgb(var(--canvas))}
+.ws-rail{display:flex;flex-direction:column;min-height:0;border-right:1px solid rgb(var(--rule-hairline))}
+.ws-rail__top{padding:var(--space-3);display:flex;flex-direction:column;gap:var(--space-3)}
+.ws-brand{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-1) var(--space-2)}
+.ws-brand__mark{display:flex;align-items:center;flex:none}
+.ws-brand__name{font-family:var(--font-sans);font-size:var(--text-lead);font-weight:var(--weight-medium);letter-spacing:-.03em;line-height:1;color:rgb(var(--ink))}
+.ws-rail__scroll{flex:1;min-height:0;overflow-y:auto;padding:0 var(--space-2) var(--space-3)}
+.ws-group{margin-top:var(--space-5)}
+.ws-group__head{display:flex;align-items:center;justify-content:space-between;padding:0 var(--space-2) var(--space-2)}
+.ws-rail__foot{padding:var(--space-3);border-top:1px solid rgb(var(--rule-hairline))}
+.ws-user{display:flex;align-items:center;gap:var(--space-2)}
+.ws-user__avatar{width:1.75rem;height:1.75rem;border-radius:var(--radius-full);background:rgb(var(--ink));color:rgb(var(--ink-on-ink));display:flex;align-items:center;justify-content:center;font-size:var(--text-caption);font-weight:var(--weight-medium);flex-shrink:0}
+.ws-conv{display:block;padding:var(--space-2) var(--space-3)}
+.ws-conv__title{font-size:var(--text-small);color:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0}
+.ws-conv__meta{margin:2px 0 0}
+
+.ws-main{display:flex;flex-direction:column;min-width:0;background:rgb(var(--canvas))}
+.ws-head{display:flex;align-items:center;gap:var(--space-3);height:3rem;padding:0 var(--space-3) 0 var(--space-4);flex-shrink:0}
+.ws-head__spacer{flex:1}
+
+/* The opening sheet. One thing is being asked of the screen, so one thing is in
+   the middle of it: the composer, with the greeting directly above and one small
+   card of ways out directly below. An empty workspace should read as room. */
+.hm{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;justify-content:center;padding:var(--space-8)}
+.hm__inner{width:100%;max-width:var(--measure-read);margin-inline:auto;margin-block:auto}
+.hm-greet{display:flex;flex-direction:column;align-items:center;gap:var(--space-5);margin-bottom:var(--space-8);text-align:center}
+.hm-greet__line{font-size:var(--text-display);font-weight:var(--weight-bold);letter-spacing:var(--tracking-display);line-height:var(--leading-tight);margin:0}
+/* The greeting is completed, never replaced: the time of day paints at once,
+   the name is appended when the session resolves. */
+.hm-greet__name{opacity:0;animation:ds-arrive var(--dur-reveal) var(--ease-settle) 240ms forwards;color:rgb(var(--ink-muted))}
+
+/* Ways out. One soft card, the system's row treatment inside it. */
+.hm-ways{margin-top:var(--space-8);padding:var(--space-2);box-shadow:none;background:rgb(var(--surface-sunken))}
+.hm-way{background:transparent}
+.hm-way:hover{background:rgb(var(--ink) / 0.05)}
+.hm-way:active{transform:translateY(1px)}
+.hm-way__what,.hm-way__key{flex:none;font-size:var(--text-micro);color:rgb(var(--ink-muted));white-space:nowrap}
+.hm-way__key{position:absolute;right:var(--space-3);top:50%;transform:translateY(-50%);opacity:0;transition:opacity var(--dur-tick) var(--ease-phase)}
+.hm-way__what{transition:opacity var(--dur-tick) var(--ease-phase)}
+.hm-way:hover .hm-way__what,.hm-way:focus-visible .hm-way__what{opacity:0}
+.hm-way:hover .hm-way__key,.hm-way:focus-visible .hm-way__key{opacity:1}
+
+/* ── Rail closed ──────────────────────────────────────────────────────────
+   Not a narrower rail: a different instrument. Language drops away and only
+   the icons remain, each on the same 2.25rem square. Groups keep separation
+   as hairlines; a control's name arrives on hover as a charcoal pill. */
+.ws.is-closed{grid-template-columns:var(--rail-closed) 1fr}
+.is-closed .ws-rail__top{padding:var(--space-2);align-items:center}
+.is-closed .ws-brand{padding:var(--space-1) 0;justify-content:center}
+.is-closed .ws-brand__name{display:none}
+.is-closed .ws-rail__scroll{padding:0 var(--space-2) var(--space-3);overflow:visible}
+.is-closed .ws-group__head{display:none}
+.is-closed .ws-group{margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid rgb(var(--rule-hairline))}
+.is-closed .ws-rail__scroll > .ws-group:first-child{margin-top:var(--space-2);padding-top:0;border-top:0}
+.is-closed [data-closed-hide]{display:none}
+.is-closed .ws-rail .ds-row{position:relative;width:2.25rem;height:2.25rem;padding:0;justify-content:center;margin-inline:auto;border-radius:var(--radius-sm)}
+.is-closed .ws-rail .ds-row > :not(.ds-row__icon){display:none}
+.is-closed .ws-rail .ds-row__icon{margin:0}
+.is-closed .ws-rail .ds-row::after{content:attr(data-tip);position:absolute;left:calc(100% + var(--space-2));top:50%;transform:translateY(-50%) translateX(-2px);background:rgb(var(--chrome));color:rgb(var(--chrome-ink));font-family:var(--font-sans);font-size:var(--text-caption);padding:3px 10px;border-radius:var(--radius-full);white-space:nowrap;opacity:0;pointer-events:none;z-index:20;transition:opacity var(--dur-tick) var(--ease-phase),transform var(--dur-tick) var(--ease-settle)}
+.is-closed .ws-rail .ds-row:hover::after{opacity:1;transform:translateY(-50%) translateX(0)}
+.is-closed .ws-rail .ds-btn--primary{width:2.25rem!important;padding:0;justify-content:center}
+.is-closed .ws-rail .ds-btn--primary span{display:none}
+.is-closed .ws-rail .ds-search{width:2.25rem;padding:0;justify-content:center}
+.is-closed .ws-rail .ds-search__input{display:none}
+.is-closed .ws-rail__foot{padding:var(--space-2);display:flex;justify-content:center}
+.is-closed .ws-user{flex-direction:column;gap:var(--space-2)}
+.is-closed .ws-user > div{display:none}
+</style>
+</head>
+<body class="ds-root">
+
+<div class="ws">
+
+  <aside class="ws-rail ds-scroll">
+    <div class="ws-rail__top">
+      <div class="ws-brand">
+        <span class="ws-brand__mark">
+          <svg width="24" height="24" viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.6" y="6.5" width="2.6" height="7" rx="1.3" fill="rgb(var(--ink))"></rect><rect x="6.9" y="3.5" width="2.6" height="13" rx="1.3" fill="rgb(var(--ink))"></rect><rect x="11.2" y="1.5" width="2.6" height="17" rx="1.3" fill="rgb(var(--accent))"></rect><rect x="15.5" y="5" width="2.6" height="10" rx="1.3" fill="rgb(var(--ink))"></rect></svg>
+        </span>
+        <span class="ws-brand__name">Cadence</span>
+      </div>
+      <button class="ds-btn ds-btn--primary" style="width:100%">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path></svg>
+        <span>New conversation</span>
+      </button>
+      <div class="ds-search">
+        <svg class="ds-search__icon" width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"></circle><path d="M8.5 8.5l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg>
+        <input class="ds-search__input" placeholder="Search everything…" aria-label="Search conversations">
+      </div>
+    </div>
+
+    <div class="ws-rail__scroll ds-scroll">
+      <div class="ws-group">
+        <div class="ws-group__head"><span class="ds-eyebrow">Workspace</span></div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 6.4 7 2.2l5 4.2V12H2z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"></path></svg></span>
+          <span class="ds-row__label">Home</span>
+        </div>
+        <div class="ds-row is-active" style="--depth:0">
+          <span class="ds-row__icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.2 7.2 5.2 2.4 9.6 5.3ZM15.8 7.2 14.8 2.4 10.4 5.3Z" fill="currentColor"></path><path d="M4 10.2a6 6 0 0 1 12 0v1.4a6 6 0 0 1-12 0Z" fill="currentColor"></path><circle cx="7.5" cy="9.9" r="2.5" fill="rgb(var(--surface-sunken))"></circle><circle cx="12.5" cy="9.9" r="2.5" fill="rgb(var(--surface-sunken))"></circle><circle cx="7.5" cy="9.9" r="1.15" fill="rgb(var(--accent))"></circle><circle cx="12.5" cy="9.9" r="1.15" fill="rgb(var(--accent))"></circle><path d="M10 11.6l1.15 2.1H8.85Z" fill="rgb(var(--surface-sunken))"></path></svg></span>
+          <span class="ds-row__label">Owl</span>
+          <span class="ds-mono">ask</span>
+        </div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 8V6m3 4V4m3 8V2m3 9V5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path></svg></span>
+          <span class="ds-row__label">Calls</span>
+          <span class="ds-mono">18</span>
+        </div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.1"></circle><circle cx="7" cy="7" r="1.6" stroke="currentColor" stroke-width="1.1"></circle></svg></span>
+          <span class="ds-row__label">Leads</span>
+          <span class="ds-mono">64</span>
+        </div>
+      </div>
+
+      <div class="ws-group">
+        <div class="ws-group__head">
+          <span class="ds-eyebrow">Agents</span>
+        </div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="6.2" cy="6.2" r="4" stroke="currentColor" stroke-width="1.1"></circle><path d="M9.3 9.3 12 12M4.4 6.2h3.6M6.2 4.4v3.6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path></svg></span>
+          <span class="ds-row__label">X-ray</span>
+          <span style="width:6px;height:6px;border-radius:var(--radius-full);background:rgb(var(--accent));flex:none;animation:ds-beat var(--dur-beat) var(--ease-phase) infinite"></span>
+        </div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M3 2h6l2 2v8H3z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"></path><path d="M5 6.5h4M5 9h3" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path></svg></span>
+          <span class="ds-row__label">Brief</span>
+        </div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="2" y="3.5" width="10" height="7" rx="1" stroke="currentColor" stroke-width="1.1"></rect><path d="m2.4 4.2 4.6 3.3 4.6-3.3" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"></path></svg></span>
+          <span class="ds-row__label">Follow-up</span>
+        </div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="2.5" cy="7" r="1.1" fill="currentColor"></circle><circle cx="7" cy="7" r="1.1" fill="currentColor"></circle><circle cx="11.5" cy="7" r="1.1" fill="currentColor"></circle></svg></span>
+          <span class="ds-row__label" style="color:rgb(var(--ink-muted))">All agents</span>
+        </div>
+      </div>
+
+      <div class="ws-group">
+        <div class="ws-group__head"><span class="ds-eyebrow">Knowledge</span></div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 3v8.2c1.5-.9 3-.9 4.5 0 1.5-.9 3-.9 4.5 0V3c-1.5-.9-3-.9-4.5 0-1.5-.9-3-.9-4.5 0z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"></path><path d="M7 3.1v8.1" stroke="currentColor" stroke-width="1.1"></path></svg></span>
+          <span class="ds-row__label">Library</span>
+          <span class="ds-mono" style="color:rgb(var(--gold-deep))">canon</span>
+        </div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><rect x="2" y="3" width="10" height="8" rx="1" stroke="currentColor" stroke-width="1.1"></rect><path d="M2 5.6h10M5.6 5.6V11" stroke="currentColor" stroke-width="1.1"></path></svg></span>
+          <span class="ds-row__label">Datasheets</span>
+          <span class="ds-mono">11</span>
+        </div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 2v3M7 9v3M2 7h3M9 7h3" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.1"></circle></svg></span>
+          <span class="ds-row__label">Sources</span>
+          <span class="ds-mono">6</span>
+        </div>
+      </div>
+
+      <div class="ws-group" data-closed-hide>
+        <div class="ws-group__head">
+          <span class="ds-eyebrow">Projects</span>
+          <button class="ds-icon-btn" style="width:1.25rem;height:1.25rem" aria-label="New project">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg>
+          </button>
+        </div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+          <span class="ds-row__label" data-x="1">Northgate — timing refresh</span>
+          <span class="ds-mono">7</span>
+        </div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+          <span class="ds-row__label">Private 5G — Toronto</span>
+          <span class="ds-mono">12</span>
+        </div>
+        <div class="ds-row" style="--depth:0">
+          <span class="ds-row__icon"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+          <span class="ds-row__label">Defence vertical</span>
+          <span class="ds-mono">5</span>
+        </div>
+      </div>
+
+      <div class="ws-group" data-closed-hide>
+        <div class="ws-group__head"><span class="ds-eyebrow">Recent</span></div>
+        <div class="ds-row ws-conv"><div style="width:100%"><p class="ws-conv__title">Which case study for a tier-one bank?</p><p class="ds-mono ws-conv__meta"><span style="color:rgb(var(--accent-ink))">▪</span> sonnet · 4m ago</p></div></div>
+        <div class="ds-row ws-conv"><div style="width:100%"><p class="ws-conv__title">PTP² Mesh vs boundary clocks</p><p class="ds-mono ws-conv__meta">▪ haiku · 2h ago</p></div></div>
+        <div class="ds-row ws-conv"><div style="width:100%"><p class="ws-conv__title">Rewrite the Halden Engineering follow-up</p><p class="ds-mono ws-conv__meta"><span style="color:rgb(var(--accent-ink))">▪</span> sonnet · yesterday</p></div></div>
+        <div class="ds-row ws-conv"><div style="width:100%"><p class="ws-conv__title">What is Galileo OSNMA?</p><p class="ds-mono ws-conv__meta">▪ haiku · Tuesday</p></div></div>
+      </div>
+    </div>
+
+    <div class="ws-rail__foot">
+      <div class="ws-user">
+        <span class="ws-user__avatar">I</span>
+        <div style="min-width:0;line-height:var(--leading-snug);white-space:nowrap;overflow:hidden;flex:1">
+          <p class="ds-small" style="color:rgb(var(--ink));margin:0">Sam Whitfield</p>
+          <p class="ds-caption" style="margin:0;color:rgb(var(--ink-muted))">Admin</p>
+        </div>
+        <button class="ds-icon-btn" aria-label="Settings">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.1"></circle><path d="M7 1.8v1.4M7 10.8v1.4M2.3 7h1.4M10.3 7h1.4M3.7 3.7l1 1M9.3 9.3l1 1M10.3 3.7l-1 1M4.7 9.3l-1 1" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="ws-main">
+    <header class="ws-head">
+      <button class="ds-icon-btn" data-rail-toggle aria-pressed="false" aria-label="Close the rail">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1.5" y="2.5" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"></rect><path d="M5.5 2.5v10" stroke="currentColor" stroke-width="1.2"></path></svg>
+      </button>
+      <span class="ds-small" style="color:rgb(var(--ink));font-weight:var(--weight-medium)">New conversation</span>
+      <div class="ws-head__spacer"></div>
+      <span class="ds-mark ds-mark--idle">no project</span>
+      <button class="ds-icon-btn" aria-label="Conversation options">
+        <svg width="14" height="14" viewBox="0 0 12 12" fill="none"><circle cx="2" cy="6" r="1" fill="currentColor"></circle><circle cx="6" cy="6" r="1" fill="currentColor"></circle><circle cx="10" cy="6" r="1" fill="currentColor"></circle></svg>
+      </button>
+    </header>
+
+    <div class="hm ds-scroll">
+      <div class="hm__inner">
+        <div class="hm-greet ds-arrive">
+          <svg width="36" height="36" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4.2 7.2 5.2 2.4 9.6 5.3ZM15.8 7.2 14.8 2.4 10.4 5.3Z" fill="rgb(var(--ink))"></path><path d="M4 10.2a6 6 0 0 1 12 0v1.4a6 6 0 0 1-12 0Z" fill="rgb(var(--ink))"></path><circle cx="7.5" cy="9.9" r="2.5" fill="rgb(var(--surface))"></circle><circle cx="12.5" cy="9.9" r="2.5" fill="rgb(var(--surface))"></circle><circle cx="7.5" cy="9.9" r="1.15" fill="rgb(var(--accent))"></circle><circle cx="12.5" cy="9.9" r="1.15" fill="rgb(var(--accent))"></circle><path d="M10 11.6l1.15 2.1H8.85Z" fill="rgb(var(--surface))"></path></svg>
+          <h1 class="hm-greet__line">Afternoon<span class="hm-greet__name">, Sam.</span></h1>
+        </div>
+
+        <div class="ds-composer ds-composer--open ds-arrive" style="--arrive:60ms">
+          <textarea class="ds-composer__input" rows="1" placeholder="Ask Owl, or name an agent to run…" autofocus></textarea>
+          <div class="ds-composer__bar">
+            <button class="ds-icon-btn" aria-label="Attach">
+              <svg width="14" height="14" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg>
+            </button>
+            <span class="ds-composer__gap"></span>
+            <button class="ds-icon-btn ds-icon-btn--fill" aria-label="Send">
+              <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M6 11V1M1.5 5.5 6 1l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <nav class="ds-card hm-ways ds-arrive" style="--arrive:120ms" aria-label="Shortcuts">
+          <a class="ds-row hm-way" href="#">
+            <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><circle cx="2.5" cy="7" r="1.1" fill="currentColor"></circle><circle cx="7" cy="7" r="1.1" fill="currentColor"></circle><circle cx="11.5" cy="7" r="1.1" fill="currentColor"></circle></svg></span>
+            <span class="ds-row__label">Agents</span>
+            <span class="ds-mono hm-way__what">all eleven</span>
+            <span class="ds-mono hm-way__key">⌘1</span>
+          </a>
+          <a class="ds-row hm-way" href="#">
+            <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 3v8.2c1.5-.9 3-.9 4.5 0 1.5-.9 3-.9 4.5 0V3c-1.5-.9-3-.9-4.5 0-1.5-.9-3-.9-4.5 0z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"></path><path d="M7 3.1v8.1" stroke="currentColor" stroke-width="1.1"></path></svg></span>
+            <span class="ds-row__label">Call history</span>
+            <span class="ds-mono hm-way__what">every call analysed</span>
+            <span class="ds-mono hm-way__key">⌘2</span>
+          </a>
+          <a class="ds-row hm-way" href="#">
+            <span class="ds-row__icon"><svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 2v3M7 9v3M2 7h3M9 7h3" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"></path><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.1"></circle></svg></span>
+            <span class="ds-row__label">Knowledge</span>
+            <span class="ds-mono hm-way__what">what Owl knows</span>
+            <span class="ds-mono hm-way__key">⌘3</span>
+          </a>
+        </nav>
+      </div>
+    </div>
+  </main>
+
+</div>
+<script src="grow.js"></script>
+<script>
+for (const row of document.querySelectorAll('.ws-rail .ds-row')) {
+  const l = row.querySelector('.ds-row__label');
+  if (l) row.setAttribute('data-tip', l.textContent.trim());
+}
+const ws = document.querySelector('.ws'), tog = document.querySelector('[data-rail-toggle]');
+tog.addEventListener('click', () => {
+  const closed = ws.classList.toggle('is-closed');
+  tog.setAttribute('aria-pressed', String(closed));
+  tog.setAttribute('aria-label', closed ? 'Open the rail' : 'Close the rail');
+});
+</script>
+</body>
+</html>

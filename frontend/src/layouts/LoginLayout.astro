@@ -7,14 +7,15 @@ interface Props {
 const { title = 'Cadence' } = Astro.props;
 ---
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en-GB" class="h-full">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/images/cadence-mark.svg" />
   <title>{title} — Cadence</title>
-  <meta name="description" content="Cadence — Timebeat internal operations console" />
+  <meta name="description" content="Cadence — agentic sales and operations console" />
 </head>
-<body class="h-full bg-surface-0 text-ink-primary">
+<body class="ds-root h-full">
   <slot />
 </body>
 </html>

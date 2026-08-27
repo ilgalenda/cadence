@@ -1,0 +1,292 @@
+<!-- @dsCard group="Foundations" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Colour — Cadence Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../primitives.css">
+<link rel="stylesheet" href="preview.css">
+</head>
+<body class="ds-root">
+
+<header class="pv-head">
+  <p class="ds-eyebrow">Foundations · 01</p>
+  <h1>Colour</h1>
+  <p>
+    Acme's binding palette, given interface roles. White and charcoal are the primary
+    pair; blue is the active signal; green, amber and gold are the secondaries. The system
+    speaks in sync language — <strong>locked</strong>, <strong>drift</strong>,
+    <strong>fault</strong> — so a colour always states a condition rather than a mood.
+  </p>
+</header>
+
+<section class="pv-section">
+  <h2>One background, measured once</h2>
+  <p class="pv-note">
+    <strong>Rebuilt 2026-08-19.</strong> The field is plain white everywhere — the translucent
+    rail, sheet and gradient ground are retired. Every figure below is measured against
+    <code>#FFFFFF</code> (or solid <code>--chrome</code> for the on-charcoal set); no ranges,
+    no worst cases.
+  </p>
+</section>
+
+<section class="pv-section">
+  <h2>Colour fields — the featured surfaces</h2>
+  <p class="pv-note" style="margin-bottom: var(--space-5);">
+    Occasional full-bleed colour moments built from the brand secondaries — a featured card, an
+    insights panel, a hero. Each field names its ink; no other pairing is legal. <strong>At most
+    one field per view.</strong> A field says "look here"; a signal colour says "this is the
+    condition" — the two never trade jobs.
+  </p>
+  <div class="pv-grid">
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--field-blue)); display:flex;align-items:center;justify-content:center"><span style="color:rgb(var(--field-blue-ink));font-size:var(--text-title);font-weight:var(--weight-bold);letter-spacing:var(--tracking-title)">Aa</span></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Blue field</p>
+        <p class="pv-swatch__token">--field-blue · white ink · 3.7:1</p>
+        <p class="pv-swatch__use">Display or title text only — the ratio does not cover body copy.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--field-sky)); display:flex;align-items:center;justify-content:center"><span style="color:rgb(var(--field-sky-ink));font-size:var(--text-title);font-weight:var(--weight-bold);letter-spacing:var(--tracking-title)">Aa</span></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Sky field</p>
+        <p class="pv-swatch__token">--field-sky · charcoal ink</p>
+        <p class="pv-swatch__use">The light of brand blue — insights panels, data moments. Carries full body copy.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--field-amber)); display:flex;align-items:center;justify-content:center"><span style="color:rgb(var(--field-amber-ink));font-size:var(--text-title);font-weight:var(--weight-bold);letter-spacing:var(--tracking-title)">Aa</span></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Amber field</p>
+        <p class="pv-swatch__token">--field-amber · charcoal ink · 9.1:1</p>
+        <p class="pv-swatch__use">The boldest moment the system has. Featured and marketing surfaces.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--field-gold)); display:flex;align-items:center;justify-content:center"><span style="color:rgb(var(--field-gold-ink));font-size:var(--text-title);font-weight:var(--weight-bold);letter-spacing:var(--tracking-title)">Aa</span></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Gold field</p>
+        <p class="pv-swatch__token">--field-gold · charcoal ink</p>
+        <p class="pv-swatch__use">Featured <em>canonical</em> content only — gold keeps its one meaning even here.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Canvas &amp; surfaces</h2>
+  <div class="pv-grid">
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--canvas)); box-shadow: inset 0 0 0 1px rgb(var(--rule-hairline));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Canvas</p>
+        <p class="pv-swatch__token">--canvas · #FFFFFF</p>
+        <p class="pv-swatch__use">Brand White. The whole field — the page, the rail, everything structural.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--surface)); box-shadow: inset 0 0 0 1px rgb(var(--rule-hairline));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Surface</p>
+        <p class="pv-swatch__token">--surface · #FFFFFF</p>
+        <p class="pv-swatch__use">The same white with intent: cards and panels, separated from the field by a soft shadow.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--surface-sunken));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Sunken</p>
+        <p class="pv-swatch__token">--surface-sunken · #F4F3F1</p>
+        <p class="pv-swatch__use">Wells, pills, inputs at rest, code, tool calls. Recessed, never raised.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--surface-ink));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Ink surface</p>
+        <p class="pv-swatch__token">--surface-ink · #1A1A19</p>
+        <p class="pv-swatch__use">Primary pill buttons and dark CTAs. Same value as <code class="pv-spec">--chrome</code> — the system has one dark, not two.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Charcoal — the authority accent</h2>
+  <p class="pv-note" style="margin-bottom: var(--space-5);">
+    Charcoal is no longer a frame — it is an <strong>accent</strong>: the primary pill button, the
+    bulk bar, a toast, a tooltip. Objects, never regions. Set
+    <code class="pv-spec">.ds-chrome</code> on such an object and every primitive inside it
+    inverts; there is still no dark variant of any component. If a whole pane is charcoal, it is
+    wrong. <strong>Rebuilt 2026-08-19</strong> with the frame doctrine's retirement.
+  </p>
+  <div class="pv-grid">
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--chrome));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Chrome</p>
+        <p class="pv-swatch__token">--chrome · #1A1A19</p>
+        <p class="pv-swatch__use">The charcoal objects: primary pills, the bulk bar, toasts, tooltips. Solid, except toast/tooltip glass.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--chrome-raised));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Chrome raised</p>
+        <p class="pv-swatch__token">--chrome-raised · #262624</p>
+        <p class="pv-swatch__use">Solid chrome surfaces that are not the rail. The rail's own hover now uses an alpha of --chrome-ink instead.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--chrome-rule));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Chrome rule</p>
+        <p class="pv-swatch__token">--chrome-rule · #383734</p>
+        <p class="pv-swatch__use">Separation inside a charcoal object. The only border charcoal gets.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--chrome-ink-muted));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Chrome ink muted</p>
+        <p class="pv-swatch__token">--chrome-ink-muted · #98958E · 5.8:1 on charcoal</p>
+        <p class="pv-swatch__use">Metadata on a charcoal object, and the floor there. Primary text on charcoal is --chrome-ink, at 15.8:1.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--chrome)); display:flex; align-items:center; justify-content:center; gap: var(--space-4);">
+        <span class="ds-mark ds-mark--locked" style="color: rgb(var(--signal-locked-on-chrome)); background: rgb(var(--signal-locked-on-chrome) / 0.12);">locked</span>
+        <span class="ds-mark ds-mark--fault" style="color: rgb(var(--signal-fault-on-chrome)); background: rgb(var(--signal-fault-on-chrome) / 0.12);">fault</span>
+      </div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Signals on charcoal</p>
+        <p class="pv-swatch__token">--signal-*-on-chrome · --gold-on-chrome · --accent-on-chrome</p>
+        <p class="pv-swatch__use">Lifted variants for text on charcoal objects. The field values fall under 4.5:1 there; <code class="pv-spec">.ds-chrome</code> and <code class="pv-spec">.ds-toast</code> swap them in.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Ink</h2>
+  <p class="pv-note" style="margin-bottom: var(--space-5);">
+    Measured against the white field. Charcoal, then two steps of recession; muted is the floor.
+  </p>
+  <div class="pv-grid">
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--ink));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Ink</p>
+        <p class="pv-swatch__token">--ink · #121212 · 17.9:1</p>
+        <p class="pv-swatch__use">Body copy, headings, anything that must be read without effort.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--ink-secondary));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Secondary</p>
+        <p class="pv-swatch__token">--ink-secondary · #5C5A56 · 6.6:1</p>
+        <p class="pv-swatch__use">Supporting copy, descriptions, inactive navigation.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--ink-muted));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Muted</p>
+        <p class="pv-swatch__token">--ink-muted · #706D67 · 5.0:1</p>
+        <p class="pv-swatch__use">Metadata, timestamps, placeholders. The AA floor — nothing lighter is permitted, and nothing may reduce the sheet's tint far enough to push this under 4.5:1.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Accent — brand blue</h2>
+  <div class="pv-grid">
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--accent));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Accent</p>
+        <p class="pv-swatch__token">--accent · #0084FF · 3.5:1</p>
+        <p class="pv-swatch__use">Focus rules, live marks, the send action, and the encoding colour for data. Legal for UI and large text — never for body copy.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--accent-ink));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Accent ink</p>
+        <p class="pv-swatch__token">--accent-ink · #005AB8 · 6.4:1</p>
+        <p class="pv-swatch__use">Accent-coloured <em>text</em> and links. Small text never uses --accent directly.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--accent-wash));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Accent wash</p>
+        <p class="pv-swatch__token">--accent-wash · #E8F3FF</p>
+        <p class="pv-swatch__use">Selection inside prose and text-editing surfaces only. Rails and lists invert instead.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Signal — the sync vocabulary</h2>
+  <div class="pv-row" style="margin-bottom: var(--space-4);">
+    <span class="ds-mark ds-mark--locked">locked</span>
+    <span class="ds-mark ds-mark--drift">drift</span>
+    <span class="ds-mark ds-mark--fault">fault</span>
+    <span class="ds-mark ds-mark--live">running</span>
+    <span class="ds-mark ds-mark--idle">idle</span>
+    <span class="ds-mark ds-mark--canon">canon</span>
+  </div>
+  <div class="pv-grid">
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--signal-locked));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Locked</p>
+        <p class="pv-swatch__token">--signal-locked · #2A8800</p>
+        <p class="pv-swatch__use">In sync, confirmed, approved. The brand green.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--signal-drift));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Drift</p>
+        <p class="pv-swatch__token">--signal-drift · #F6A100</p>
+        <p class="pv-swatch__use">Pending review, awaiting a human. The brand amber.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: rgb(var(--signal-fault));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Fault</p>
+        <p class="pv-swatch__token">--signal-fault · #C12D22</p>
+        <p class="pv-swatch__use">Error, destructive action. A brand extension — see the note below.</p>
+      </div>
+    </div>
+    <div class="pv-swatch">
+      <div class="pv-swatch__chip" style="background: linear-gradient(135deg, rgb(var(--gold)), rgb(var(--gold-deep)));"></div>
+      <div class="pv-swatch__meta">
+        <p class="pv-swatch__name">Gold</p>
+        <p class="pv-swatch__token">--gold · #C39A49 → #5D4923</p>
+        <p class="pv-swatch__use">Canonical, promoted knowledge. One meaning only, used sparingly, paired with charcoal — and deliberately kept out of the ground.</p>
+      </div>
+    </div>
+  </div>
+  <p class="pv-note" style="margin-top: var(--space-4);">
+    <strong>Two deliberate positions.</strong> The guidelines define no red, and an interface
+    must be able to say something is wrong — so <code>--signal-fault</code> is an extension,
+    tuned to sit beside amber rather than shout over it. And gold is held to a single meaning:
+    canonical knowledge. If gold appears anywhere else in the platform, it has been misused.
+  </p>
+</section>
+
+</body>
+</html>

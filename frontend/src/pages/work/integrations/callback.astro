@@ -1,0 +1,52 @@
+---
+/**
+ * Where Google sends the browser back to.
+ *
+ * The backend does the token exchange and redirects here with `ok` or `error`, so
+ * this page only reports. It is a real page rather than a redirect straight to
+ * Integrations because a failed connection needs somewhere to say why — landing
+ * silently back on a page that still reads "not connected" tells the person
+ * nothing about what went wrong.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+---
+<PlatformLayout title="Google Calendar" requires="lead">
+  <div class="page">
+    <p class="ds-eyebrow">Integrations</p>
+    <h1 class="ds-heading page__title" id="heading">Completing sign-in…</h1>
+    <p class="ds-body page__detail" id="detail"></p>
+  </div>
+
+  <style>
+    .page { max-width: var(--measure-read); margin-inline: auto; padding: var(--space-16) var(--space-8); }
+    .page__title { margin: var(--space-3) 0; }
+    .page__detail { color: rgb(var(--ink-secondary)); margin-bottom: var(--space-8); }
+  </style>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const heading = document.getElementById('heading')!;
+    const detail = document.getElementById('detail')!;
+
+    /** What each backend error code means to the person who hit it. */
+    const REASONS: Record<string, string> = {
+      invalid_state: 'The sign-in did not match the request that started it. Start again from Integrations.',
+      user_mismatch: 'You finished signing in as a different user than the one who started. Start again while signed in as yourself.',
+      access_denied: 'You declined the permission request, so nothing was connected.',
+    };
+
+    if (params.get('ok')) {
+      heading.textContent = 'Connected.';
+      detail.textContent = 'Your Google Calendar is linked. Nothing writes to it yet — the '
+        + 'scheduling and Gmail work in Phase 4 is what will use this.';
+    } else {
+      const code = params.get('error');
+      heading.textContent = code ? 'Connection failed.' : 'Nothing to complete.';
+      // An unrecognised code is shown as-is: it came from Google or the token
+      // exchange, and hiding it behind "something went wrong" loses the only clue.
+      detail.textContent = code
+        ? (REASONS[code] ?? `Google reported: ${code}`)
+        : 'This page had no sign-in result to report. Start from Integrations.';
+    }
+  </script>
+</PlatformLayout>

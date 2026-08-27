@@ -1,0 +1,328 @@
+---
+/**
+ * GTM — propose candidate companies for outbound.
+ *
+ * The agent proposes; the user selects. Nothing here starts outreach, and the
+ * page says so, because a list that looks like a queue invites the assumption
+ * that something is already running.
+ *
+ * **The list is unverified, and the page is built around admitting that.** GTM
+ * answers from what the model knows rather than from a live search — a grounded
+ * version was measured at two successes in five attempts and two to five minutes,
+ * and the checking moved downstream to X-ray and Research, which do search. So
+ * every candidate carries what to `check` and whatever the model is unsure of,
+ * a `.ds-banner--drift` states the qualification once at the top, and the row's
+ * X-ray button is the point of the page rather than a footnote.
+ *
+ * **Composition is the platform's, not this page's.** `.agent-page` ›
+ * `.agent-page__column` › eyebrow-title-lead head › the ask › result under an
+ * `.agent-page__sect` head, shared with the other ten agent surfaces. Its closest
+ * sibling is `xray.astro`, which joined the same composition on 2026-08-24; the
+ * design project's `preview/screen-xray.html` still depicts the workspace shell
+ * X-ray was moved *off*, so it is not the reference for this page.
+ *
+ * The forty-second wait is held the way X-ray holds its twenty: a `.ds-mark--live`
+ * on the action, a skeleton in the shape of the result so the page keeps its
+ * geometry, and a ticking elapsed count in the section head's mono slot
+ * (`lib/elapsed`). No spinner — the system does not have one.
+ */
+import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+---
+<PlatformLayout title="Target companies" requires="lead">
+  <div class="agent-page">
+    <div class="agent-page__column agent-page__column--top">
+      <header class="agent-page__head ds-arrive">
+        <p class="ds-eyebrow">GTM</p>
+        <h1 class="ds-heading ds-page__title">Who to approach</h1>
+        <p class="ds-lead ds-page__intro">
+          Target by vertical, or find look-alikes of a company you already know. These come back
+          as proposals — nothing is contacted, and no outreach begins, until you take one forward.
+        </p>
+      </header>
+
+      <form class="gtm__ask ds-arrive" style="--arrive: var(--dur-step)" id="form">
+        <div class="gtm__row">
+          <div class="gtm__cell">
+            <label class="ds-label" for="vertical">Vertical or ICP</label>
+            <input class="ds-field" id="vertical" placeholder="finance, private 5G, defence" autocomplete="off" />
+          </div>
+          <div class="gtm__cell">
+            <label class="ds-label" for="seed">Or look like <span class="ds-label__optional">optional</span></label>
+            <input class="ds-field" id="seed" placeholder="Northgate Nordics" autocomplete="off" />
+          </div>
+        </div>
+        <div class="gtm__cell gtm__cell--wide">
+          <label class="ds-label" for="notes">Constraints <span class="ds-label__optional">optional</span></label>
+          <input class="ds-field" id="notes" placeholder="Nordics only, over 500 staff, recently funded" autocomplete="off" />
+        </div>
+        <div class="gtm__actions">
+          <button class="ds-btn ds-btn--accent" id="run" type="submit">Find companies</button>
+          <span class="ds-mark ds-mark--live" id="running" hidden>proposing</span>
+        </div>
+        <!-- Not filling the form in is not a failure, and does not get the red
+             banner a backend fault gets. `.ds-error` is the form layer's own
+             quiet register for it. -->
+        <p class="ds-error gtm__validation" id="validation" hidden></p>
+        <p class="ds-caption gtm__note">Around forty seconds. One model call — nothing is contacted.</p>
+      </form>
+
+      <div class="ds-banner ds-banner--fault gtm__banner" id="error" hidden>
+        <span class="ds-banner__label">Could not propose</span>
+        <span id="error-text"></span>
+      </div>
+
+      <section class="gtm__result ds-arrive" id="result" hidden style="--arrive: calc(var(--dur-step) * 2)">
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow">Proposed accounts</h2>
+          <span class="ds-mono" id="count"></span>
+        </div>
+
+        <!-- Stated once, in the system's register for "succeeded but qualified",
+             rather than as a footnote under the list where it reads as a
+             disclaimer nobody has to look at. -->
+        <div class="ds-banner ds-banner--drift gtm__banner" id="unverified">
+          <span class="ds-banner__label">Unverified</span>
+          <span>From what the model knows, not a live search — some may be acquired, renamed or wrong. X-ray a name to check it.</span>
+        </div>
+
+        <ul class="ds-list ds-stagger" id="companies"></ul>
+      </section>
+
+      <div class="ds-empty ds-arrive gtm__empty" id="empty">
+        <p class="ds-empty__title">Nothing proposed yet</p>
+        <p class="ds-empty__body">Name a vertical to target, or a company to find look-alikes of.</p>
+      </div>
+    </div>
+  </div>
+
+  <style is:global>
+    /* Screen-level layout only. The page frame is the shared `.agent-page`
+       column; everything tonal and typographic comes from the design system.
+
+       Namespaced `.gtm__*` throughout: the previous `.error` and `.result` were
+       declared `is:global` here *and* in `research.astro` and `signals.astro`,
+       three copies of one rule fighting over two of the commonest words on the
+       platform. */
+    .gtm__row { display: flex; gap: var(--space-5); flex-wrap: wrap; }
+    .gtm__cell { flex: 1; min-width: 16rem; }
+    /* Full column width, not `--measure-form`. The two cells above need 32rem to
+       stay side by side and `--measure-form` is 30rem, so capping there would
+       stack them and lose the either/or the pairing states. Aligning all three
+       to the column edge keeps the form square instead. */
+    .gtm__cell--wide { margin-top: var(--space-4); }
+    .gtm__actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-5); }
+    .gtm__validation { margin-top: var(--space-3); }
+    .gtm__note { margin-top: var(--space-3); color: rgb(var(--ink-muted)); max-width: var(--measure-read); }
+
+    .gtm__banner { margin-top: var(--space-6); max-width: var(--measure-read); }
+    .gtm__result { margin-top: var(--space-12); }
+    .gtm__result .gtm__banner { margin-top: 0; margin-bottom: var(--space-5); }
+
+    /* `.ds-empty` and `.ds-field` set a `display`, which outweighs the `[hidden]`
+       attribute — without this the empty state cannot be hidden and sits under
+       the results. The same guard is in `xray.astro`. */
+    .gtm__empty[hidden] { display: none; }
+
+    /* The row is the system's record row; what is page-specific is that a
+       candidate has three registers — who, why, and what to check — stacked
+       rather than strung along one line. A single line would either truncate the
+       rationale or push the action off the right edge. */
+    .gtm__candidate { cursor: default; }
+    .gtm__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+    .gtm__check { color: rgb(var(--ink-muted)); }
+    .gtm__check b { font-weight: var(--weight-medium); color: rgb(var(--ink-secondary)); }
+    /* The model's doubt about the company itself, in the system's colour for
+       "pending, attention" but at caption weight. It was a `.ds-mark--drift`
+       pill on the name, which read as an alarm on most rows — when nearly every
+       row carries one, a loud mark stops being a signal and just makes a good
+       list look broken, while pushing the company name out of first place. */
+    .gtm__caveat { color: rgb(var(--signal-drift)); }
+    /* Always visible, never hover-revealed. Taking a candidate to X-ray is the
+       one thing this row exists for, and `.ds-row__actions` concealment would
+       put it behind a gesture no touch device can make — the same reasoning
+       already written over `.pl__acts` in `global.css`. */
+    .gtm__acts { flex-shrink: 0; }
+
+    /* Three bars, not two: a real row is a name, a two-line rationale and a
+       check, and a skeleton shorter than what replaces it makes the page jump at
+       the moment the answer lands — which is the one thing holding the shape was
+       supposed to prevent. */
+    .gtm__skeleton { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-4) var(--space-3); }
+    .gtm__skeleton span { height: var(--space-4); border-radius: var(--radius-xs); }
+    .gtm__skeleton span:nth-child(1) { width: 32%; }
+    .gtm__skeleton span:nth-child(2) { width: 92%; }
+    .gtm__skeleton span:nth-child(3) { width: 64%; }
+  </style>
+
+  <script>
+    import { el } from '../../../lib/dom';
+    import { startElapsed, type StopElapsed } from '../../../lib/elapsed';
+
+    const form = el<HTMLFormElement>('form');
+    const runBtn = el<HTMLButtonElement>('run');
+    const running = el('running');
+    const validation = el('validation');
+    const errorBox = el('error');
+    const result = el('result');
+    const unverified = el('unverified');
+    const empty = el('empty');
+    const list = el('companies');
+    const count = el('count');
+
+    const verticalField = el<HTMLInputElement>('vertical');
+    const seedField = el<HTMLInputElement>('seed');
+    const notesField = el<HTMLInputElement>('notes');
+
+    let stopElapsed: StopElapsed | null = null;
+
+    // Signals links here as `/work/agents/gtm?seed_company=…`, and until now the
+    // page ignored it and opened blank. Prefilled but deliberately not run: a
+    // forty-second model call is the user's decision, not the link's.
+    readLink();
+
+    function readLink(): void {
+      const params = new URLSearchParams(window.location.search);
+      const seed = (params.get('seed_company') ?? '').trim();
+      const vertical = (params.get('vertical') ?? '').trim();
+      if (!seed && !vertical) return;
+
+      seedField.value = seed;
+      verticalField.value = vertical;
+      runBtn.focus();
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const vertical = verticalField.value.trim();
+      const seed = seedField.value.trim();
+
+      if (!vertical && !seed) {
+        validation.textContent = 'Give a vertical to target, or a company to find look-alikes of.';
+        validation.hidden = false;
+        verticalField.focus();
+        return;
+      }
+
+      startRun();
+      try {
+        const res = await fetch('/api/sales/gtm/identify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vertical, seed_company: seed, notes: notesField.value.trim() }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `Failed (${res.status})`);
+
+        const payload = await res.json();
+        const companies = (payload.final || {}).companies || [];
+        // A 200 whose answer could not be parsed is a failure, not an empty
+        // sector. Reporting it as "nothing came back" is what hid a broken agent
+        // for months.
+        if (!companies.length && payload.error) {
+          throw new Error(`That did not come back cleanly (${payload.error}).`);
+        }
+        render(companies);
+      } catch (err: any) {
+        el('error-text').textContent = err?.message || 'The request did not complete.';
+        errorBox.hidden = false;
+        result.hidden = true;
+        empty.hidden = true;
+      } finally {
+        endRun();
+      }
+    });
+
+    /** Hold the page's shape while the model thinks, and say how long it has been. */
+    function startRun(): void {
+      runBtn.disabled = true;
+      running.hidden = false;
+      validation.hidden = true;
+      errorBox.hidden = true;
+
+      // Emptying the page would say "nothing proposed" for the forty seconds
+      // before the answer arrives, so the result section stays and holds a
+      // skeleton in the shape of what is coming.
+      empty.hidden = true;
+      result.hidden = false;
+      unverified.hidden = true;
+      list.innerHTML = '';
+      for (let i = 0; i < 5; i += 1) {
+        const li = document.createElement('li');
+        li.className = 'gtm__skeleton';
+        li.innerHTML = '<span class="ds-skeleton"></span><span class="ds-skeleton"></span><span class="ds-skeleton"></span>';
+        list.appendChild(li);
+      }
+
+      stopElapsed?.();
+      stopElapsed = startElapsed((seconds) => { count.textContent = `proposing · ${seconds}s`; });
+    }
+
+    function endRun(): void {
+      stopElapsed?.();
+      stopElapsed = null;
+      runBtn.disabled = false;
+      running.hidden = true;
+    }
+
+    function render(companies: any[]): void {
+      list.innerHTML = '';
+
+      if (!companies.length) {
+        result.hidden = true;
+        empty.querySelector('.ds-empty__title')!.textContent = 'Nothing came back';
+        empty.querySelector('.ds-empty__body')!.textContent =
+          'Try a broader vertical, or name a company to find look-alikes of.';
+        empty.hidden = false;
+        return;
+      }
+
+      empty.hidden = true;
+      result.hidden = false;
+      unverified.hidden = false;
+      count.textContent = `${companies.length} proposed`;
+
+      companies.forEach((company) => {
+        const isText = typeof company === 'string';
+        const name = isText ? company : company.name || '—';
+        const why = isText ? '' : company.rationale || company.why || '';
+        // What to verify, and what the model is itself unsure of. Both come back
+        // from the agent and both used to be dropped here — an unverified row
+        // that looks identical to a confident one is the whole failure mode.
+        const check = isText ? '' : company.check || '';
+        const caveat = isText ? '' : company.caveat || '';
+
+        const li = document.createElement('li');
+        li.className = 'ds-row ds-row--record gtm__candidate';
+        li.innerHTML = `
+          <div class="gtm__main">
+            <span class="ds-table__primary" data-name></span>
+            <p class="ds-small" data-why></p>
+            <p class="ds-caption gtm__check" data-check hidden><b>Check</b> · <span data-check-text></span></p>
+            <p class="ds-caption gtm__caveat" data-caveat hidden><b>Unsure</b> · <span data-caveat-text></span></p>
+          </div>
+          <span class="gtm__acts">
+            <a class="ds-btn ds-btn--secondary ds-btn--sm" data-xray>X-ray</a>
+          </span>`;
+
+        // Model output — set as text, never as markup. The labelled lines carry
+        // their label in the template and take the model's words in a child, so
+        // "Check" and "Unsure" can never be something the model wrote.
+        const put = (attr: string, value: string) => {
+          li.querySelector<HTMLElement>(`[${attr}]`)!.textContent = value;
+        };
+        const putLine = (attr: string, value: string) => {
+          if (!value) return;
+          put(`${attr}-text`, value);
+          li.querySelector<HTMLElement>(`[${attr}]`)!.hidden = false;
+        };
+        put('data-name', name);
+        put('data-why', why);
+        putLine('data-check', check);
+        putLine('data-caveat', caveat);
+
+        li.querySelector<HTMLAnchorElement>('[data-xray]')!.href =
+          `/work/agents/xray?company=${encodeURIComponent(name)}`;
+        list.appendChild(li);
+      });
+    }
+  </script>
+</PlatformLayout>

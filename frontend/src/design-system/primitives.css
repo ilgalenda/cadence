@@ -1,0 +1,727 @@
+/* ============================================================================
+   Cadence Design System — primitives
+   ----------------------------------------------------------------------------
+   The component layer. Every rule here is expressed in tokens from tokens.css;
+   there are no literal colours, sizes or durations below this line.
+
+   The language (rebuilt 2026-08-19): a white field, soft grey wells, pill
+   controls, deeply rounded cards, charcoal as the authority accent. Depth is
+   soft and sparing; glass exists only on the floating layer.
+   ========================================================================== */
+
+@import "components.css";
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+
+.ds-root {
+  background: rgb(var(--canvas));
+  color: rgb(var(--ink));
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-body);
+  font-weight: var(--weight-regular);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: rgb(var(--accent) / 0.18); color: rgb(var(--ink)); }
+
+/* One focus treatment everywhere; the ring follows the element's own radius. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 1px;
+}
+
+/* ── Typography ───────────────────────────────────────────────────────────────
+   Hierarchy is size AND weight together: big, bold, tight headlines over calm
+   regular body. Nothing in between apologises. */
+
+.ds-display { font-size: var(--text-display); font-weight: var(--weight-bold);   line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
+.ds-heading { font-size: var(--text-heading); font-weight: var(--weight-bold);   line-height: var(--leading-tight); letter-spacing: var(--tracking-display); }
+.ds-title   { font-size: var(--text-title);   font-weight: var(--weight-medium); line-height: var(--leading-snug);  letter-spacing: var(--tracking-title); }
+.ds-lead    { font-size: var(--text-lead);    font-weight: var(--weight-regular);line-height: var(--leading-relaxed); letter-spacing: var(--tracking-title); }
+.ds-body    { font-size: var(--text-body);    font-weight: var(--weight-regular);line-height: var(--leading-normal); }
+.ds-small   { font-size: var(--text-small);   color: rgb(var(--ink-secondary)); }
+.ds-caption { font-size: var(--text-caption); color: rgb(var(--ink-secondary)); }
+
+/* The whisper register: Kode Mono for timestamps, ids, counts, key hints —
+   short identifiers only. A mono sentence is in the wrong face. */
+.ds-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  letter-spacing: var(--tracking-mono);
+  color: rgb(var(--ink-muted));
+  font-variant-numeric: tabular-nums;
+}
+
+/* The eyebrow — sans now. Small caps label that marks a section without a
+   heading's weight. */
+.ds-eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--text-caption);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-label);
+  color: rgb(var(--ink-muted));
+  font-weight: var(--weight-medium);
+}
+
+.ds-numeric { font-variant-numeric: tabular-nums; }
+
+/* ── Rules ────────────────────────────────────────────────────────────────── */
+
+.ds-rule   { height: 1px; background: rgb(var(--rule-hairline)); border: 0; }
+.ds-rule--structural { background: rgb(var(--rule)); }
+.ds-rule--fade { background: linear-gradient(to right, rgb(var(--rule)), rgb(var(--rule) / 0)); }
+
+/* ── Buttons — pills ──────────────────────────────────────────────────────── */
+
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: 2.25rem;
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-body);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition:
+    background-color var(--dur-tick) var(--ease-phase),
+    border-color     var(--dur-tick) var(--ease-phase),
+    color            var(--dur-tick) var(--ease-phase),
+    box-shadow       var(--dur-tick) var(--ease-phase);
+}
+.ds-btn:active:not(:disabled) { transform: translateY(1px); transition-duration: var(--dur-tap); }
+.ds-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Primary — the charcoal pill. The brand's authority colour commits; blue
+   stays free to mean "live". */
+.ds-btn--primary { background: rgb(var(--surface-ink)); color: rgb(var(--ink-on-ink)); }
+.ds-btn--primary:hover:not(:disabled) { background: rgb(var(--chrome-raised)); }
+
+/* Accent — the one action that starts work: send, run, detect. */
+.ds-btn--accent { background: rgb(var(--accent)); color: rgb(255 255 255); }
+.ds-btn--accent:hover:not(:disabled) { background: rgb(var(--accent-pressed)); }
+
+/* Secondary — a soft grey pill, no border. */
+.ds-btn--secondary { background: rgb(var(--surface-sunken)); color: rgb(var(--ink)); }
+.ds-btn--secondary:hover:not(:disabled) { background: rgb(var(--ink) / 0.09); }
+
+.ds-btn--ghost { background: transparent; color: rgb(var(--ink-secondary)); }
+.ds-btn--ghost:hover:not(:disabled) { background: rgb(var(--ink) / 0.05); color: rgb(var(--ink)); }
+
+.ds-btn--danger { background: transparent; color: rgb(var(--signal-fault)); border-color: rgb(var(--signal-fault) / 0.3); }
+.ds-btn--danger:hover:not(:disabled) { background: rgb(var(--signal-fault-wash)); border-color: rgb(var(--signal-fault) / 0.5); }
+
+.ds-btn--sm { height: 1.75rem; padding: 0 var(--space-3); font-size: var(--text-caption); }
+.ds-btn--lg { height: 2.75rem; padding: 0 var(--space-6); font-size: var(--text-body); }
+
+/* Round icon button — the rail and toolbar workhorse. */
+.ds-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2rem; height: 2rem;
+  border: 0; border-radius: var(--radius-full);
+  background: transparent; color: rgb(var(--ink-muted));
+  cursor: pointer;
+  transition: background-color var(--dur-tick) var(--ease-phase), color var(--dur-tick) var(--ease-phase);
+}
+.ds-icon-btn:hover { background: rgb(var(--ink) / 0.05); color: rgb(var(--ink)); }
+.ds-icon-btn--danger:hover { background: rgb(var(--signal-fault-wash)); color: rgb(var(--signal-fault)); }
+/* The row-scale icon button: a control that sits inside a line of text rather
+   than in a toolbar, so it matches the line, not the toolbar. */
+.ds-icon-btn--sm { width: 1.25rem; height: 1.25rem; }
+/* A filled round action — the send arrow, the new-thing plus. */
+.ds-icon-btn--fill { background: rgb(var(--surface-ink)); color: rgb(var(--ink-on-ink)); }
+.ds-icon-btn--fill:hover { background: rgb(var(--chrome-raised)); color: rgb(var(--ink-on-ink)); }
+
+/* ── Fields — soft wells ──────────────────────────────────────────────────── */
+
+.ds-field {
+  display: block;
+  width: 100%;
+  height: 2.5rem;
+  padding: 0 var(--space-4);
+  background: rgb(var(--surface-sunken));
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: var(--text-small);
+  color: rgb(var(--ink));
+  transition: background-color var(--dur-tick) var(--ease-phase), border-color var(--dur-tick) var(--ease-phase), box-shadow var(--dur-tick) var(--ease-phase);
+}
+.ds-field::placeholder { color: rgb(var(--ink-muted)); }
+.ds-field:hover:not(:focus) { background: rgb(var(--ink) / 0.07); }
+/* Focus lifts the well to a white pill with a stated edge. */
+.ds-field:focus {
+  outline: none;
+  background: rgb(var(--surface));
+  border-color: rgb(var(--ink) / 0.35);
+  box-shadow: var(--shadow-raised);
+}
+.ds-field--invalid { border-color: rgb(var(--signal-fault)); }
+.ds-field--invalid:focus { border-color: rgb(var(--signal-fault)); }
+
+/* Text areas grow with what is typed, stop at a ceiling, then scroll.
+   A multi-line well cannot be a pill; it takes the card radius instead. */
+.ds-textarea, .ds-grow {
+  height: auto;
+  min-height: 5rem;
+  max-height: 18rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  line-height: var(--leading-normal);
+  field-sizing: content;
+  overflow-y: auto;
+  resize: none;
+}
+.ds-textarea--resizable { resize: vertical; }
+
+.ds-label { display: block; font-size: var(--text-caption); font-weight: var(--weight-medium); color: rgb(var(--ink-secondary)); margin-bottom: var(--space-2); }
+.ds-help  { font-size: var(--text-caption); color: rgb(var(--ink-muted)); margin-top: var(--space-1); }
+.ds-label__optional { font-weight: var(--weight-regular); color: rgb(var(--ink-muted)); }
+.ds-error { font-size: var(--text-caption); color: rgb(var(--signal-fault)); margin-top: var(--space-1); }
+
+/* Search — a grey pill with the glass in it. */
+.ds-search {
+  display: flex; align-items: center; gap: var(--space-2);
+  height: 2.5rem; padding: 0 var(--space-4);
+  background: rgb(var(--surface-sunken));
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  transition: background-color var(--dur-tick) var(--ease-phase), border-color var(--dur-tick) var(--ease-phase), box-shadow var(--dur-tick) var(--ease-phase);
+}
+.ds-search:focus-within { background: rgb(var(--surface)); border-color: rgb(var(--ink) / 0.35); box-shadow: var(--shadow-raised); }
+.ds-search__icon { color: rgb(var(--ink-muted)); flex-shrink: 0; }
+.ds-search__input { flex: 1; min-width: 0; border: 0; background: transparent; font-family: var(--font-sans); font-size: var(--text-small); color: rgb(var(--ink)); }
+.ds-search__input:focus { outline: none; }
+.ds-search__input::placeholder { color: rgb(var(--ink-muted)); }
+
+/* ── Status marks — wash pills ────────────────────────────────────────────────
+   The sync vocabulary: locked (in sync), drift (pending), fault (wrong),
+   live (working now), canon (gold, promoted knowledge). A mark is a soft
+   pill: tinted wash, a dot, a small label in the signal's text colour. */
+
+.ds-mark {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  height: 1.5rem; padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: rgb(var(--surface-sunken));
+  font-family: var(--font-sans);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: rgb(var(--ink-secondary));
+  white-space: nowrap;
+}
+.ds-mark::before { content: ''; width: 6px; height: 6px; border-radius: var(--radius-full); background: currentColor; flex-shrink: 0; }
+
+.ds-mark--locked { color: rgb(var(--signal-locked)); background: rgb(var(--signal-locked-wash)); }
+.ds-mark--drift  { color: rgb(var(--signal-drift));  background: rgb(var(--signal-drift-wash)); }
+.ds-mark--fault  { color: rgb(var(--signal-fault));  background: rgb(var(--signal-fault-wash)); }
+.ds-mark--live   { color: rgb(var(--accent-ink));    background: rgb(var(--accent-wash)); }
+.ds-mark--idle   { color: rgb(var(--ink-muted)); }
+.ds-mark--canon  { color: rgb(var(--gold-deep)); background: rgb(var(--field-gold) / 0.18); }
+
+/* A live mark breathes at the ambient beat — the only ambient motion in the
+   system, and only on something genuinely in progress. */
+.ds-mark--live::before { animation: ds-beat var(--dur-beat) var(--ease-phase) infinite; }
+
+@keyframes ds-beat {
+  0%, 100% { opacity: 1;    transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.82); }
+}
+
+/* ── Keys ─────────────────────────────────────────────────────────────────── */
+
+.ds-kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.375rem; height: 1.375rem; padding: 0 var(--space-1);
+  border-radius: var(--radius-xs);
+  border: 1px solid rgb(var(--ink) / 0.22);
+  border-bottom-width: 2px;
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  color: rgb(var(--ink));
+}
+.ds-chrome .ds-kbd { border-color: rgb(var(--chrome-ink-muted) / 0.6); color: rgb(var(--chrome-ink)); }
+
+/* ── Tag — a quiet grey chip ──────────────────────────────────────────────── */
+
+.ds-tag {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  height: 1.5rem; padding: 0 var(--space-3);
+  background: rgb(var(--surface-sunken));
+  border: 0;
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: var(--text-caption);
+  color: rgb(var(--ink-secondary));
+}
+.ds-tag--accent { background: rgb(var(--accent-wash)); color: rgb(var(--accent-ink)); }
+
+/* ── Surfaces ─────────────────────────────────────────────────────────────────
+   A panel and a card are lifted gently off the field by a soft shadow; a well
+   is pressed into it by tone. No borders — depth and tone do the separating. */
+
+.ds-panel {
+  background: rgb(var(--surface));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-raised);
+}
+.ds-panel__head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid rgb(var(--rule-hairline));
+}
+.ds-panel__body { padding: var(--space-6); }
+
+.ds-card {
+  background: rgb(var(--surface));
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-raised);
+  transition: box-shadow var(--dur-shift) var(--ease-settle), transform var(--dur-shift) var(--ease-settle);
+}
+.ds-card--interactive { cursor: pointer; }
+.ds-card--interactive:hover { box-shadow: var(--shadow-lifted); transform: translateY(-1px); }
+
+/* A colour field — the featured surface. Set the field with a modifier; the
+   ink comes with it. At most one per view; display or title type only. */
+.ds-card--field-blue  { background: rgb(var(--field-blue));  color: rgb(var(--field-blue-ink)); }
+.ds-card--field-sky   { background: rgb(var(--field-sky));   color: rgb(var(--field-sky-ink)); }
+.ds-card--field-amber { background: rgb(var(--field-amber)); color: rgb(var(--field-amber-ink)); }
+.ds-card--field-gold  { background: rgb(var(--field-gold));  color: rgb(var(--field-gold-ink)); }
+
+.ds-well {
+  background: rgb(var(--surface-sunken));
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+/* The trail. */
+.ds-crumb { display: flex; align-items: center; gap: var(--space-2); min-width: 0; font-size: var(--text-small); }
+.ds-crumb__up { margin-right: calc(var(--space-2) * -1); flex-shrink: 0; }
+.ds-crumb__link { color: rgb(var(--ink-muted)); text-decoration: none; white-space: nowrap; transition: color var(--dur-tick) var(--ease-phase); }
+.ds-crumb__link:hover { color: rgb(var(--ink)); }
+.ds-crumb > * + *::before { content: '/'; margin-right: var(--space-2); color: rgb(var(--ink-muted)); opacity: 0.5; }
+.ds-crumb__here { color: rgb(var(--ink)); font-weight: var(--weight-medium); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Sections and lists ───────────────────────────────────────────────────── */
+
+.ds-sectionhead {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.ds-sectionhead__title { color: rgb(var(--ink)); }
+
+.ds-page {
+  max-width: var(--measure-page);
+  margin-inline: auto;
+  padding: var(--space-12) var(--space-8) var(--space-16);
+}
+.ds-page__head { margin-bottom: var(--space-8); }
+.ds-page__title { margin: var(--space-3) 0; }
+.ds-page__intro { color: rgb(var(--ink-secondary)); max-width: var(--measure-read); }
+@media (max-width: 60rem) {
+  .ds-page { padding-inline: var(--space-4); }
+}
+
+.ds-list { list-style: none; margin: 0; padding: 0; }
+.ds-list > * + * { border-top: 1px solid rgb(var(--rule-hairline)); }
+
+/* ── Navigation & list rows ───────────────────────────────────────────────────
+   One row treatment for nav, conversation lists and trees. The active row is
+   a soft grey well — charcoal is reserved for committing actions, and blue
+   stays reserved for live work. */
+
+.ds-row {
+  position: relative;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  min-height: 2.25rem;
+  border-radius: var(--radius-sm);
+  color: rgb(var(--ink-secondary));
+  font-size: var(--text-small);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--dur-tick) var(--ease-phase), color var(--dur-tick) var(--ease-phase);
+}
+.ds-row:hover { background: rgb(var(--ink) / 0.05); color: rgb(var(--ink)); }
+.ds-row--record {
+  align-items: flex-start;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-3);
+  min-height: 0;
+}
+.ds-row.is-active { background: rgb(var(--surface-sunken)); color: rgb(var(--ink)); font-weight: var(--weight-medium); }
+.ds-row.is-active .ds-row__icon { color: rgb(var(--ink)); }
+.ds-row__icon { flex-shrink: 0; width: 1rem; color: rgb(var(--ink-muted)); display: inline-flex; justify-content: center; }
+.ds-row__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ds-row__actions { display: flex; align-items: center; gap: var(--space-px); opacity: 0; transition: opacity var(--dur-tick) var(--ease-phase); }
+.ds-row:hover .ds-row__actions,
+.ds-row:focus-within .ds-row__actions { opacity: 1; }
+
+.ds-row--tree { padding-left: calc(var(--space-3) + (var(--depth, 0) * var(--space-4))); }
+
+.ds-twisty { transition: transform var(--dur-shift) var(--ease-phase); }
+.ds-twisty.is-open { transform: rotate(90deg); }
+
+/* ── Tabs — quiet text, stated underline ──────────────────────────────────── */
+
+.ds-tabs { display: flex; gap: var(--space-5); border-bottom: 1px solid rgb(var(--rule-hairline)); }
+.ds-tab {
+  position: relative;
+  padding: var(--space-2) 0;
+  background: none; border: 0;
+  font-family: var(--font-sans); font-size: var(--text-small);
+  font-weight: var(--weight-medium);
+  color: rgb(var(--ink-muted));
+  cursor: pointer;
+  transition: color var(--dur-tick) var(--ease-phase);
+}
+.ds-tab:hover { color: rgb(var(--ink)); }
+.ds-tab.is-active { color: rgb(var(--ink)); }
+.ds-tab.is-active::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  border-radius: var(--radius-full);
+  background: rgb(var(--ink));
+}
+
+/* ── Menu — glass, floating ───────────────────────────────────────────────── */
+
+.ds-menu {
+  min-width: 12rem; padding: var(--space-2);
+  background: rgb(var(--surface) / var(--glass-light));
+  backdrop-filter: blur(var(--blur-regular)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--blur-regular)) saturate(var(--glass-saturate));
+  border-top: 1px solid rgb(255 255 255 / 0.55);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lifted);
+  animation: ds-menu-in var(--dur-shift) var(--ease-settle);
+  transform-origin: top;
+}
+@keyframes ds-menu-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.99); }
+  to   { opacity: 1; transform: none; }
+}
+.ds-menu--up { transform-origin: bottom; animation-name: ds-menu-in-up; }
+@keyframes ds-menu-in-up {
+  from { opacity: 0; transform: translateY(4px) scale(0.99); }
+  to   { opacity: 1; transform: none; }
+}
+.ds-menu__item {
+  display: flex; align-items: center; gap: var(--space-3); width: 100%;
+  padding: var(--space-2) var(--space-3);
+  min-height: 2.125rem;
+  border: 0; background: none; border-radius: var(--radius-sm);
+  font-family: var(--font-sans); font-size: var(--text-small); color: rgb(var(--ink));
+  text-align: left; cursor: pointer;
+  transition: background-color var(--dur-tick) var(--ease-phase);
+}
+.ds-menu__item:hover { background: rgb(var(--ink) / 0.05); }
+.ds-menu__item--danger { color: rgb(var(--signal-fault)); }
+.ds-menu__item--danger:hover { background: rgb(var(--signal-fault-wash)); }
+.ds-menu__sep { height: 1px; margin: var(--space-1) 0; background: rgb(var(--rule-hairline)); }
+
+/* ── Dialog — glass, thick, above a scrim ─────────────────────────────────── */
+
+.ds-scrim {
+  position: fixed; inset: 0; z-index: var(--z-overlay);
+  background: rgb(18 18 18 / 0.32);
+  animation: ds-fade-in var(--dur-reveal) var(--ease-settle);
+}
+.ds-dialog {
+  position: fixed; z-index: var(--z-dialog);
+  left: 50%; top: 50%;
+  width: min(var(--measure-form), calc(100vw - var(--space-8)));
+  transform: translate(-50%, -50%);
+  background: rgb(var(--surface) / var(--glass-light));
+  backdrop-filter: blur(var(--blur-thick)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--blur-thick)) saturate(var(--glass-saturate));
+  border-top: 1px solid rgb(255 255 255 / 0.55);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  animation: ds-dialog-in var(--dur-reveal) var(--ease-settle);
+}
+@keyframes ds-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ds-dialog-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); }
+  to   { opacity: 1; transform: translate(-50%, -50%); }
+}
+.ds-dialog__head { padding: var(--space-6) var(--space-6) var(--space-3); }
+.ds-dialog__body { padding: 0 var(--space-6); }
+.ds-dialog__foot { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-6); }
+
+/* ── Toast — dark glass pill ──────────────────────────────────────────────── */
+
+.ds-toast {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: rgb(var(--chrome) / var(--glass-dark));
+  backdrop-filter: blur(var(--blur-regular)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--blur-regular)) saturate(var(--glass-saturate));
+  border-top: 1px solid rgb(255 255 255 / 0.14);
+  color: rgb(var(--chrome-ink));
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lifted);
+  font-size: var(--text-small);
+  animation: ds-toast-in var(--dur-reveal) var(--ease-settle);
+}
+@keyframes ds-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Transcript ───────────────────────────────────────────────────────────────
+   A conversation, typeset. The person's question is a soft grey bubble on the
+   right; the answer is plain prose on the field, full measure — the answer is
+   the content, so it is never boxed. Machine facts (time, model, tools run)
+   are a quiet readout line between the two, never interrupting the prose. */
+
+.ds-log { max-width: var(--measure-read); margin-inline: auto; }
+
+.ds-x { display: flex; flex-direction: column; padding-block: var(--space-8); }
+
+.ds-x__stamp { align-self: flex-end; margin: 0 var(--space-2) var(--space-2) 0; font-family: var(--font-mono); font-size: var(--text-micro); letter-spacing: var(--tracking-mono); color: rgb(var(--ink-muted)); white-space: nowrap; }
+
+/* The question bubble. */
+.ds-x__q {
+  align-self: flex-end;
+  max-width: 85%;
+  margin: 0;
+  padding: var(--space-3) var(--space-5);
+  background: rgb(var(--surface-sunken));
+  border-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-xs);
+  font-size: var(--text-body);
+  line-height: var(--leading-normal);
+  color: rgb(var(--ink));
+  text-wrap: pretty;
+}
+
+/* The readout: what the machine did, as a quiet wrapping row of ticks. */
+.ds-x__spine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-top: var(--space-6); }
+.ds-x__body { margin-top: var(--space-4); }
+.ds-x__acts { display: flex; gap: var(--space-px); margin-top: var(--space-3); opacity: 0; transition: opacity var(--dur-tick) var(--ease-phase); }
+.ds-x:hover .ds-x__acts, .ds-x:focus-within .ds-x__acts { opacity: 1; }
+
+/* A tick — one machine fact: a dot and a mono identifier. */
+.ds-tick { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; font-family: var(--font-mono); font-size: var(--text-micro); letter-spacing: var(--tracking-mono); line-height: 1.4; color: rgb(var(--ink-muted)); overflow-wrap: break-word; }
+.ds-tick::before { content: ''; width: 5px; height: 5px; border-radius: var(--radius-full); flex: none; background: currentColor; }
+.ds-tick--model { color: rgb(var(--ink-secondary)); }
+.ds-tick--model::before { background: none; box-shadow: inset 0 0 0 1px currentColor; }
+.ds-tick--done { color: rgb(var(--signal-locked)); }
+.ds-tick--fault { color: rgb(var(--signal-fault)); }
+.ds-tick--canon { color: rgb(var(--gold-deep)); }
+.ds-tick--live { color: rgb(var(--accent-ink)); }
+.ds-tick--live::before { animation: ds-beat var(--dur-beat) var(--ease-phase) infinite; }
+.ds-tick--link { color: rgb(var(--ink-muted)); text-decoration: none; }
+.ds-tick--link:hover { color: rgb(var(--ink)); }
+
+/* Waiting: the answer's first line is a caret, exactly where the first word
+   will be. No spinner, no skeleton paragraph. */
+.ds-caret { display: inline-block; width: 2px; height: 1.15em; vertical-align: -0.2em; background: rgb(var(--ink)); animation: ds-caret calc(var(--dur-beat) / 2) var(--ease-phase) infinite; }
+@media (prefers-reduced-motion: reduce) { .ds-caret { animation: none; } }
+
+/* Arrival: each part comes up 4px into place in the order the machine produced
+   it — question, readout, prose. Set --arrive to stagger. One-shot. */
+@keyframes ds-arrive { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.ds-arrive { animation: ds-arrive var(--dur-reveal) var(--ease-settle) both; animation-delay: var(--arrive, 0ms); }
+@media (prefers-reduced-motion: reduce) { .ds-arrive { animation: none; } }
+
+/* A transcript in a narrow container — a drawer, a split view. The measure
+   gives; the grammar holds. */
+.ds-log--tight { max-width: none; }
+.ds-log--tight .ds-x { padding-block: var(--space-6); }
+
+/* Answer prose — the only place in the system with relaxed leading. */
+.ds-answer { font-size: var(--text-body); line-height: var(--leading-relaxed); color: rgb(var(--ink)); }
+.ds-answer > * + * { margin-top: var(--space-5); }
+.ds-answer > :first-child { margin-top: 0; }
+.ds-answer h2 { font-size: var(--text-title); font-weight: var(--weight-medium); letter-spacing: var(--tracking-title); margin-top: var(--space-8); }
+.ds-answer h3 { font-size: var(--text-lead); font-weight: var(--weight-medium); margin-top: var(--space-6); }
+.ds-answer ul, .ds-answer ol { padding-left: var(--space-5); }
+/* Tailwind's preflight strips list-style; restore it here — an answer's list
+   must read as a list on every surface, not only where preflight is absent. */
+.ds-answer ul { list-style: disc; }
+.ds-answer ol { list-style: dehaldenl; }
+.ds-answer li + li { margin-top: var(--space-2); }
+.ds-answer code { font-family: var(--font-mono); font-size: 0.9em; background: rgb(var(--surface-sunken)); padding: 0.1em 0.35em; border-radius: var(--radius-xs); }
+.ds-answer pre { background: rgb(var(--surface-sunken)); padding: var(--space-4); border-radius: var(--radius-md); overflow-x: auto; }
+.ds-answer pre code { background: none; padding: 0; }
+.ds-answer blockquote {
+  padding-left: var(--space-4);
+  border-left: 2px solid rgb(var(--rule));
+  font-size: var(--text-body);
+  color: rgb(var(--ink-secondary));
+}
+.ds-answer a { color: rgb(var(--accent-ink)); text-underline-offset: 2px; }
+
+/* Thinking — three ticks at the ambient beat, phase-offset. A metronome. */
+.ds-thinking { display: inline-flex; align-items: center; gap: 3px; height: 1.25rem; }
+.ds-thinking__tick { width: 3px; height: 10px; border-radius: var(--radius-full); background: rgb(var(--ink-muted)); animation: ds-tickbeat var(--dur-beat) var(--ease-phase) infinite; }
+.ds-thinking__tick:nth-child(2) { animation-delay: calc(var(--dur-beat) / -6); }
+.ds-thinking__tick:nth-child(3) { animation-delay: calc(var(--dur-beat) / -3); }
+@keyframes ds-tickbeat {
+  0%, 100% { opacity: 0.25; transform: scaleY(0.6); }
+  50%      { opacity: 1;    transform: scaleY(1); }
+}
+
+/* Streaming text sits in the same column as finished prose, so nothing
+   reflows when the answer settles. */
+.ds-streaming { font-size: var(--text-body); line-height: var(--leading-relaxed); white-space: pre-wrap; }
+.ds-streaming::after {
+  content: ''; display: inline-block; width: 2px; height: 1em;
+  margin-left: 2px; vertical-align: text-bottom;
+  background: rgb(var(--accent));
+  animation: ds-caret 1s steps(2) infinite;
+}
+@keyframes ds-caret { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+
+/* A tool call — one step of work, stated as a soft well row. */
+.ds-toolcall {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: rgb(var(--surface-sunken));
+  border-radius: var(--radius-md);
+  font-size: var(--text-small);
+  color: rgb(var(--ink-secondary));
+}
+.ds-toolcall > * { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-toolcall > :nth-child(2) { flex: 1; }
+.ds-toolcall__name { color: rgb(var(--ink)); font-weight: var(--weight-medium); }
+.ds-toolcall--done .ds-toolcall__name { color: rgb(var(--signal-locked)); }
+.ds-toolcall--failed .ds-toolcall__name { color: rgb(var(--signal-fault)); }
+.ds-toolcall__meta { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-micro); letter-spacing: var(--tracking-mono); color: rgb(var(--ink-muted)); }
+
+/* The composer — a soft tray. The question sits on its own line with room to
+   become three; every control the question needs is inside the same tray.
+   At rest it is a grey well; focused, it lifts to a white card. */
+.ds-composer {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4);
+  background: rgb(var(--surface-sunken));
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  transition: background-color var(--dur-tick) var(--ease-phase), border-color var(--dur-tick) var(--ease-phase), box-shadow var(--dur-shift) var(--ease-settle);
+}
+.ds-composer:focus-within { background: rgb(var(--surface)); border-color: rgb(var(--rule-hairline)); box-shadow: var(--shadow-lifted); }
+.ds-composer__input {
+  width: 100%; min-width: 0;
+  border: 0; background: transparent; resize: none;
+  field-sizing: content;
+  min-height: 1.5rem;
+  max-height: 12rem;
+  overflow-y: auto;
+  padding: var(--space-1) var(--space-1) 0;
+  font-family: var(--font-sans); font-size: var(--text-body); line-height: var(--leading-normal);
+  color: rgb(var(--ink));
+}
+.ds-composer__bar { display: flex; align-items: center; gap: var(--space-2); }
+.ds-composer__bar > .ds-composer__gap { flex: 1; min-width: var(--space-2); }
+.ds-composer--open { padding: var(--space-5); gap: var(--space-5); }
+.ds-composer--open .ds-composer__input { min-height: 3rem; font-size: var(--text-lead); }
+.ds-composer__input:focus { outline: none; }
+.ds-composer__input::placeholder { color: rgb(var(--ink-muted)); }
+
+/* ── Feedback states ──────────────────────────────────────────────────────── */
+
+.ds-skeleton {
+  background: linear-gradient(90deg,
+    rgb(var(--surface-sunken)) 25%,
+    rgb(var(--rule-hairline)) 50%,
+    rgb(var(--surface-sunken)) 75%);
+  background-size: 200% 100%;
+  border-radius: var(--radius-xs);
+  animation: ds-sweep 1.4s linear infinite;
+}
+@keyframes ds-sweep { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-skeleton { animation: none; background: rgb(var(--surface-sunken)); }
+  .ds-streaming::after { animation: none; }
+}
+
+.ds-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-4); padding: var(--space-16) var(--space-6); }
+.ds-empty__title { font-size: var(--text-title); font-weight: var(--weight-medium); letter-spacing: var(--tracking-title); }
+.ds-empty__body  { font-size: var(--text-small); color: rgb(var(--ink-secondary)); max-width: 26rem; line-height: var(--leading-relaxed); }
+/* An empty that is a note, not a hero: the same idea at the scale of a rail
+   slot or a panel, where a centred block with hero padding would be absurd. */
+.ds-empty--inline { align-items: flex-start; text-align: left; gap: var(--space-1); padding: var(--space-2) var(--space-3); }
+.ds-empty--inline .ds-empty__body { font-size: var(--text-caption); max-width: none; }
+
+.ds-stagger > * { animation: ds-rise var(--dur-shift) var(--ease-settle) backwards; }
+.ds-stagger > *:nth-child(1) { animation-delay: calc(0 * var(--dur-step)); }
+.ds-stagger > *:nth-child(2) { animation-delay: calc(1 * var(--dur-step)); }
+.ds-stagger > *:nth-child(3) { animation-delay: calc(2 * var(--dur-step)); }
+.ds-stagger > *:nth-child(4) { animation-delay: calc(3 * var(--dur-step)); }
+.ds-stagger > *:nth-child(5) { animation-delay: calc(4 * var(--dur-step)); }
+.ds-stagger > *:nth-child(n+6) { animation-delay: calc(5 * var(--dur-step)); }
+@keyframes ds-rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* ── Charcoal objects ─────────────────────────────────────────────────────────
+   .ds-chrome is no longer a frame — it is the class for the few surfaces that
+   ARE charcoal: the bulk bar, a toast, a dark featured band. Solid, never
+   glass (a toast handles its own material). Primitives inside invert. */
+.ds-chrome {
+  background: rgb(var(--chrome));
+  color: rgb(var(--chrome-ink));
+}
+.ds-chrome .ds-eyebrow, .ds-chrome .ds-mono { color: rgb(var(--chrome-ink-muted)); }
+.ds-chrome .ds-small { color: rgb(var(--chrome-ink) / 0.8); }
+.ds-chrome .ds-rule, .ds-chrome .ds-rule--structural { background: rgb(var(--chrome-rule)); }
+
+.ds-chrome .ds-row { color: rgb(var(--chrome-ink) / 0.74); }
+.ds-chrome .ds-row:hover { background: rgb(var(--chrome-ink) / 0.08); color: rgb(var(--chrome-ink)); }
+.ds-chrome .ds-row.is-active { background: rgb(var(--chrome-ink) / 0.14); color: rgb(var(--chrome-ink)); }
+.ds-chrome .ds-row.is-active .ds-row__icon { color: rgb(var(--chrome-ink)); }
+.ds-chrome .ds-row__icon { color: rgb(var(--chrome-ink-muted)); }
+.ds-chrome .ds-row:hover .ds-row__icon { color: rgb(var(--chrome-ink)); }
+
+.ds-chrome .ds-icon-btn { color: rgb(var(--chrome-ink-muted)); }
+.ds-chrome .ds-icon-btn:hover { background: rgb(var(--chrome-ink) / 0.08); color: rgb(var(--chrome-ink)); }
+
+.ds-chrome .ds-search { background: rgb(0 0 0 / 0.16); }
+.ds-chrome .ds-search:focus-within { background: rgb(var(--chrome-ink) / 0.08); border-color: rgb(var(--chrome-rule)); box-shadow: none; }
+.ds-chrome .ds-search__input { color: rgb(var(--chrome-ink)); }
+.ds-chrome .ds-search__input::placeholder, .ds-chrome .ds-search__icon { color: rgb(var(--chrome-ink-muted)); }
+
+.ds-chrome .ds-btn--primary { background: rgb(var(--chrome-ink)); color: rgb(var(--chrome)); }
+.ds-chrome .ds-btn--primary:hover:not(:disabled) { background: rgb(255 255 255); }
+.ds-chrome .ds-btn--secondary { background: rgb(var(--chrome-ink) / 0.1); color: rgb(var(--chrome-ink)); }
+.ds-chrome .ds-btn--secondary:hover:not(:disabled) { background: rgb(var(--chrome-ink) / 0.18); }
+.ds-chrome .ds-btn--ghost { color: rgb(var(--chrome-ink-muted)); }
+.ds-chrome .ds-btn--ghost:hover:not(:disabled) { background: rgb(var(--chrome-ink) / 0.08); color: rgb(var(--chrome-ink)); }
+
+/* Signal colours on charcoal: lifted variants, and marks go borderless washes
+   of the lifted colour. */
+.ds-chrome .ds-mark--idle, .ds-toast .ds-mark--idle { color: rgb(var(--chrome-ink-muted)); background: rgb(var(--chrome-ink) / 0.08); }
+.ds-chrome .ds-mark--live, .ds-toast .ds-mark--live { color: rgb(var(--accent-on-chrome)); background: rgb(var(--accent-on-chrome) / 0.12); }
+.ds-chrome .ds-mark--locked, .ds-toast .ds-mark--locked { color: rgb(var(--signal-locked-on-chrome)); background: rgb(var(--signal-locked-on-chrome) / 0.12); }
+.ds-chrome .ds-mark--drift, .ds-toast .ds-mark--drift { color: rgb(var(--signal-drift-on-chrome)); background: rgb(var(--signal-drift-on-chrome) / 0.12); }
+.ds-chrome .ds-mark--fault, .ds-toast .ds-mark--fault { color: rgb(var(--signal-fault-on-chrome)); background: rgb(var(--signal-fault-on-chrome) / 0.12); }
+.ds-chrome .ds-mark--canon, .ds-toast .ds-mark--canon { color: rgb(var(--gold-on-chrome)); background: rgb(var(--gold-on-chrome) / 0.12); }
+.ds-chrome .ds-answer a, .ds-toast a { color: rgb(var(--accent-on-chrome)); }
+.ds-chrome .ds-tag { background: rgb(var(--chrome-ink) / 0.1); color: rgb(var(--chrome-ink-muted)); }
+.ds-chrome.ds-scroll, .ds-chrome .ds-scroll { scrollbar-color: rgb(var(--chrome-rule)) transparent; }
+.ds-chrome .ds-scroll::-webkit-scrollbar-thumb, .ds-chrome.ds-scroll::-webkit-scrollbar-thumb { background: rgb(var(--chrome-rule)); background-clip: content-box; }
+
+/* ── Scrollbars ───────────────────────────────────────────────────────────── */
+
+.ds-scroll { scrollbar-width: thin; scrollbar-color: rgb(var(--rule)) transparent; }
+.ds-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.ds-scroll::-webkit-scrollbar-track { background: transparent; }
+.ds-scroll::-webkit-scrollbar-thumb {
+  background: rgb(var(--rule));
+  border-radius: var(--radius-full);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.ds-scroll::-webkit-scrollbar-thumb:hover { background: rgb(var(--ink-muted) / 0.5); background-clip: content-box; }

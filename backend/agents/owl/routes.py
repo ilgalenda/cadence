@@ -5,16 +5,20 @@ import os
 import uuid
 from typing import Optional
 
-import anthropic
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from agents.lead.knowledge import _OWL_PERSONA, _owl_identity_tail, owl_system_blocks
-from agents.shared.vault import load_vault_for_analysis, log_cache_usage
+from agents.mind.blocks import owl_identity_tail, owl_system_blocks
+from agents.mind.contributions_block import render_own_contributions_block
+from agents.mind import core as mind
+from agents.mind import memory, memory_seed, persona
+from agents.shared.vault import load_vault_for_analysis
 from agents.owl.routing import HAIKU_MODEL, SONNET_MODEL, select_model
-from agents.owl import storage
+from agents.owl import projects, storage
+from agents.owl.routes_organisation import router as organisation_router
 from agents.owl.topics import extract_topics
+from agents.sales import tools as sales_tools
 from agents.shared import vault as vault_mod
 from agents.shared.notifications import send_admin_email
 from auth import require_authed
@@ -34,21 +38,64 @@ Return ONLY a JSON object — no prose, no markdown — with these keys:
 Be conservative — only mark is_correction=true when the user is clearly disagreeing with Owl, not just adding context or asking a follow-up."""
 
 
-def _classify_correction(client: anthropic.Anthropic, owl_reply: str, user_msg: str) -> Optional[dict]:
+TITLE_PROMPT = """You name a conversation, the way a person would name a note.
+
+Return ONLY the title — no quotes, no prose, no markdown, no trailing full stop.
+
+Rules:
+  - Between three and seven words.
+  - Name the subject, not the act: "Case study for a tier-one bank", never
+    "User asks about a case study".
+  - Sentence case. Keep product and protocol names as they are written.
+  - British English."""
+
+TITLE_MAX_WORDS = 10
+
+
+def _generate_title(user_msg: str, owl_reply: str) -> str:
+    """Name a conversation from its opening exchange.
+
+    Returns "" on any failure, which leaves the provisional title the row was
+    created with — a truncation of the opening message. Naming is a nicety, so
+    it must never be able to cost the conversation itself.
+    """
+    if not user_msg.strip():
+        return ""
+    try:
+        result = mind.classify(
+            system=TITLE_PROMPT,
+            messages=[{
+                "role": "user",
+                "content": f"Question:\n{user_msg[:1000]}\n\nAnswer:\n{owl_reply[:1000]}",
+            }],
+            max_tokens=40,
+        )
+        # A model that ignores "no prose" tends to do it across several lines, so
+        # only the first is trusted, and an over-long one is treated as a refusal
+        # rather than truncated into a worse title than we already have.
+        title = result.text.strip().splitlines()[0].strip().strip('"').rstrip(".")
+        if not title or len(title.split()) > TITLE_MAX_WORDS:
+            return ""
+        return title[:80]
+    except Exception as e:
+        print(f"[owl] title generation failed: {e}")
+        return ""
+
+
+def _classify_correction(owl_reply: str, user_msg: str) -> Optional[dict]:
     """Run a small Haiku classifier to detect correction intent. Returns the proposed correction dict if detected, else None."""
     if not owl_reply.strip() or not user_msg.strip():
         return None
     try:
-        resp = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=400,
+        result = mind.classify(
             system=CORRECTION_CLASSIFIER_PROMPT,
             messages=[{
                 "role": "user",
                 "content": f"Owl's previous answer:\n{owl_reply[:2000]}\n\nUser's reply:\n{user_msg[:1000]}",
             }],
+            max_tokens=400,
         )
-        raw = resp.content[0].text if resp.content else ""
+        raw = result.text
         # Find the JSON object in the response
         start = raw.find("{")
         end = raw.rfind("}")
@@ -76,6 +123,21 @@ class ChatRequest(BaseModel):
     # call, its analysis is injected as default context, and the verbatim
     # transcript is available only via the fetch_transcript tool (deep-dive).
     call_id: Optional[str] = None
+    # The project a NEW conversation should be filed under. Ignored when
+    # continuing an existing conversation, which already knows its project.
+    project_id: Optional[str] = None
+
+
+def _project_instructions_block(project_id: Optional[str], username: str) -> str:
+    """A project's standing instructions, framed for the system tail."""
+    instructions = projects.project_instructions(project_id, username)
+    if not instructions:
+        return ""
+    return (
+        "Standing instructions for the project this conversation belongs to. "
+        "They shape how you answer here, but never override Company Truth or "
+        "the knowledge-governance rules above:\n\n" + instructions
+    )
 
 
 # Tool that exposes the stored transcript on demand. Owl answers from the
@@ -105,14 +167,12 @@ _TRANSCRIPT_FULL_CHAR_CAP = 48000  # ~12k tokens — bound the worst case
 
 def _load_call_session(call_id: str, username: str) -> Optional[dict]:
     """Find an analysed call owned by this user (live sessions only)."""
-    from agents.calls.routes import load_sessions  # lazy: avoid import cycle
-    for s in load_sessions(False):
-        if (
-            s.get("type") == "call_analysis"
-            and s.get("id") == call_id
-            and s.get("username") == username
-        ):
-            return s
+    from agents.sales.store import calls as calls_store  # lazy: avoid import cycle
+
+    session = calls_store.get_session(call_id, username, sandbox=False)
+    # The store answers for any session; only an analysed call can ground a chat.
+    if session is not None and session.get("type") == "call_analysis":
+        return session
     return None
 
 
@@ -153,14 +213,14 @@ def _owl_call_system_blocks(username: str, call_session: dict) -> list[dict]:
     result = call_session.get("result", {}) or {}
     scoped_vault = load_vault_for_analysis(transcript)
     context = _call_context_md(result)
-    return [
-        {
-            "type": "text",
-            "text": _OWL_PERSONA + scoped_vault + "\n\n" + context,
-            "cache_control": {"type": "ephemeral"},
-        },
-        {"type": "text", "text": _owl_identity_tail(username)},
-    ]
+    return persona.system_blocks(
+        role_overlay=persona.CHAT_STANCE,
+        extra_overlay=context,
+        vault_knowledge=scoped_vault,
+        tail=owl_identity_tail(username),
+        memory_block=memory.render_memory_block(username),
+        cache=True,
+    )
 
 
 def _transcript_response(transcript: str, query: Optional[str]) -> str:
@@ -206,8 +266,8 @@ async def owl_stream(req: ChatRequest, user: dict = Depends(require_authed)):
     if not api_key:
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not set.")
 
-    client = anthropic.Anthropic(api_key=api_key)
     username = user["username"]
+    memory_seed.seed_if_empty(username)  # one-time backfill of accounts from existing stores
 
     last_user_msg = ""
     for m in reversed(req.messages):
@@ -229,10 +289,14 @@ async def owl_stream(req: ChatRequest, user: dict = Depends(require_authed)):
 
     # Resolve a stable conversation id: continue the one the client sent (if the
     # user owns it), otherwise start a fresh conversation.
+    # A continuing conversation already knows its project; a new one takes the
+    # project the client started it in, if the user owns that project.
     if req.conversation_id and storage.conversation_exists(req.conversation_id, username):
         session_id = req.conversation_id
+        project_id = storage.project_of(session_id, username)
     else:
         session_id = uuid.uuid4().hex
+        project_id = req.project_id if projects.get_project(req.project_id or "", username) else None
 
     # Lock the model to the conversation: the first turn decides, later turns
     # reuse it so the voice/quality doesn't flip-flop mid-conversation.
@@ -252,9 +316,28 @@ async def owl_stream(req: ChatRequest, user: dict = Depends(require_authed)):
         tools = [FETCH_TRANSCRIPT_TOOL]
         call_transcript = call_session.get("transcript", "") or ""
     else:
-        system = owl_system_blocks(username)
-        tools = None
+        system = owl_system_blocks(
+            username,
+            role_overlay=persona.CHAT_STANCE,
+            memory_block=memory.render_memory_block(username),
+            project_block=_project_instructions_block(project_id, username),
+            # Presentation only — the vault this reads from is the same one every
+            # user gets. It tells Owl which of the shared knowledge is this
+            # person's own, so they can keep building on it.
+            contributions_block=render_own_contributions_block(
+                username, user.get("name", "") if isinstance(user, dict) else "",
+            ),
+        )
+        # The sales agents, as tools. Owl can therefore run any of them from the
+        # conversation — the same agents their dedicated pages drive. Empty until
+        # the first agent registers, in which case this stays None and the turn
+        # is an ordinary chat.
+        tools = sales_tools.specs() or None
         call_transcript = ""
+
+    # Read before the row is created: a generated title is only ever given to a
+    # conversation that is opening, never imposed on one already named.
+    opens_conversation = not storage.conversation_exists(session_id, username)
 
     # Persist the conversation row + user message BEFORE streaming, so the id we
     # hand the client is always backed by a real row and the user's message is
@@ -266,6 +349,7 @@ async def owl_stream(req: ChatRequest, user: dict = Depends(require_authed)):
         title=(last_user_msg[:80] or "Chat"),
         model_used=model_label,
         topics=extract_topics(last_user_msg),
+        project_id=project_id,
     )
 
     async def generate():
@@ -273,56 +357,50 @@ async def owl_stream(req: ChatRequest, user: dict = Depends(require_authed)):
         # persist the id and send it back on the next turn.
         yield f"data: {json.dumps({'conversation_id': session_id})}\n\n"
         full_response: list[str] = []
+
+        def _dispatch(name: str, tool_input: dict) -> str:
+            # Grounded call turns expose the transcript; every other turn exposes
+            # the sales agents. One dispatcher, so a tool can never be offered
+            # without something able to run it.
+            if name == "fetch_transcript":
+                q = tool_input.get("query") if isinstance(tool_input, dict) else None
+                return _transcript_response(call_transcript, q)
+            return sales_tools.dispatch(username, name, tool_input or {})
+
         try:
-            if tools:
-                # Tool-use loop: stream text; when Owl calls fetch_transcript,
-                # run it server-side, feed the result back, and continue until it
-                # answers. Bounded so a misbehaving model can't loop forever.
-                convo = list(req.messages)
-                for _ in range(4):
-                    stream_kwargs = dict(
-                        model=model, max_tokens=1024, system=system,
-                        messages=convo, tools=tools,
-                    )
-                    with client.messages.stream(**stream_kwargs) as stream:
-                        for text in stream.text_stream:
-                            full_response.append(text)
-                            yield f"data: {json.dumps({'text': text})}\n\n"
-                        final = stream.get_final_message()
-                    log_cache_usage("owl.chat.call", final.usage)
-                    if final.stop_reason != "tool_use":
-                        break
-                    tool_results = []
-                    for blk in final.content:
-                        if getattr(blk, "type", None) == "tool_use" and blk.name == "fetch_transcript":
-                            q = (blk.input or {}).get("query") if isinstance(blk.input, dict) else None
-                            tool_results.append({
-                                "type": "tool_result",
-                                "tool_use_id": blk.id,
-                                "content": _transcript_response(call_transcript, q),
-                            })
-                    convo.append({"role": "assistant", "content": final.content})
-                    convo.append({"role": "user", "content": tool_results})
-            else:
-                with client.messages.stream(
-                    model=model,
-                    max_tokens=1024,
-                    system=system,
-                    messages=req.messages,
-                ) as stream:
-                    for text in stream.text_stream:
-                        full_response.append(text)
-                        yield f"data: {json.dumps({'text': text})}\n\n"
-                    log_cache_usage("owl.chat", stream.get_final_message().usage)
+            # Owl Core chat_stream: dynamic model (locked/router), the bounded
+            # fetch_transcript tool loop, and the max_tokens continuation so long
+            # answers stream to completion instead of truncating.
+            for event in mind.chat_stream(
+                system=system,
+                messages=list(req.messages),
+                model=model,
+                tools=tools,
+                tool_dispatch=_dispatch if tools else None,
+            ):
+                if event["type"] == "text":
+                    full_response.append(event["text"])
+                    yield f"data: {json.dumps({'text': event['text']})}\n\n"
             yield f"data: {json.dumps({'model': model})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
             return
 
+        full_text = "".join(full_response)
+
+        # A conversation earns its name from the exchange, not from the first 80
+        # characters of the question. Done after the answer has streamed, so
+        # naming never delays a single token of it.
+        if opens_conversation and full_text.strip():
+            title = _generate_title(last_user_msg, full_text)
+            if title:
+                storage.rename_conversation(session_id, username, title)
+                yield f"data: {json.dumps({'title': title})}\n\n"
+
         # Run correction classifier — only if there's a previous Owl reply to correct
         proposed_correction = None
         if prev_owl_reply.strip():
-            proposed_correction = _classify_correction(client, prev_owl_reply, last_user_msg)
+            proposed_correction = _classify_correction(prev_owl_reply, last_user_msg)
         if proposed_correction:
             payload = {
                 "session_id": session_id,
@@ -332,7 +410,6 @@ async def owl_stream(req: ChatRequest, user: dict = Depends(require_authed)):
 
         yield "data: [DONE]\n\n"
 
-        full_text = "".join(full_response)
         if not full_text.strip():
             # Nothing usable generated. The user turn was already persisted at
             # stream start, so the conversation and the user's message survive;
@@ -352,9 +429,32 @@ async def owl_stream(req: ChatRequest, user: dict = Depends(require_authed)):
 
 
 @router.get("/sessions")
-def get_owl_sessions(q: Optional[str] = None, user: dict = Depends(require_authed)):
-    """List the user's conversations (newest first, no message bodies). Optional ?q= search."""
-    return storage.list_conversations(user["username"], query=q)
+def get_owl_sessions(
+    q: Optional[str] = None,
+    project_id: Optional[str] = None,
+    folder_id: Optional[str] = None,
+    unfiled: bool = False,
+    include_archived: bool = False,
+    user: dict = Depends(require_authed),
+):
+    """List the user's conversations — pinned first, then newest, no message bodies.
+
+    Filters compose: ``?q=`` searches titles and message bodies; ``project_id``
+    and ``folder_id`` scope to a branch of the tree; ``unfiled=true`` asks for
+    the conversations that belong to no project, which is a real query rather
+    than the absence of a filter.
+    """
+    placement = {}
+    if unfiled:
+        placement = {"project_id": None, "folder_id": None}
+    else:
+        if project_id is not None:
+            placement["project_id"] = project_id
+        if folder_id is not None:
+            placement["folder_id"] = folder_id
+    return storage.list_conversations(
+        user["username"], query=q, include_archived=include_archived, **placement,
+    )
 
 
 @router.get("/sessions/{session_id}")
@@ -373,6 +473,19 @@ def rename_owl_session(session_id: str, req: RenameRequest, user: dict = Depends
     if not storage.rename_conversation(session_id, user["username"], title):
         raise HTTPException(status_code=404, detail="Session not found.")
     return {"ok": True, "title": title}
+
+
+@router.delete("/sessions")
+def delete_all_owl_sessions(user: dict = Depends(require_authed)):
+    """Delete every conversation this user has, archived ones included.
+
+    Declared before the `/sessions/{session_id}` route below only for reading
+    order — the paths are distinct, so no shadowing is at stake. Irreversible by
+    design: transcripts are destroyed, and the UI gates it behind a counted
+    confirmation rather than this endpoint doing so.
+    """
+    deleted = storage.delete_all_conversations(user["username"])
+    return {"ok": True, "deleted": deleted}
 
 
 @router.delete("/sessions/{session_id}")
@@ -426,3 +539,8 @@ def submit_correction(req: CorrectionSubmitRequest, user: dict = Depends(require
     )
 
     return {"ok": True, "filename": path.name}
+
+
+# Organisation (projects, folders, placement, search) shares the /api/owl prefix
+# but is a separate job from chat, so it lives in its own module.
+router.include_router(organisation_router)

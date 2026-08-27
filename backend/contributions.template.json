@@ -1,0 +1,107 @@
+{
+  "_readme": [
+    "CADENCE KNOWLEDGE CONTRIBUTION TEMPLATE",
+    "",
+    "Cadence is Acme's sales agent platform. Its brain is a vault of markdown that Owl,",
+    "the assistant, reads before it answers. This file is how knowledge from outside gets in.",
+    "",
+    "HOW TO FILL IT IN",
+    "  1. Copy this file and replace `contributed_by` with your name.",
+    "  2. Replace the four worked examples in `entries` with your own. Keep the shape.",
+    "  3. Send the file back. It gets imported into a review queue and approved by hand",
+    "     before Owl can see any of it.",
+    "",
+    "IF YOU ARE ASKING CLAUDE TO FILL THIS IN FOR YOU, paste this whole file and say:",
+    "  'Fill in the `entries` array with what you know about <topic>, following the schema",
+    "   and the examples exactly. One idea per entry. Do not invent facts you are not sure",
+    "   of — set `confidence` honestly and say what you are unsure about in the content.",
+    "   Return only the JSON.'",
+    "",
+    "WHAT MAKES A GOOD ENTRY",
+    "  · One idea per entry. Two facts in one entry cannot be approved separately.",
+    "  · Write what is true about the world, not instructions to a model. Content that reads",
+    "    as addressed to an assistant is refused by the importer rather than imported.",
+    "  · No invented specifics. No figures, dates, customer names or contract terms you did",
+    "    not read somewhere. `confidence: low` is a useful answer; a confident guess is not.",
+    "  · Say where it came from in `source` — a document, a call, a standard, your own",
+    "    experience. Knowledge that cannot be traced is hard to approve.",
+    "  · British English, and keep it short. Somebody reads every one of these.",
+    "",
+    "The `_readme` and `_schema` keys are ignored by the importer. Leave them or delete them."
+  ],
+
+  "_schema": {
+    "contributed_by": "REQUIRED. Your name. It travels with every entry and is shown to Owl.",
+    "note": "Optional. One line to whoever reviews this batch — what it is and why.",
+    "entries": "REQUIRED. A list of entries, each shaped as below. Up to 500 per file.",
+    "entry": {
+      "kind": "REQUIRED. One of: glossary | entity | knowledge | research. See `_kinds`.",
+      "title": "REQUIRED. What the thing is called. Max 120 characters.",
+      "description": "REQUIRED. One line saying what this entry is. Shown in the review queue.",
+      "content": "REQUIRED. The knowledge itself, as markdown. Max 20,000 characters.",
+      "entity_type": "REQUIRED when kind is 'entity'. e.g. protocol, hardware, standard, company.",
+      "aliases": "Optional. Other names for it, as a list of strings.",
+      "tags": "Optional. Lowercase keywords, as a list of strings. More are detected on import.",
+      "products": "Optional. Acme products this relates to, as a list of strings.",
+      "source": "Optional but wanted. Where this came from.",
+      "confidence": "Optional. high | medium | low. Defaults to medium."
+    },
+    "_kinds": {
+      "glossary": "A term someone might not know. Definition first, then why it matters to Acme.",
+      "entity": "A specific named thing — a protocol, a piece of hardware, a standard, a company.",
+      "knowledge": "How something works, or how it is done. The catch-all for domain understanding.",
+      "research": "A finding, a model, a market or competitor observation. Something learned."
+    }
+  },
+
+  "contributed_by": "REPLACE WITH YOUR NAME",
+  "note": "Optional one-line note to the reviewer.",
+
+  "entries": [
+    {
+      "kind": "glossary",
+      "title": "Holdover",
+      "description": "What a clock does when it loses its reference, and why the oscillator inside it decides how long that is survivable.",
+      "content": "How long a clock can keep accurate time after losing its reference signal — usually GNSS. During holdover the local oscillator free-runs and drifts, so the question is never whether it drifts but how fast.\n\nThe oscillator sets the answer. A TCXO drifts out of a microsecond in minutes; an OCXO holds for hours; a rubidium standard holds for days.\n\n**Why it matters commercially:** holdover is what a customer is really buying when they ask about GNSS jamming or antenna access. A site that cannot get a rooftop antenna, or that sits somewhere GNSS is unreliable, is a holdover conversation rather than an antenna one.",
+      "aliases": ["holdover performance", "free-run"],
+      "tags": ["holdover", "ocxo", "rubidium", "gnss"],
+      "products": [],
+      "source": "Standard industry definition plus Acme product positioning",
+      "confidence": "high"
+    },
+    {
+      "kind": "entity",
+      "title": "SyncE (Synchronous Ethernet)",
+      "description": "A physical-layer frequency distribution method that complements PTP rather than competing with it.",
+      "entity_type": "protocol",
+      "content": "An ITU-T standard that carries a frequency reference in the Ethernet physical layer, rather than in packets.\n\nBecause it is physical-layer, it is not affected by the packet delay variation that degrades PTP under load. It carries **frequency only** — it cannot deliver time of day or phase.\n\n**How it sits with PTP:** the two are usually deployed together. SyncE holds frequency stable while PTP delivers phase and time on top, which is why a network that already runs SyncE is often an easier PTP conversation, not a harder one.",
+      "aliases": ["Synchronous Ethernet", "ITU-T G.8262"],
+      "tags": ["synce", "ptp", "telecom", "frequency"],
+      "products": [],
+      "source": "ITU-T G.8262",
+      "confidence": "high"
+    },
+    {
+      "kind": "knowledge",
+      "title": "Why GNSS antenna access decides the shape of a data centre deal",
+      "description": "Roof access is a landlord and lease problem before it is a technical one, and it changes what can be sold.",
+      "content": "Most data centre timing deployments assume a GNSS antenna on the roof. In colocation that assumption often fails, and for reasons that have nothing to do with engineering: the roof belongs to the landlord, the lease does not grant access, or the facility will not permit new penetrations.\n\nThis surfaces late, usually after a technical win, and it is a common reason a deal stalls between agreement and purchase order.\n\n**What to do with it:** ask about antenna access early, in the first technical conversation rather than at design. Where the answer is no, the conversation moves to alternatives — a timing feed from a carrier or neighbouring facility, or a holdover-led design with a better oscillator.\n\n**What I am not sure about:** whether any of the large European colocation providers now offer timing as a facility service. Worth checking before relying on it as an answer.",
+      "aliases": [],
+      "tags": ["gnss", "data-centre", "holdover", "objection-handling"],
+      "products": [],
+      "source": "Customer conversations",
+      "confidence": "medium"
+    },
+    {
+      "kind": "research",
+      "title": "MiFID II RTS 25 timestamp requirements by participant type",
+      "description": "The regulation sets different accuracy obligations depending on how a firm trades, which changes who has a compliance driver.",
+      "content": "RTS 25 does not impose one number on everybody. The obligation scales with activity:\n\n| Activity | Divergence from UTC | Granularity |\n| --- | --- | --- |\n| High-frequency algorithmic trading | 100 microseconds | 1 microsecond |\n| Other algorithmic trading | 1 millisecond | 1 millisecond |\n| Voice trading | 1 second | 1 second |\n\n**Why it matters for qualification:** a firm's own description of itself is a poor guide to which row it is in, and the row is what decides whether there is a compliance driver at all. A voice desk at one second has no timing problem the regulation creates.\n\nFirms must also be able to *evidence* traceability to UTC, not merely achieve the accuracy — which is a records and monitoring requirement, not only a hardware one.",
+      "aliases": ["RTS 25", "MiFID II clock synchronisation"],
+      "tags": ["mifid-ii", "finance", "compliance", "utc"],
+      "products": [],
+      "source": "MiFID II RTS 25",
+      "confidence": "high"
+    }
+  ]
+}

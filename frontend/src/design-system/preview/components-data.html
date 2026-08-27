@@ -1,0 +1,143 @@
+<!-- @dsCard group="Components" -->
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data — Cadence Design System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../primitives.css">
+<link rel="stylesheet" href="preview.css">
+</head>
+<body class="ds-root">
+
+<header class="pv-head">
+  <p class="ds-eyebrow">Components · 04</p>
+  <h1>Data</h1>
+  <p>
+    When Owl returns people, accounts or runs, the answer stops being prose and becomes a
+    readout. Tables here have <strong>no vertical rules and no zebra striping</strong> — a
+    hairline per row and tabular figures are enough, and everything else is ink competing with
+    the data. Selection is the point of a results table, so the bulk bar is charcoal and states
+    the count.
+  </p>
+</header>
+
+<section class="pv-section">
+  <h2>Results</h2>
+  <div class="ds-bulk" style="margin-bottom: var(--space-3);">
+    <span class="ds-bulk__count">2 of 11 selected</span>
+    <span class="ds-bulk__spacer"></span>
+    <button class="ds-btn ds-btn--secondary ds-btn--sm">Enrich emails</button>
+    <button class="ds-btn ds-btn--secondary ds-btn--sm">Add to campaign</button>
+    <button class="ds-btn ds-btn--primary ds-btn--sm">Draft outreach</button>
+  </div>
+  <div class="pv-frame">
+    <table class="ds-table">
+      <thead>
+        <tr>
+          <th class="ds-table__pick"><input type="checkbox" class="ds-check" aria-label="Select all"></th>
+          <th>Person</th>
+          <th>Signal</th>
+          <th>Contact</th>
+          <th style="text-align: right;">Fit</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="is-selected">
+          <td class="ds-table__pick"><input type="checkbox" class="ds-check" checked aria-label="Select"></td>
+          <td>
+            <span class="ds-table__primary">Annika Lindqvist</span>
+            <span class="ds-table__sub" title="Head of Market Infrastructure · Northgate Nordics">Head of Market Infrastructure · Northgate Nordics</span>
+          </td>
+          <td><span class="ds-mark ds-mark--locked">verified</span></td>
+          <td class="ds-table__id"><a href="mailto:a.lindqvist@northgate.com">a.lindqvist@northgate.com</a></td>
+          <td class="ds-table__num">0.94</td>
+        </tr>
+        <tr class="is-selected">
+          <td class="ds-table__pick"><input type="checkbox" class="ds-check" checked aria-label="Select"></td>
+          <td>
+            <span class="ds-table__primary">Johan Berg</span>
+            <span class="ds-table__sub" title="Network Architect · Northgate Nordics">Network Architect · Northgate Nordics</span>
+          </td>
+          <td><span class="ds-mark ds-mark--locked">verified</span></td>
+          <td class="ds-table__id"><a href="mailto:johan.berg@northgate.com">johan.berg@northgate.com</a></td>
+          <td class="ds-table__num">0.88</td>
+        </tr>
+        <tr>
+          <td class="ds-table__pick"><input type="checkbox" class="ds-check" aria-label="Select"></td>
+          <td>
+            <span class="ds-table__primary">Marta Or</span>
+            <span class="ds-table__sub" title="Director, Trading Technology · Northgate Nordics">Director, Trading Technology · Northgate Nordics</span>
+          </td>
+          <td><span class="ds-mark ds-mark--drift">needs review</span></td>
+          <td class="ds-table__id ds-table__id--empty">not verified</td>
+          <td class="ds-table__num">0.71</td>
+        </tr>
+        <tr>
+          <td class="ds-table__pick"><input type="checkbox" class="ds-check" aria-label="Select"></td>
+          <td>
+            <span class="ds-table__primary">Erik Halvorsen</span>
+            <span class="ds-table__sub" title="Senior Engineer, Clocking · Northgate Oslo">Senior Engineer, Clocking · Northgate Oslo</span>
+          </td>
+          <td><span class="ds-mark ds-mark--fault">bounced</span></td>
+          <td class="ds-table__id"><a href="mailto:e.halvorsen@northgate.com">e.halvorsen@northgate.com</a></td>
+          <td class="ds-table__num">0.42</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="pv-note" style="margin-top: var(--space-6);">Fit is a score, so it is mono and right-aligned; names are prose, so they are not. Any column a person compares down should be tabular and right-aligned — <code class="pv-spec">.ds-table__num</code>.</p>
+</section>
+
+<section class="pv-section">
+  <h2>Progress</h2>
+  <div class="pv-stack" style="max-width: var(--measure-read);">
+    <div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-2);">
+        <span class="ds-small">Enriching 11 contacts</span>
+        <span class="ds-mono">7 of 11</span>
+      </div>
+      <div class="ds-meter ds-meter--live"><div class="ds-meter__fill" style="width: 64%;"></div></div>
+    </div>
+    <div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-2);">
+        <span class="ds-small">Credit used this month</span>
+        <span class="ds-mono">2,840 / 5,000</span>
+      </div>
+      <div class="ds-meter"><div class="ds-meter__fill" style="width: 57%;"></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>People</h2>
+  <div class="pv-row" style="gap: var(--space-6);">
+    <div class="pv-row" style="gap: var(--space-2);">
+      <span class="ds-avatar ds-avatar--sm">AL</span>
+      <span class="ds-avatar">JB</span>
+      <span class="ds-avatar ds-avatar--lg ds-avatar--ink">IG</span>
+    </div>
+    <span class="pv-spec">sm 22px · default 28px · lg 36px</span>
+  </div>
+</section>
+
+<section class="pv-section">
+  <h2>Sources</h2>
+  <p class="ds-caption" style="max-width: var(--measure-read); margin-bottom: var(--space-4);">
+    Owl cites. Inline citations are mono superscripts<a href="#" class="ds-cite">1</a> that stay
+    out of the prose, and the sources themselves sit under the answer where they can be opened
+    without leaving the thread.
+  </p>
+  <div class="ds-sources">
+    <a class="ds-source" href="#"><span class="ds-source__n">1</span><span class="ds-source__name">MiFID II RTS 25 — clock synchronisation</span></a>
+    <a class="ds-source" href="#"><span class="ds-source__n">2</span><span class="ds-source__name">Exchange deployment case study (internal)</span></a>
+    <a class="ds-source" href="#"><span class="ds-source__n">3</span><span class="ds-source__name">Discovery call · 14 May · transcript</span></a>
+  </div>
+</section>
+
+</body>
+</html>

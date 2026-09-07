@@ -10,7 +10,7 @@ import json
 import pytest
 
 from agents.shared import jsonparse
-from agents.shared.jsonparse import parse_json_array
+from agents.shared.jsonparse import _quote_bare_keys, parse_json_array, parse_json_object
 
 
 def test_parse_json_plain():
@@ -142,3 +142,72 @@ class TestTruncatedArrays:
     def test_truncated_before_any_object_completes_still_raises(self):
         with pytest.raises(ValueError):
             parse_json_array('[\n  {\n    "type": "mcq",\n    "question": "half a qu')
+
+
+# ── A bare key, repaired ────────────────────────────────────────────────────
+#
+# Observed live: Sonnet writing a nine-account target list dropped the quotes on
+# one key — `geography: "Sweden / Nordics"` — in row two of an otherwise perfect
+# three-thousand-token answer, and strict JSON discarded all of it. One slip
+# costing a whole run is the wrong trade when the slip is unambiguous.
+#
+# The repair is the **last** thing tried, only in the best-effort object path, and
+# it inserts quotes and nothing else. These pin the two halves of that: that it
+# fixes the real case, and that it never reaches inside a string.
+
+def test_a_bare_key_is_repaired():
+    assert parse_json_object('{"a": 1, geography: "Sweden / Nordics"}') == {
+        "a": 1, "geography": "Sweden / Nordics",
+    }
+
+
+def test_a_bare_first_key_is_repaired():
+    assert parse_json_object('{account: "Meridian Towers"}') == {"account": "Meridian Towers"}
+
+
+def test_a_hyphenated_bare_key_is_repaired():
+    assert parse_json_object('{next-due: "2026-09-20"}') == {"next-due": "2026-09-20"}
+
+
+def test_a_bare_key_inside_a_nested_object_is_repaired():
+    assert parse_json_object('{"a": {inner: 1}}') == {"a": {"inner": 1}}
+
+
+def test_a_colon_inside_a_string_is_prose_and_is_left_alone():
+    """A note reading "the site: Madrid" must survive exactly as written."""
+    assert parse_json_object('{"note": "the site: Madrid", "n": 1}') == {
+        "note": "the site: Madrid", "n": 1,
+    }
+
+
+def test_a_key_like_word_inside_a_string_is_not_quoted():
+    assert parse_json_object('{"note": "geography: Sweden", "n": 1}') == {
+        "note": "geography: Sweden", "n": 1,
+    }
+
+
+def test_an_escaped_quote_does_not_confuse_the_scan():
+    assert parse_json_object('{"note": "he said \\"yes\\"", n: 2}') == {
+        "note": 'he said "yes"', "n": 2,
+    }
+
+
+def test_an_array_element_is_never_treated_as_a_key():
+    assert parse_json_object('{"a": [1, 2], "b": 3}') == {"a": [1, 2], "b": 3}
+
+
+def test_a_literal_is_not_quoted():
+    assert parse_json_object('{"a": true, "b": null, "c": 1.5}') == {
+        "a": True, "b": None, "c": 1.5,
+    }
+
+
+def test_well_formed_json_is_untouched():
+    """The repair runs only after strict parsing has already failed."""
+    assert parse_json_object('{"a": 1}') == {"a": 1}
+    assert _quote_bare_keys('{"a": 1}') == '{"a": 1}'
+
+
+def test_something_it_cannot_repair_still_raises():
+    with pytest.raises(ValueError, match="could not parse JSON object"):
+        parse_json_object('{"a": 1,,, "b"}')

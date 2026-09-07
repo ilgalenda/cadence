@@ -11,20 +11,25 @@
  * transition from an empty home into the conversation.
  *
  * Everything the page removed is still reachable — the rail lists every surface,
- * and the three shortcuts below cover the ones a person actually starts from.
+ * and the shortcuts below cover the ones a person actually starts from. Each is
+ * reachable by ⌘N in the order shown; the cap comes from the rendered rows, so
+ * the list is the only place a shortcut has to be added.
  */
 import PlatformLayout from '../layouts/PlatformLayout.astro';
 import { icon } from '../lib/icons';
 
 /**
- * The ways out. Three, and each lands where its label promises: a name that
- * over-promises its destination costs more than the shortcut saves.
- * Call history opens the library, where every analysed call is kept. Past Owl
- * conversations are not orphaned by that: the rail lists Owl, and this page's
- * own composer is the way into a conversation.
+ * The ways out. Each lands where its label promises: a name that over-promises
+ * its destination costs more than the shortcut saves.
+ * Call history opens the library, where every analysed call is kept; analysing
+ * one is the other half of that pair and the thing people arrive here to do, so
+ * it earns its own row rather than a detour through the agents index. Past Owl
+ * conversations are not orphaned: the rail lists Owl, and this page's own
+ * composer is the way into a conversation.
  */
 const SHORTCUTS = [
   { name: 'agents', label: 'Agents', href: '/work/agents', what: 'all eleven' },
+  { name: 'call-analysis', label: 'Analyse a call', href: '/work/agents/call-analysis', what: 'paste a transcript' },
   { name: 'library', label: 'Call history', href: '/learn/library', what: 'every call analysed' },
   { name: 'knowledge', label: 'Knowledge', href: '/learn/knowledge', what: 'what Owl knows' },
 ] as const;
@@ -170,12 +175,15 @@ const SHORTCUTS = [
       }
     });
 
-    // ⌘1 · ⌘2 · ⌘3 — the three shortcuts, in the order they are shown.
+    // ⌘1 … ⌘N — the shortcuts, in the order they are shown. The cap comes from
+    // the rendered rows rather than a literal, so adding one to the list above
+    // cannot leave it as the only row without a key.
     document.addEventListener('keydown', (event) => {
       if (!(event.metaKey || event.ctrlKey)) return;
+      const rows = document.querySelectorAll<HTMLAnchorElement>('.hm-way');
       const slot = Number(event.key);
-      if (!slot || slot > 3) return;
-      const row = document.querySelectorAll<HTMLAnchorElement>('.hm-way')[slot - 1];
+      if (!slot || slot > rows.length) return;
+      const row = rows[slot - 1];
       if (row) { event.preventDefault(); window.location.href = row.href; }
     });
 

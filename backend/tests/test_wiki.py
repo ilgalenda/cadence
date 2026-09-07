@@ -144,8 +144,8 @@ A regional integrator running turnkey timing projects.
 """
 
 WEB_INGESTED = """---
-title: sync-insight
-slug: sync-insight
+title: fleet-insight
+slug: fleet-insight
 tagline: Turn months of clock data into the answer to &ldquo;what happened last Tuesday?&rdquo;
 category: solutions
 tags: [monitoring]
@@ -186,7 +186,7 @@ def vault(tmp_path, monkeypatch) -> Path:
         "company/glossary/holdover.md": GLOSSARY_HOLDOVER,
         "company/entities/1pps-one-pulse-per-second.md": ENTITY_1PPS,
         "company/entities/northwind-integrators.md": ENTITY_ACCOUNT,
-        "company/products/solutions/sync-insight.md": WEB_INGESTED,
+        "company/products/solutions/fleet-insight.md": WEB_INGESTED,
         "company/products/hardware/open-time-appliance.md": PRODUCT_APPLIANCE,
         "company/products/datasheets/open-time-appliance.md": DATASHEET_APPLIANCE,
         "company/products/solutions/vgmc.md": SOLUTION_VGMC,
@@ -293,7 +293,7 @@ def test_slug_titles_are_resolved_to_names(vault):
         ("vgmc", "vGMC"),
         ("acme-app", "Acme App"),
         ("clock-ensemble", "Clock Ensemble"),
-        ("sync-insight", "Sync Insight"),
+        ("fleet-insight", "Fleet Insight"),
     ],
 )
 def test_display_title_rules(stem, expected):
@@ -497,11 +497,11 @@ def test_prompt_references_never_name_a_company(vault):
 def test_html_entities_are_decoded(vault):
     """Pages ingested from the website carry `&ldquo;` and `&amp;` as literal text."""
     by_slug = {n.slug: n for n in wiki.index()}
-    tagline = by_slug["solution/sync-insight"].tagline
+    tagline = by_slug["solution/fleet-insight"].tagline
     assert "&ldquo;" not in tagline and "&rdquo;" not in tagline
     assert "“what happened last Tuesday?”" in tagline
 
-    page = wiki.page("solution/sync-insight")
+    page = wiki.page("solution/fleet-insight")
     body_text = "".join(
         span["text"] for block in page.blocks for span in block.get("spans", [])
     )

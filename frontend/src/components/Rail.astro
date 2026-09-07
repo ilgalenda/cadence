@@ -23,7 +23,8 @@
  * Rows come from `lib/platform.ts`, so the rail cannot advertise a surface that
  * does not exist — and now cannot draw one without an icon either.
  */
-import { AGENTS, LEARN, PATHS } from '../lib/platform';
+import { AGENTS, LEARN, OPERATE, PATHS } from '../lib/platform';
+import { stopsAt } from '../lib/paths';
 import { icon } from '../lib/icons';
 
 interface Props {
@@ -122,7 +123,10 @@ const isHere = (href: string, exact = false) =>
       <a class={`ds-row${isHere('/work/agents', true) ? ' is-active' : ''}`} href="/work/agents">
         <span class="ds-row__icon" set:html={icon('agents')} />
         <span class="ds-row__label">Agents</span>
-        <span class="ds-mono rail__hint">{AGENTS.length}</span>
+        {/* How many can be opened, not how many are listed. A count that includes
+            the ones still coming is the sort of number nobody checks and everyone
+            believes. */}
+        <span class="ds-mono rail__hint">{AGENTS.filter(a => a.built).length}</span>
       </a>
     </div>
 
@@ -133,6 +137,9 @@ const isHere = (href: string, exact = false) =>
            href={`/work/paths/${path.slug}`}>
           <span class="ds-row__icon" set:html={icon(path.icon)} />
           <span class="ds-row__label">{path.name}</span>
+          {/* Derived, not declared: a path waits exactly when one of its steps
+              does, so the two can never disagree. See `stopsAt`. */}
+          {stopsAt(path) && <span class="ds-mono rail__hint">soon</span>}
         </a>
       ))}
     </div>
@@ -140,6 +147,17 @@ const isHere = (href: string, exact = false) =>
     <div class="ws-group">
       <div class="ws-group__head"><span class="ds-eyebrow">Knowledge</span></div>
       {LEARN.map(surface => (
+        <a class={`ds-row${isHere(surface.href) ? ' is-active' : ''}`} href={surface.href}>
+          <span class="ds-row__icon" set:html={icon(surface.icon)} />
+          <span class="ds-row__label">{surface.name}</span>
+          {!surface.built && <span class="ds-mono rail__hint">soon</span>}
+        </a>
+      ))}
+    </div>
+
+    <div class="ws-group">
+      <div class="ws-group__head"><span class="ds-eyebrow">Operations</span></div>
+      {OPERATE.map(surface => (
         <a class={`ds-row${isHere(surface.href) ? ' is-active' : ''}`} href={surface.href}>
           <span class="ds-row__icon" set:html={icon(surface.icon)} />
           <span class="ds-row__label">{surface.name}</span>
@@ -282,7 +300,15 @@ const isHere = (href: string, exact = false) =>
   .is-compact #rail [data-closed-hide] { display: none; }
   .is-compact #rail .ws-group { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid rgb(var(--rule-hairline)); }
   .is-compact #rail .ws-rail__scroll > .ws-group:first-child { margin-top: var(--space-2); padding-top: 0; border-top: 0; }
-  .is-compact #rail .ws-rail__scroll { overflow: visible; }
+  /* The compact scroller **scrolls**, exactly like the open one.
+     It used to be `overflow: visible`, which the row's old `::after` tooltip
+     needed to escape the scroll box. That tooltip is gone — it lives on <body>
+     now (see `.rail-tip`) precisely because it could never escape — and the
+     rule outlived it. What it left behind: with the nav taller than the space
+     for it, the rows did not scroll, they **spilled**, and painted straight over
+     the account button beneath. On a 700px-tall window a hit test on the avatar
+     returned the *Events* link, so the account menu could not be opened at all.
+     Nothing needs the leak any more. */
   .is-compact #rail .ds-row { position: relative; width: 2.25rem; height: 2.25rem; padding: 0; justify-content: center; margin-inline: auto; }
   .is-compact #rail .ds-row > :not(.ds-row__icon) { display: none; }
   /* With the label gone the glyph IS the row, so it stops being metadata: it is

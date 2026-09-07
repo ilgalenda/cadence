@@ -25,15 +25,23 @@ costs nothing.
 """
 from __future__ import annotations
 
+from pydantic import ValidationError
+
 from agents.mind import core as mind
 from agents.mind import governor as mind_governor
 from agents.sales import prompts
+from agents.sales.gtm import schemas
 from agents.sales.refine import OwlRefiner
-from agents.shared.jsonparse import parse_json
+from agents.shared.jsonparse import parse_json, parse_json_object
 
 # Room for twelve candidates with a rationale, a check and a caveat each. The 2048
 # this replaced was set before the entries carried a check or a caveat.
 MAX_TOKENS = 4096
+
+#: Tracker mode's own budget. Twelve fields across ten to twelve accounts does not
+#: fit the shortlist's 4096 — a truncated answer fails to parse and the whole run
+#: is wasted, which costs more than the larger budget does.
+TRACKER_MAX_TOKENS = 8192
 
 
 def identify(
@@ -92,6 +100,99 @@ def identify(
         "owl_applied": refined != first_pass,
         "error": parse_error,
     }
+
+
+def build_targets(
+    username: str,
+    analysis: dict,
+    config: dict,
+    *,
+    use_signals: bool = True,
+) -> dict:
+    """Propose a **target list for a tracker**. Returns the same four-key contract.
+
+    `final` is `{rows, notes}`, validated through `schemas.TargetList` rather than
+    coerced. That is the difference from `identify`: a shortlist of names read by a
+    person survives a missing field, and a list that gets priced and quoted does
+    not — a row with no `deal_shape` is the difference between £300 and £1,000.
+
+    **`identify` is untouched.** This is a second mode, not a changed one: its
+    thirteen contract tests still describe the shortlist exactly as before, and a
+    caller wanting names still gets names in forty seconds.
+
+    **No refiner pass.** `refine.py:70` gives `gtm_targets` 2048 tokens, half what
+    the first pass had and a quarter of what this mode needs; a truncated second
+    pass fails to parse, is swallowed, and silently returns the first — so the
+    refinement would be invisible whether or not it happened. Better not to spend
+    the call.
+    """
+    digest = _digest(username) if use_signals else ""
+
+    with mind_governor.slot():
+        raw = mind.analyze(
+            system=prompts.GTM_TRACKER_SYSTEM,
+            messages=[{
+                "role": "user",
+                "content": prompts.gtm_tracker_user_prompt(analysis, config, digest),
+            }],
+            max_tokens=TRACKER_MAX_TOKENS,
+        ).text
+
+    try:
+        # The lenient object path, not the strict one `identify` uses: this answer
+        # is twice the size, and a single unquoted key in row two was observed
+        # discarding a whole nine-account list.
+        parsed = schemas.TargetList.model_validate(parse_json_object(raw))
+    except ValidationError as e:
+        # Reported, not raised, and the message names the field: a list refused
+        # for one bad row must tell the person which row and why, or the only
+        # remedy is to run it again and hope.
+        return {
+            "final": schemas.empty(),
+            "claude_raw": None,
+            "owl_applied": False,
+            "error": f"invalid_target_list: {_first_problem(e)}",
+        }
+    except Exception as e:  # noqa: BLE001 — an unparseable answer is a reported failure
+        return {
+            "final": schemas.empty(),
+            "claude_raw": None,
+            "owl_applied": False,
+            "error": f"parse_failed: {e}",
+        }
+
+    return {
+        "final": parsed.model_dump(),
+        "claude_raw": parsed.model_dump(),
+        "owl_applied": False,
+        "error": None,
+    }
+
+
+def _first_problem(error: ValidationError) -> str:
+    """The first validation failure, as a sentence naming where it was."""
+    problems = error.errors()
+    if not problems:
+        return "the answer did not match the target-list shape"
+    first = problems[0]
+    where = ".".join(str(part) for part in first.get("loc", ())) or "the list"
+    return f'{where}: {first.get("msg", "invalid")}'
+
+
+def _digest(username: str) -> str:
+    """The watchlist findings, as their own block — or nothing.
+
+    Read separately from `_with_signals`, which folds the digest into `notes`. In
+    tracker mode it must stay identifiable: this mode may take a *trigger* from the
+    watchlist, and a steer somebody typed by hand must not become one.
+    """
+    try:
+        from agents.sales.signals import agent as signals
+
+        return signals.digest(username)
+    except Exception as e:  # noqa: BLE001 — a steer failing must not cost the proposal
+        print(f"[gtm] signals digest unavailable: {e}")
+        return ""
 
 
 def _normalise(result: object) -> dict:
@@ -192,3 +293,86 @@ def run_as_tool(username: str, args: dict) -> str:
         + "\n\n**Unverified** — these come from recall, not a search, so some may be "
         "acquired, renamed or wrong. X-ray or research a name before acting on it."
     )
+
+
+TRACKER_TOOL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "vertical": {
+            "type": "string",
+            "description": "The vertical or ICP to build the list from.",
+        },
+        "seed_company": {
+            "type": "string",
+            "description": "A company to find look-alikes of. Excluded from the list itself.",
+        },
+        "notes": {
+            "type": "string",
+            "description": "Any steer: a geography, a product angle, a segment to avoid.",
+        },
+    },
+}
+
+
+def run_as_tool_tracker(username: str, args: dict) -> str:
+    """Build a target list for a tracker, as Owl runs it.
+
+    Returns prose because Owl streams prose. The list is **queued for review**, not
+    put on a tracker: this is the tool that writes, and what it writes is a request
+    for a decision. Owl saying "done" about accounts nobody has read would be the
+    one thing the review gate exists to prevent.
+    """
+    args = args or {}
+    analysis = {
+        "vertical": str(args.get("vertical") or "").strip(),
+        "seed_company": str(args.get("seed_company") or "").strip(),
+        "notes": str(args.get("notes") or "").strip(),
+    }
+    if not any(analysis.values()):
+        return (
+            "Say what to build the list from — a vertical, an ICP, or a company to "
+            "find look-alikes of. Without a scope the list would be a guess."
+        )
+
+    result = build_targets(username, analysis, {})
+    if result["error"]:
+        return f"The list could not be built: {result['error']}"
+
+    rows = result["final"]["rows"]
+    if not rows:
+        return "No accounts came out of that scope. Try naming a vertical."
+
+    from agents.sales.gtm import review as gtm_review
+
+    item = gtm_review.submit(username, result["final"], analysis)
+
+    tiers = {1: 0, 2: 0, 3: 0}
+    for row in rows:
+        tiers[row["tier"]] = tiers.get(row["tier"], 0) + 1
+    untriggered = sum(1 for row in rows if not row["trigger_text"])
+    unshaped = sum(1 for row in rows if not row["deal_lines"])
+
+    lines = [
+        f"{len(rows)} accounts proposed and queued for your review "
+        f"(tier 1: {tiers[1]}, tier 2: {tiers[2]}, tier 3: {tiers[3]}).",
+        "",
+    ]
+    for row in rows:
+        trigger = row["trigger_text"] or "no live trigger"
+        lines.append(f"- **{row['account']}** — {row['segment']}, {row['campaign']}. {trigger}.")
+
+    lines.append("")
+    if untriggered:
+        lines.append(
+            f"{untriggered} of them carry no trigger, because nothing on the Signals "
+            "watchlist covers them. Watching the tracker is what fills that column in."
+        )
+    if unshaped:
+        lines.append(
+            f"{unshaped} could not be given a deal shape, so they will land unpriced "
+            "rather than priced on a guess."
+        )
+    lines.append(
+        f"Nothing is on a tracker yet. Approve review item `{item['id']}` to create one."
+    )
+    return "\n".join(lines)

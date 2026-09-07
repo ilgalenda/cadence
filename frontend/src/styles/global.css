@@ -249,7 +249,179 @@
   margin-bottom: var(--space-5);
 }
 .agent-page__sect .ds-mono { color: rgb(var(--ink-muted)); }
+/* A section head that belongs to one state has to be able to leave. `display:
+   flex` outranks the `hidden` attribute, so a head hidden in markup would sit
+   there visibly heading nothing — guarded here rather than per page, the way
+   `.pl__auto` is. */
+.agent-page__sect[hidden] { display: none; }
 
 @media (max-width: 60rem) {
   .agent-page { padding: var(--space-8) var(--space-4) var(--space-10); }
 }
+
+/* ── Events ───────────────────────────────────────────────────────────────────
+   The trade-show calendar, on the same `.ds-table` grammar as the people list
+   above, and for the same reason: it is a readout somebody compares down its
+   columns. The differences from `pl__` are only the ones the subject forces —
+   there is no selection here, so no pick column and no bulk bar, and the record
+   that opens under a row is a set of facts rather than a paragraph. */
+
+/* Show takes every spare pixel; the date, countdown and state size to content. */
+.ev__colwide { width: 100%; }
+.ev__tablewrap { min-width: 0; }
+.ev__empty { color: rgb(var(--ink-muted)); }
+
+.ev__grouphead {
+  display: flex; align-items: baseline; gap: var(--space-3);
+  padding: 0; background: none; border: 0;
+  font: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.ev__groupnote { font-size: var(--text-caption); color: rgb(var(--ink-muted)); }
+.ev__grouprow > td { padding: var(--space-10) 0 0; border-bottom: 0; }
+.ev__band:first-of-type .ev__grouprow > td { padding-top: var(--space-4); }
+.ev__grouprow:hover { background: none; }
+
+.ev__who { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+.ev__whoname { min-width: 0; }
+/* `display: flex` is load-bearing, not layout tidiness: it blockifies the
+   `.ds-twisty` inside, and a transform does not apply to a non-replaced inline
+   element. Without it the chevron never rotates and the control says "closed"
+   while its record is open. The group heads got this for free by being flex;
+   this one had to be told. */
+.ev__twisty {
+  flex-shrink: 0; display: flex; padding: 0;
+  background: none; border: 0; cursor: pointer;
+  color: rgb(var(--ink-muted));
+}
+.ev__twisty:hover { color: rgb(var(--ink)); }
+.ev__when { color: rgb(var(--ink-secondary)); white-space: nowrap; }
+
+/* The opened record hangs off the row above it, so that row loses its rule. */
+.ev__row.is-open > td { border-bottom: 0; }
+.ev__detailrow > td { padding-top: 0; }
+.ev__detail { max-width: 100%; padding: var(--space-2) 0 var(--space-6); }
+
+/* The case leads the record — it is what an approval turns on. */
+.ev__why { max-width: var(--measure-read); margin-bottom: var(--space-6); }
+.ev__key { color: rgb(var(--ink-muted)); }
+.ev__case { margin: var(--space-1) 0 0; color: rgb(var(--ink)); }
+
+.ev__facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 14rem));
+  gap: var(--space-5) var(--space-8); margin-bottom: var(--space-8);
+}
+.ev__fact { display: flex; flex-direction: column; }
+.ev__value { color: rgb(var(--ink)); font-size: var(--text-small); }
+
+.ev__items { margin-bottom: var(--space-8); }
+.ev__item { padding: var(--space-3) 0; }
+.ev__item + .ev__item { border-top: 1px solid rgb(var(--rule-hairline)); }
+.ev__itemhead { display: flex; align-items: baseline; gap: var(--space-3); }
+.ev__itemname { color: rgb(var(--ink)); font-weight: var(--weight-medium); font-size: var(--text-small); }
+.ev__due { color: rgb(var(--ink-muted)); margin: var(--space-1) 0 0; }
+.ev__none { color: rgb(var(--ink-muted)); }
+.ev__acts { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+.ev__acts--decide { margin: 0 0 var(--space-8); }
+
+/* The destructive control, kept away from the routine ones by a rule and a
+   gap rather than by wording alone. */
+.ev__remove {
+  display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap;
+  margin-top: var(--space-4); padding-top: var(--space-5);
+  border-top: 1px solid rgb(var(--rule-hairline));
+}
+
+.ev__tablewrap { overflow-x: auto; }
+
+/* ── The events timeline ──────────────────────────────────────────────────────
+   A year on one track, drawn because the design system has no calendar and this
+   is the one thing a table cannot say: which shows crowd each other, and where
+   one show's ordering deadline falls inside the run-up to another.
+
+   Twelve gridlines and percentage-positioned bars, so the arithmetic stays in
+   `lib/eventsTimeline.ts` where it is tested and the CSS holds no dates. */
+
+.tl { display: flex; flex-direction: column; min-width: 34rem; }
+
+/* The months sit over the lane column, on the same twelve-part grid the lanes
+   use, so each label is always over its own slice of the track. The empty
+   columns either side match the label and state columns of a row. */
+.tl__scale {
+  display: grid; grid-template-columns: 11rem 1fr; gap: var(--space-4);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
+  border-bottom: 1px solid rgb(var(--rule-hairline));
+}
+.tl__months { grid-column: 2; display: grid; grid-template-columns: repeat(12, 1fr); }
+.tl__month { font-size: var(--text-caption); color: rgb(var(--ink-muted)); }
+
+.tl__row {
+  display: grid; grid-template-columns: 11rem 1fr;
+  align-items: center; gap: var(--space-4);
+  width: 100%; padding: var(--space-3) 0; text-align: left;
+  background: none; border: 0; border-bottom: 1px solid rgb(var(--rule-hairline));
+  cursor: pointer;
+  transition: background-color var(--dur-tick) var(--ease-phase);
+}
+.tl__row:hover { background: rgb(var(--ink) / 0.03); }
+
+.tl__label { display: flex; flex-direction: column; min-width: 0; }
+.tl__name {
+  font-size: var(--text-small); font-weight: var(--weight-medium);
+  color: rgb(var(--ink));
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tl__where { color: rgb(var(--ink-muted)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The track itself. A well, so the bars read as sitting in the year rather
+   than floating over it. */
+.tl__lane {
+  position: relative; display: grid; grid-template-columns: repeat(12, 1fr);
+  height: 1.75rem; border-radius: var(--radius-sm);
+  background: rgb(var(--surface-sunken));
+}
+.tl__gridline { border-left: 1px solid rgb(var(--canvas)); }
+.tl__gridline:first-child { border-left: 0; }
+
+.tl__bar {
+  position: absolute; top: 0.35rem; bottom: 0.35rem;
+  min-width: var(--space-1); border-radius: var(--radius-full);
+  background: rgb(var(--ink));
+}
+/* A proposal is not yet a commitment, so its bar is drawn rather than filled. */
+.tl__bar--proposed {
+  background: rgb(var(--canvas));
+  box-shadow: inset 0 0 0 var(--space-px) rgb(var(--ink-muted));
+}
+.tl__bar--declined, .tl__bar--attended { background: rgb(var(--ink-muted)); }
+
+/* The deadline, as a tick standing on the track before the bar it serves. */
+/* A hairline tick was too quiet to be the thing this view exists to show, so
+   the marker is a slim pill instead — still about a day and a half wide on a
+   year, with the exact date in its tooltip. */
+.tl__flag {
+  position: absolute; top: 0.1rem; bottom: 0.1rem; width: var(--space-1);
+  border-radius: var(--radius-full);
+  background: rgb(var(--ink-muted));
+}
+.tl__flag--breached { background: rgb(var(--signal-fault)); }
+.tl__flag--due_soon, .tl__flag--decide { background: rgb(var(--signal-drift)); }
+.tl__flag--ready, .tl__flag--ordered { background: rgb(var(--signal-locked)); }
+
+/* The record, opened under its own bar. It reuses `.ev__detail` so the table
+   and the track show one show the same way. */
+.tl__row.is-open { border-bottom: 0; }
+.tl__detail { padding-left: var(--space-4); border-bottom: 1px solid rgb(var(--rule-hairline)); }
+
+/* Mark over count, always — side by side it fitted for one show and wrapped for
+   the next, so no two rows were the same height. */
+.tl__state {
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: var(--space-1); margin-top: var(--space-2);
+}
+.tl__count { color: rgb(var(--ink-muted)); }
+
+/* The track carries twelve months and cannot compress below `.tl`'s own
+   min-width, so it scrolls inside its own container at every width — the page
+   body never scrolls sideways. */
+.tl__wrap { overflow-x: auto; }

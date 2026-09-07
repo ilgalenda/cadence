@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { AGENTS, LEARN, PATHS, STAGES } from './platform';
+import { AGENTS, LEARN, OPERATE, PATHS, STAGES } from './platform';
 
 /**
  * The shipped app-mark tokens, read from the design system rather than restated
@@ -63,6 +63,7 @@ describe('the platform registries', () => {
       ...AGENTS.map((a) => a.href),
       ...PATHS.map((p) => `/work/paths/${p.slug}`),
       ...LEARN.map((l) => l.href),
+      ...OPERATE.map((o) => o.href),
     ];
 
     expect(new Set(hrefs).size).toBe(hrefs.length);
@@ -97,5 +98,35 @@ describe('the app-mark palette', () => {
   // one token that flips on chrome. A per-stage face would mean three artworks.
   it('declares exactly one face for the whole set', () => {
     expect(declared.has(FACE)).toBe(true);
+  });
+});
+
+// What is held back, stated as a test rather than left to be noticed. `built` is
+// half of a decision the backend takes too — `HELD_BACK` in
+// `agents/sales/registry.py` keeps the same agents off Owl's tool list and leaves
+// their routers unmounted — so a change here that is not matched there ships a
+// page saying "coming soon" over a live agent.
+describe('what is not ready yet', () => {
+  const HELD_BACK = ['research', 'signals'];
+
+  it('holds back exactly the agents the backend does', () => {
+    expect(AGENTS.filter((agent) => !agent.built).map((agent) => agent.slug).sort())
+      .toEqual([...HELD_BACK].sort());
+  });
+
+  it('keeps every held-back agent in the catalogue rather than deleting it', () => {
+    // The launcher is the roster. An agent that is coming is worth more said than
+    // omitted, and its page is where the wait is explained.
+    for (const slug of HELD_BACK) {
+      const agent = AGENTS.find((a) => a.slug === slug);
+      expect(agent, `${slug} must stay listed`).toBeDefined();
+      expect(agent!.href).toBeTruthy();
+      expect(agent!.does).toBeTruthy();
+    }
+  });
+
+  it('leaves every other surface ready', () => {
+    expect(LEARN.every((surface) => surface.built)).toBe(true);
+    expect(OPERATE.every((surface) => surface.built)).toBe(true);
   });
 });

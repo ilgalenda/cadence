@@ -4,7 +4,14 @@
  *
  * The same shared `AnalysisResult` every other call surface renders — the only
  * difference is the endpoint, which reaches across users, and the owner shown
- * beside the title.
+ * beside the title. The fetch, the wait and both failure states belong to the
+ * component; `endpoint` is the one thing this view has to say about them.
+ *
+ * **No `requires`, deliberately.** `requires` takes an *agent slug* — the shell
+ * checks it with `canReach()`, which is `user.agents.includes(slug)`. There is no
+ * `admin` agent, and passing `requires="calls"` would bounce an admin who does
+ * not happen to hold the calls agent. The real guard is server-side on
+ * `/api/admin/*`; `/admin` itself passes no `requires` for the same reason.
  */
 import PlatformLayout from '../../../layouts/PlatformLayout.astro';
 import AnalysisResult from '../../../components/AnalysisResult.astro';
@@ -14,10 +21,9 @@ import AnalysisResult from '../../../components/AnalysisResult.astro';
     <header class="ds-page__head">
       <p class="ds-eyebrow">Admin · calls</p>
       <h1 class="ds-heading ds-page__title" id="call-heading">Call analysis</h1>
+      <p class="ds-mono page__when" id="when"></p>
       <span class="ds-mark ds-mark--idle" id="call-owner" hidden></span>
     </header>
-
-    <div class="ds-small state" id="load-state">loading analysis…</div>
 
     <AnalysisResult showClear={false} />
   </div>
@@ -25,45 +31,29 @@ import AnalysisResult from '../../../components/AnalysisResult.astro';
   <style>
     /* Screen-level layout only. The head sits on `.ds-page`; the shared
        `AnalysisResult` carries its own styling. */
-    .state { color: rgb(var(--ink-muted)); padding-block: var(--space-8); }
+    .page__when { color: rgb(var(--ink-muted)); }
   </style>
 
   <script>
-    const byId = (id: string) => document.getElementById(id)!;
+    import { el } from '../../../lib/dom';
+
     const id = new URLSearchParams(window.location.search).get('id');
 
-    function fail(message: string): void {
-      const state = byId('load-state');
-      state.textContent = message;
-      state.style.color = 'rgb(var(--signal-fault))';
-    }
+    (window as any).loadAnalysis(id, {
+      endpoint: '/api/admin/calls/',
+      onSession(session: { title?: string; timestamp?: string; username?: string }) {
+        const title = session.title || 'Call analysis';
+        document.title = `${title} — Cadence`;
+        el('call-heading').textContent = title;
+        el('when').textContent = session.timestamp || '';
 
-    if (!id) {
-      fail('no call id provided');
-    } else {
-      fetch(`/api/admin/calls/${encodeURIComponent(id)}`)
-        .then((r) => { if (!r.ok) throw new Error('not found'); return r.json(); })
-        .then((session) => {
-          const result = session.result || {};
-          result._title = session.title || 'Call analysis';
-          result._call_id = session.id;
-
-          const label = (session.title || 'Call analysis')
-            + (session.timestamp ? ' · ' + session.timestamp : '');
-          byId('call-heading').textContent = session.title || 'Call analysis';
-
-          // Whose call it is — the one thing this view adds over the others.
-          if (session.username) {
-            const owner = byId('call-owner');
-            owner.textContent = session.username;
-            owner.hidden = false;
-          }
-
-          (window as any).renderAnalysisResult(result);
-          byId('ar-heading').textContent = label;
-          byId('load-state').hidden = true;
-        })
-        .catch(() => fail('analysis not found'));
-    }
+        // Whose call it is — the one thing this view adds over the others.
+        if (session.username) {
+          const owner = el('call-owner');
+          owner.textContent = session.username;
+          owner.hidden = false;
+        }
+      },
+    });
   </script>
 </PlatformLayout>

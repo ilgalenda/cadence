@@ -1,0 +1,33 @@
+---
+/**
+ * An agent that is in the product but not yet ready to run.
+ *
+ * Shown on the agent's own page, above its form. The form stays: it is the
+ * clearest statement of what the agent will do, and hiding it would leave a page
+ * that says "soon" about nothing in particular. Its action is disabled, and the
+ * backend does not mount the route at all (`HELD_BACK` in
+ * `agents/sales/registry.py`), so the disabled button is the courtesy rather than
+ * the control.
+ *
+ * `.ds-banner--drift` is the system's register for "true, but qualified" — the
+ * same one GTM uses to say its list is unverified. Not `--fault`: nothing here
+ * has gone wrong.
+ */
+interface Props {
+  /**
+   * Why it is not ready, in plain terms. The whole sentence, because an agent
+   * and a path are not held back for the same reason and a fixed tail would be
+   * wrong for one of them.
+   */
+  reason: string;
+}
+const { reason } = Astro.props;
+---
+<div class="ds-banner ds-banner--drift soon">
+  <span class="ds-banner__label">Coming soon</span>
+  <span>{reason}</span>
+</div>
+
+<style>
+  .soon { margin-bottom: var(--space-6); }
+</style>

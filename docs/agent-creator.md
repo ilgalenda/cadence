@@ -46,6 +46,12 @@ python backend/scripts/create_agent.py --spec backend/scripts/specs/duty.json --
   - `frontend/src/pages/dashboard.astro` — an agent card.
   - `backend/seed_users.py` — the slug added to seeded profiles.
 
+> **Three of those paths no longer exist.** 2.0 has no `frontend/src/agents/`, no
+> `frontend/src/pages/agents/` — pages live under `work/agents/` — and no
+> dashboard. The tool is kept as a record of how the v1 agents were scaffolded,
+> not as something to run against this tree. `lib/platform.ts` is where an agent
+> is declared now.
+
 It refuses to overwrite an existing agent directory. After running, grant access
 with `python backend/seed_users.py --rewrite-profiles`, then build out the
 generated `routes.py` / page with real logic.

@@ -28,13 +28,26 @@ from integrations import google_oauth as grant
 # The grant
 # ---------------------------------------------------------------------------
 
-def test_the_grant_asks_for_exactly_three_scopes():
-    """Every entry here costs a re-consent from every user."""
+def test_the_grant_asks_for_exactly_four_scopes():
+    """Every entry here costs a re-consent from every user.
+
+    `spreadsheets` joined the list on 2026-09-03 for the shared events working
+    document — the tab Alex, Nils, Jo and operations read, none of whom have a
+    Cadence account. Deliberately not a Drive scope: the Sheets API creates the
+    file under the connecting account, and sharing it stays a person's decision.
+    """
     assert grant.SCOPES == [
         "https://www.googleapis.com/auth/calendar.events",
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/gmail.compose",
+        "https://www.googleapis.com/auth/spreadsheets",
     ]
+
+
+def test_it_asks_for_no_drive_scope():
+    """Reading somebody's whole Drive is not what a shared sheet needs."""
+    joined = " ".join(grant.SCOPES)
+    assert "auth/drive" not in joined
 
 
 def test_it_asks_for_compose_and_not_modify():
@@ -99,7 +112,7 @@ def test_a_calendar_only_grant_cannot_draft(tokens):
     grant.set_creds("sam", {"access_token": "a", "scopes": [grant.CALENDAR_SCOPE, grant.EMAIL_SCOPE]})
 
     assert grant.can_draft_email("sam") is False
-    assert grant.missing_scopes("sam") == [grant.GMAIL_COMPOSE_SCOPE]
+    assert grant.missing_scopes("sam") == [grant.GMAIL_COMPOSE_SCOPE, grant.SHEETS_SCOPE]
 
 
 def test_a_full_grant_can_draft(tokens):

@@ -34,7 +34,7 @@ def test_classify_new_site_urls():
         "https://www.acme.example/software",
         "https://www.acme.example/solutions/vgmc",
         "https://www.acme.example/industries/private-5g",
-        "https://www.acme.example/sync-insight",
+        "https://www.acme.example/fleet-insight",
         "https://www.acme.example/acme-agent",
         "https://www.acme.example/ptp-feed",
         "https://www.acme.example/white-rabbit",

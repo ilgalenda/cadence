@@ -40,7 +40,15 @@ export interface Agent {
   does: string;
   href: string;
   grant: Grant;
-  /** False until the agent is built — surfaces say so rather than 404. */
+  /**
+   * False while the agent is not ready — surfaces say so rather than 404.
+   *
+   * It is not only a label. The same decision is taken in the backend's
+   * `HELD_BACK` (`agents/sales/registry.py`), which keeps the agent off Owl's
+   * tool list and leaves its router unmounted. A page that says "coming soon"
+   * over a live route and a live tool is a hidden agent, not a held-back one, so
+   * the two must be flipped together.
+   */
   built: boolean;
   /** The tool name Owl knows it by, when it is registered. */
   tool?: string;
@@ -90,7 +98,11 @@ export const AGENTS: Agent[] = [
     does: 'What changed at the accounts you watch — funding, build-outs, timing work.',
     href: '/work/agents/signals',
     grant: 'lead',
-    built: true,
+    // Held back from 2.0. Two reasons: the same forced-tool-call fault as
+    // Research, and no scheduler — `maybe_sweep()` fires when somebody opens the
+    // page, so an agent promising "what changed while you were not looking" only
+    // looks while you are. See `HELD_BACK` in `agents/sales/registry.py`.
+    built: false,
     tool: 'check_signals',
   },
   {
@@ -101,7 +113,10 @@ export const AGENTS: Agent[] = [
     does: 'A deep brief on the company and the decision-maker.',
     href: '/work/agents/research',
     grant: 'lead',
-    built: true,
+    // Held back from 2.0: the brief completes about two times in five and takes
+    // two to five minutes. It is a step in all three paths, so those say so too
+    // — see `stopsAt` in `lib/paths.ts`, which is what decides.
+    built: false,
     tool: 'research_account',
   },
   {
@@ -233,12 +248,10 @@ export const pathBySlug = (slug: string): Path | undefined =>
 export const stepsOf = (path: Path): Agent[] =>
   path.steps.map(agentBySlug).filter((a): a is Agent => Boolean(a));
 
-/** How far a path can currently be walked before it meets an unbuilt agent. */
-export function pathReadiness(path: Path): { built: number; total: number } {
-  const steps = stepsOf(path);
-  const firstGap = steps.findIndex((s) => !s.built);
-  return { built: firstGap === -1 ? steps.length : firstGap, total: steps.length };
-}
+// `pathReadiness` was here, and had no callers anywhere in the repo — the runner
+// measures a run with `progress()` in `lib/paths.ts`, which counts what is
+// actually walkable rather than the prefix before the first gap. Deleted rather
+// than left as a plausible-looking function for the next person to build on.
 
 export interface LearnSurface {
   name: string;
@@ -281,6 +294,37 @@ export const LEARN: LearnSurface[] = [
     does: 'Test what you know against the calls the team has had.',
     href: '/learn/practice',
     grant: 'calls',
+    built: true,
+  },
+];
+
+/**
+ * A surface that is not an agent.
+ *
+ * Events reasons about no data and calls no model — it is a record and a set of
+ * deadlines. Listing it under `AGENTS` would have cost a fourth `Stage`, a grant,
+ * an app symbol and a pair of palette tokens, all to describe something that is
+ * not an agent, and the launcher's own vocabulary would have had to be widened to
+ * accommodate a lie. `LEARN` was already the precedent for a rail group of plain
+ * surfaces; this is the second one.
+ */
+export interface OpsSurface {
+  name: string;
+  does: string;
+  href: string;
+  /** Omitted where every signed-in person may use it — which Events is. */
+  grant?: Grant;
+  built: boolean;
+  icon: IconName;
+}
+
+/** Operations — the work behind the work. */
+export const OPERATE: OpsSurface[] = [
+  {
+    name: 'Events',
+    icon: 'events',
+    does: 'Which shows we are going to, who is going, and what they still need.',
+    href: '/work/events',
     built: true,
   },
 ];

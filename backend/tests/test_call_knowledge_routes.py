@@ -142,3 +142,68 @@ def test_a_library_row_reports_what_reached_the_vault(client):
     [row] = client.get("/api/sales/calls").json()
     assert row["knowledge"] == 2
     assert row["extracts"] == 1, "what the model proposed is a different number"
+
+
+# --- product fit, the opt-in second pass ------------------------------------
+#
+# The page leaves the product field blank in the common case — "assess across
+# the catalogue" — and the route's contract is `product_name: str = ""`. Sending
+# anything that is not a string fails validation before the agent is reached, so
+# the button could only report "failed — try again". There was no coverage here
+# at all, which is why that went unnoticed.
+
+def test_an_unnamed_product_assesses_the_whole_catalogue(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        call_routes.agent, "product_fit",
+        lambda username, *, call_id, product_name, sandbox=False: seen.update(
+            product_name=product_name
+        ) or {"primary": "Open Time Appliance"},
+    )
+
+    res = client.post(f"/api/sales/calls/{SESSION['id']}/product-fit", json={"product_name": ""})
+
+    assert res.status_code == 200
+    assert seen["product_name"] == ""
+
+
+def test_an_omitted_product_is_the_same_as_an_unnamed_one(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        call_routes.agent, "product_fit",
+        lambda username, *, call_id, product_name, sandbox=False: seen.update(
+            product_name=product_name
+        ) or {"primary": "Open Time Appliance"},
+    )
+
+    res = client.post(f"/api/sales/calls/{SESSION['id']}/product-fit", json={})
+
+    assert res.status_code == 200
+    assert seen["product_name"] == ""
+
+
+def test_a_named_product_reaches_the_agent(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        call_routes.agent, "product_fit",
+        lambda username, *, call_id, product_name, sandbox=False: seen.update(
+            product_name=product_name
+        ) or {"primary": "Open Timecard"},
+    )
+
+    res = client.post(
+        f"/api/sales/calls/{SESSION['id']}/product-fit",
+        json={"product_name": "Open Timecard"},
+    )
+
+    assert res.status_code == 200
+    assert seen["product_name"] == "Open Timecard"
+
+
+def test_a_null_product_is_refused_rather_than_silently_meaning_nothing(client):
+    """The contract is a string. `null` is a caller bug, and it must be loud."""
+    res = client.post(
+        f"/api/sales/calls/{SESSION['id']}/product-fit", json={"product_name": None}
+    )
+
+    assert res.status_code == 422

@@ -29,9 +29,18 @@ def _smtp_config() -> dict | None:
     admin = os.environ.get("ADMIN_NOTIFY_EMAIL", "").strip()
     if not (host and port and user and password and admin):
         return None
+    # A non-numeric port is a typo, not a crash. This runs on the request path —
+    # `is_configured()` is called while somebody waits — and an uncaught
+    # ValueError here would 500 a registration that had already been saved,
+    # which is exactly the failure the caller is written to avoid.
+    try:
+        port_number = int(port)
+    except ValueError:
+        print(f"[notify] SMTP_PORT is not a number: {port!r} — email is off")
+        return None
     return {
         "host": host,
-        "port": int(port),
+        "port": port_number,
         "user": user,
         "password": password,
         "from": os.environ.get("SMTP_FROM", "").strip() or user,
@@ -39,8 +48,28 @@ def _smtp_config() -> dict | None:
     }
 
 
-def send_admin_email(subject: str, body: str) -> bool:
-    """Send an email to ADMIN_NOTIFY_EMAIL. Returns True if sent."""
+def is_configured() -> bool:
+    """Whether email can be sent at all.
+
+    Separate from `send_admin_email`'s return value because a caller needs to
+    tell *"nobody has set this up"* apart from *"it was set up and the send
+    failed"*. Both come back as False from the sender, and a surface that
+    reports the first when the second happened is telling somebody their message
+    went nowhere for the wrong reason.
+
+    Mirrors `integrations.google_oauth.is_configured()`.
+    """
+    return _smtp_config() is not None
+
+
+def send_admin_email(subject: str, body: str, html: str | None = None) -> bool:
+    """Send an email to ADMIN_NOTIFY_EMAIL. Returns True if sent.
+
+    ``html`` is optional and additive: given one, the message goes out as
+    multipart/alternative with the plain text first, so a client that cannot or
+    will not render HTML still gets a complete message rather than a fallback
+    apology. Callers that pass nothing are unchanged.
+    """
     cfg = _smtp_config()
     if cfg is None:
         print(f"[notify] SMTP not configured — skipping: {subject}")
@@ -51,6 +80,8 @@ def send_admin_email(subject: str, body: str) -> bool:
     msg["From"] = cfg["from"]
     msg["To"] = cfg["to"]
     msg.set_content(body)
+    if html:
+        msg.add_alternative(html, subtype="html")
 
     try:
         ctx = ssl.create_default_context()

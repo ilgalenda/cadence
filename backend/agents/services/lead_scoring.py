@@ -68,7 +68,7 @@ PAGE_PATTERNS: list[tuple[str, tuple[str, ...]]] = [
     # high intent. Substrings cover the rebuilt paths plus legacy Wix ones.
     ("product", (
         "/hardware", "/software", "/solutions", "/industries", "/products",
-        "sync-insight", "acme-agent", "ptp-feed", "white-rabbit",
+        "fleet-insight", "acme-agent", "ptp-feed", "white-rabbit",
         "open-time", "timecard", "appliance", "ocp-tap", "private-5g", "advisory",
         "/downloads", "download",
         # legacy Wix-era paths still present in historical Leadinfo data

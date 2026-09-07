@@ -19,6 +19,7 @@ original, domain-specific instance of this same pattern; it converges onto this
 primitive when ``lead``/``calls`` are retired (Phase 3).
 """
 import json
+import os
 import threading
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -42,6 +43,32 @@ _ALLOWED_TRANSITIONS = {PENDING: {APPROVED, REJECTED}}
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+class QueueUnreadable(RuntimeError):
+    """The queue file exists and could not be read.
+
+    Its own type because the caller's choice matters: an empty queue is a normal
+    answer and this is not one.
+    """
+
+
+#: One lock per queue **file**, not per :class:`ReviewQueue`.
+#:
+#: Every call site builds a fresh queue per call — see the identical
+#: `_queue()` helpers in Composer, Recap and GTM — so that a test pointing the
+#: data root elsewhere is honoured. A lock held on the instance therefore guarded
+#: nothing: two concurrent requests took two different locks over one file, both
+#: did a full read-modify-write, and one of them lost. Keyed on the resolved path
+#: so the late binding those helpers rely on still works.
+_LOCKS: dict[Path, threading.Lock] = {}
+_LOCKS_GUARD = threading.Lock()
+
+
+def _lock_for(path: Path) -> threading.Lock:
+    key = Path(os.path.abspath(path))
+    with _LOCKS_GUARD:
+        return _LOCKS.setdefault(key, threading.Lock())
 
 
 @dataclass
@@ -80,20 +107,44 @@ class ReviewQueue:
 
     def __init__(self, path: Path | str):
         self._path = Path(path)
-        self._lock = threading.Lock()
+
+    @property
+    def _lock(self) -> threading.Lock:
+        """Shared by every queue on this file — see `_lock_for`."""
+        return _lock_for(self._path)
 
     # -- persistence --------------------------------------------------------
     def _load(self) -> dict[str, dict]:
+        """Every item, or `{}` when there is no queue yet.
+
+        **A file that exists and will not parse raises.** It used to be folded
+        into `{}` alongside the missing-file case, which read as "no items" — and
+        the next `_save` then wrote that empty dict back over the top. A torn read
+        during somebody else's write was enough to erase the queue silently, with
+        no exception anywhere to say so. Losing every pending draft is not a state
+        this may report as normal.
+        """
         if not self._path.exists():
             return {}
         try:
             return json.loads(self._path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            return {}
+        except (json.JSONDecodeError, OSError) as e:
+            raise QueueUnreadable(f"The review queue at {self._path} could not be read: {e}")
 
     def _save(self, records: dict[str, dict]) -> None:
+        """Replace the file atomically.
+
+        A bare `write_text` truncates first, so every reader between the truncate
+        and the write sees a partial file. Writing a sibling and renaming means a
+        reader sees either the old queue or the new one, never half of one.
+        """
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(records, indent=2), encoding="utf-8")
+        temporary = self._path.with_name(f"{self._path.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            temporary.write_text(json.dumps(records, indent=2), encoding="utf-8")
+            os.replace(temporary, self._path)
+        finally:
+            temporary.unlink(missing_ok=True)
 
     # -- commands -----------------------------------------------------------
     def submit(self, *, kind: str, payload: dict, submitted_by: str) -> ReviewItem:

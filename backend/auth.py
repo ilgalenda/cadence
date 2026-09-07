@@ -90,6 +90,16 @@ def require_admin(request: Request) -> dict:
     return user
 
 
+def is_admin(user: dict) -> bool:
+    """Whether this person sees everything.
+
+    `require_admin` is for a route that refuses; this is for one that *narrows* —
+    the same question asked where the answer changes a query rather than the
+    response code. Mirrors `isAdmin` in the frontend's `lib/session.ts`.
+    """
+    return user.get("access") == "admin"
+
+
 def is_sandbox(request: Request) -> bool:
     user = current_user(request)
     if not user or user.get("access") != "admin":

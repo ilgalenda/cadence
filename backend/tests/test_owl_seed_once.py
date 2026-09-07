@@ -55,7 +55,7 @@ def test_the_attempt_is_recorded_even_when_it_seeds_nothing(store):
 def test_the_marker_is_per_user(store):
     calls, _ = store
     memory_seed.seed_if_empty("sam")
-    memory_seed.seed_if_empty("lasse")
+    memory_seed.seed_if_empty("nils")
     assert calls["seeded"] == 2
 
 

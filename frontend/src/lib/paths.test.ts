@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { agentBySlug, pathBySlug } from './platform';
 import {
   absorb, canRun, inputProblem, isDone, isRunnable, pickCompany, pickPerson, progress,
-  requestFor, responseProblem, storableCarry, stopsAt, summarise, walk, type Carry,
+  requestFor, responseProblem, storableCarry, stopsAt, summarise, waitingFor, walk, type Carry,
 } from './paths';
 
 const websiteLead = pathBySlug('website-lead')!;
@@ -166,25 +166,28 @@ describe('dropping stale state', () => {
 describe('walking a path', () => {
   it('opens with exactly one active step and nothing done', () => {
     const steps = walk(websiteLead, {});
-    // Research needs no precondition — it takes a typed company — so it is
-    // runnable from the start rather than waiting on the steps above it.
+    // Scoring is active, X-ray waits on it, and everything from Research on is
+    // `unbuilt` while Research is held back — `walk` cascades, because a step
+    // after a stop is not merely pending.
     expect(steps.map((s) => s.state))
-      .toEqual(['active', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting']);
+      .toEqual(['active', 'waiting', 'unbuilt', 'unbuilt', 'unbuilt', 'unbuilt']);
   });
 
   it('advances the active step once the previous one has run', () => {
     const carry = absorb('scoring', { final: SCORED }, {});
     const steps = walk(websiteLead, carry);
     expect(steps.map((s) => s.state))
-      .toEqual(['done', 'active', 'waiting', 'waiting', 'waiting', 'waiting']);
+      .toEqual(['done', 'active', 'unbuilt', 'unbuilt', 'unbuilt', 'unbuilt']);
   });
 
-  it('walks the inbound path, which has no step before Research', () => {
-    // This path was entirely unwalkable until Research and Composer were built —
-    // it reported "0 of 2 built" and nothing on it could be clicked.
+  it('stops the inbound path at its first step while Research is held back', () => {
+    // Inbound has no step before Research, so holding Research back stops the
+    // whole path — which is why `[path].astro` states the wait rather than
+    // painting a meter that reads "0 of 0".
     const steps = walk(inbound, {});
-    expect(steps.map((s) => s.state)).toEqual(['active', 'waiting', 'waiting', 'waiting']);
-    expect(stopsAt(inbound)).toBeUndefined();
+    expect(steps.map((s) => s.state)).toEqual(['unbuilt', 'unbuilt', 'unbuilt', 'unbuilt']);
+    expect(stopsAt(inbound)?.slug).toBe('research');
+    expect(progress(inbound, {})).toEqual({ done: 0, runnable: 0 });
   });
 
   it('offers a pick only once GTM has proposed something', () => {
@@ -203,17 +206,21 @@ describe('walking a path', () => {
   });
 
   it('counts progress over the steps that can actually run', () => {
-    expect(progress(websiteLead, {})).toEqual({ done: 0, runnable: 6 });
-    expect(progress(websiteLead, absorb('scoring', { final: SCORED }, {}))).toEqual({ done: 1, runnable: 6 });
-    expect(progress(inbound, {})).toEqual({ done: 0, runnable: 4 });
+    // `runnable` is the honest denominator: two of website-lead's six steps are
+    // reachable while Research is held back, so a finished X-ray reads 1 of 2
+    // rather than 1 of 6.
+    expect(progress(websiteLead, {})).toEqual({ done: 0, runnable: 2 });
+    expect(progress(websiteLead, absorb('scoring', { final: SCORED }, {}))).toEqual({ done: 1, runnable: 2 });
+    expect(progress(inbound, {})).toEqual({ done: 0, runnable: 0 });
   });
 
-  it('no longer stops any path short', () => {
-    // Every step of all three paths is built. When the next agent lands unbuilt,
-    // `stopsAt` is what will name it again.
-    expect(stopsAt(websiteLead)).toBeUndefined();
-    expect(stopsAt(icp)).toBeUndefined();
-    expect(stopsAt(inbound)).toBeUndefined();
+  it('names the one agent all three paths are waiting on', () => {
+    // Research is a step in every path, so holding it back stops all three — and
+    // `stopsAt` is the single thing that decides, which is why no path carries a
+    // readiness flag of its own to fall out of step with it.
+    expect(stopsAt(websiteLead)?.slug).toBe('research');
+    expect(stopsAt(icp)?.slug).toBe('research');
+    expect(stopsAt(inbound)?.slug).toBe('research');
   });
 
   it('counts an empty X-ray result as done, because "nobody" is an answer', () => {
@@ -346,6 +353,17 @@ describe('the handoff to Composer', () => {
     expect(body.brief).toEqual(BRIEF);
   });
 
+  it('carries the enriched address, which the brief does not', () => {
+    // The brief's `person` is Research's profile of them, not the X-ray row that
+    // was paid for, so the address only survives by being sent explicitly. The
+    // standalone Composer page collected the field and dropped it for exactly as
+    // long as nothing here asserted it.
+    expect(requestFor('composer', { brief: BRIEF }).body.recipient).toBe('');
+    expect(
+      requestFor('composer', { brief: BRIEF, person: { _email: 'lena@northgate.com' } }).body.recipient,
+    ).toBe('lena@northgate.com');
+  });
+
   it('writes email alone unless more channels are chosen', () => {
     expect(requestFor('composer', { brief: BRIEF }).body.channels).toEqual(['email']);
     expect(requestFor('composer', { brief: BRIEF }, { channels: ['email', 'call'] }).body.channels)
@@ -365,7 +383,9 @@ describe('the handoff to Composer', () => {
   it('will not run before there is a brief to write from', () => {
     expect(canRun('composer', {})).toBe(false);
     expect(canRun('composer', { brief: BRIEF })).toBe(true);
-    expect(walk(inbound, {})[1].waiting).toMatch(/brief/i);
+    // Asked of the contract, not of a walk: every path currently stops before
+    // this step is reached, and the sentence is the contract's either way.
+    expect(waitingFor('composer')).toMatch(/brief/i);
   });
 
   it('refuses an empty channel mix rather than composing nothing', () => {
@@ -416,12 +436,11 @@ describe('what the new steps report', () => {
   });
 
   it('counts an empty set of touches as not done', () => {
-    // Composer is the last step of the inbound path: research → recall → plan →
-    // compose. Everything before it is done, so it is the active one.
+    // A composition that produced no touches has not happened, so the step must
+    // stay runnable rather than reading as finished.
     const carry = { brief: BRIEF, intel: INTEL, campaign: PLAN, drafts: {} };
-    const composer = walk(inbound, carry).at(-1)!;
-    expect(composer.agent.slug).toBe('composer');
-    expect(composer.state).toBe('active');
+    expect(isDone('composer', carry)).toBe(false);
+    expect(canRun('composer', carry)).toBe(true);
   });
 });
 
@@ -456,7 +475,7 @@ describe('the handoff to Campaign intelligence', () => {
   it('will not run before there is a brief to place the account', () => {
     expect(canRun('campaign-intelligence', {})).toBe(false);
     expect(canRun('campaign-intelligence', { brief: BRIEF })).toBe(true);
-    expect(walk(inbound, {})[1].waiting).toMatch(/brief/i);
+    expect(waitingFor('campaign-intelligence')).toMatch(/brief/i);
   });
 
   it('needs nothing typed', () => {
@@ -467,7 +486,7 @@ describe('the handoff to Campaign intelligence', () => {
     // "This market has no history" is a real answer, and re-running will not
     // change it — so the step must not sit active waiting to be tried again.
     const carry = absorb('campaign-intelligence', { vertical: 'broadcast', recall: [], error: 'no_recall' }, { brief: BRIEF });
-    expect(walk(inbound, carry)[1].state).toBe('done');
+    expect(isDone('campaign-intelligence', carry)).toBe(true);
   });
 
   it('summarises what it recalled and how much came back', () => {

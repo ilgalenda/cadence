@@ -51,6 +51,10 @@ EXCLUDES=(
   # The proprietary prompt library — stubbed separately, never copied
   --exclude 'prompts.py'
   --exclude 'signal_prompts.py'
+  # Scratch files left behind by an editor or an agent session. `.rail2.tmp.mjs`
+  # carried a real home path and read a password out of `.env`; it reached this
+  # tree once and the gate caught it. Excluded by shape so the next one cannot.
+  --exclude '.*.tmp.*' --exclude '*.tmp.mjs' --exclude '*.tmp.js'
   # Build, tooling and OS noise
   --exclude '__pycache__/' --exclude '*.pyc'
   --exclude '.venv/' --exclude 'node_modules/' --exclude 'dist/' --exclude '.astro/'
@@ -107,6 +111,11 @@ DIRS=(
   backend/agents/shared
   # The eleven sales agents, plus their orchestration
   backend/agents/sales
+  # The two subsystems that run without reaching the Mind: a record of the trade
+  # shows and their deadlines, and a campaign's account list with an append-only
+  # trail. Neither imports a prompt module, so neither goes through redaction.
+  backend/agents/events
+  backend/agents/outbound
   # Surfaces: workspace, wiki, learn, admin
   backend/agents/owl
   backend/agents/wiki

@@ -7,7 +7,7 @@
 | **Mind profile** | `research` |
 | **Human gate** | none — internal preparation |
 
-**Prompts: withheld.** The module ships with its signatures and docstrings; the prompt bodies are proprietary and raise `NotImplementedError` in this build. Everything else — the orchestration, the schema, the gates — is real code.
+**Not in this release.** The code is here and current — this is not a Phase 2 agent waiting to be brought onto the Mind. It is finished, and held back: its router is not mounted, it is not registered as a tool on Owl, and its page says so. Both agents held back drove a web-search turn that was compelled to call a tool after its search budget was spent, so the turn thrashed and never produced its answer — about two completions in five attempts. Its prompts are withheld with the rest.
 
 ---
 

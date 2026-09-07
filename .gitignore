@@ -65,6 +65,9 @@ htmlcov/
 # ============================================================
 frontend/node_modules/
 frontend/dist/
+# Astro's generated type cache. Tracked at v1 by accident, and the leak gate
+# fails on its presence — so building locally must not be able to put it back.
+frontend/.astro/
 node_modules/
 .npm/
 .yarn/

@@ -2,31 +2,62 @@
 /**
  * A call, read.
  *
- * Three surfaces render this — `/work/agents/call-analysis`, `/learn/library/call`
- * and `/admin/calls/call` — so it stays one component. Its **public surface is
- * fixed** and callers depend on it:
+ * Four surfaces render this — `/work/agents/call-analysis`, `/learn/library/call`,
+ * `/admin/calls/call` and, through the first of those, the run itself — so it
+ * stays one component. Its **public surface is fixed** and callers depend on it:
  *
- *   - the `showClear` and `analysisId` props
- *   - `window.renderAnalysisResult(result)`
- *   - the `#ar-heading` element, which two pages overwrite with a title and date
+ *   - the `showClear` prop
+ *   - `window.renderAnalysisResult(result)` — hand it a reading you already have
+ *   - `window.loadAnalysis(id, options)` — hand it an id and it fetches, holding
+ *     the wait, the not-found and the fault itself
+ *   - `window.showAnalysisWait(waiting)` — for a caller running the analysis
+ *     itself, so it borrows this skeleton rather than drawing a second one
+ *   - `data-analysis-empty` on a host page's own empty state, which joins it to
+ *     this component's switch instead of running a second one beside it
+ *   - the `#ar-heading` element, which the component names itself and no page
+ *     overwrites: the page head owns the title, this head owns the reading
  *
- * On the design system as of the uniformity pass. It was the last thing rendering
- * legacy classes *inside* new pages: two design-system surfaces displayed a block
- * styled like the old product. Reusing it untouched was right on duplication and
- * wrong on coherence, and this fixes the second without breaking the first.
+ * `loadAnalysis` exists because the fetch had been written three times — here,
+ * in the library detail page and in the admin one — and the copy here was
+ * unreachable, because the `analysisId` prop it depended on was never passed by
+ * anybody. One request, one set of states, three callers.
  *
- * The script stays `is:inline` because `renderAnalysisResult` has to be a global —
- * the pages that call it do so from their own module scripts.
+ * The script stays `is:inline` because the globals have to be globals — the
+ * pages that call them do so from their own module scripts.
  */
+import robotoUrl from '@fontsource-variable/roboto/files/roboto-latin-wght-normal.woff2?url';
+import kodeMonoUrl from '@fontsource-variable/kode-mono/files/kode-mono-latin-wght-normal.woff2?url';
+import { agentBySlug } from '../lib/platform';
+
 interface Props {
-  /** When set, the component fetches /api/sales/calls/{id} on mount and renders it. */
-  analysisId?: string;
   /** Show the "Clear" button (hide on standalone detail pages). */
   showClear?: boolean;
 }
-const { analysisId, showClear = true } = Astro.props;
+const { showClear = true } = Astro.props;
+
+//: Whether there is a next step to offer. Research is the only one this reading
+//: hands off to, so while it is held back the section goes rather than becoming a
+//: button that leads somewhere nobody can act.
+const researchReady = agentBySlug('research')!.built;
 ---
-<div id="analysis-result" data-analysis-id={analysisId ?? ''} hidden={!analysisId}>
+<!-- The wait, in the shape of what is coming: a head, the tab strip, and the
+     prose beneath it. The page keeps its geometry rather than collapsing. -->
+<div id="ar-loading" hidden>
+  <div class="ar__skeleton-head"><span class="ds-skeleton"></span></div>
+  <div class="ar__skeleton-tabs">
+    <span class="ds-skeleton"></span><span class="ds-skeleton"></span><span class="ds-skeleton"></span>
+  </div>
+  <div class="ar__skeleton-body">
+    <span class="ds-skeleton"></span><span class="ds-skeleton"></span>
+    <span class="ds-skeleton"></span><span class="ds-skeleton"></span>
+  </div>
+</div>
+
+<!-- Nothing found, or the backend unreachable. Two different sentences, so the
+     reader can tell a deleted call from a server that is down. -->
+<div id="ar-problem" hidden></div>
+
+<div id="analysis-result" data-font-sans={robotoUrl} data-font-mono={kodeMonoUrl} hidden>
 
   <header class="ar__head">
     <h2 class="ds-eyebrow ar__title" id="ar-heading">Analysis</h2>
@@ -39,55 +70,67 @@ const { analysisId, showClear = true } = Astro.props;
     </div>
   </header>
 
-  <div class="ds-tabs ar__tabs" role="tablist">
-    <button class="ds-tab result-tab is-active" type="button" role="tab" data-tab="summary">Summary</button>
-    <button class="ds-tab result-tab" type="button" role="tab" data-tab="sales">Sales intel</button>
-    <button class="ds-tab result-tab" type="button" role="tab" data-tab="recommendation">Recommendation</button>
-    <button class="ds-tab result-tab" type="button" role="tab" data-tab="knowledge">Learning</button>
-    <button class="ds-tab result-tab" type="button" role="tab" data-tab="quiz">Quiz</button>
+  <!-- Selection is stated three ways — the class for the eye, the aria for
+       assistive tech, and the tabindex so the strip is one Tab stop with focus
+       parked on the active tab. The button ids are `ar-tab-*` because the panels
+       already own `tab-*` and the switcher builds panel ids from `data-tab`. -->
+  <div class="ds-tabs ar__tabs" role="tablist" aria-label="Analysis sections">
+    <button class="ds-tab result-tab is-active" type="button" role="tab" id="ar-tab-summary"
+      aria-selected="true" aria-controls="tab-summary" data-tab="summary">Summary</button>
+    <button class="ds-tab result-tab" type="button" role="tab" id="ar-tab-sales"
+      aria-selected="false" aria-controls="tab-sales" tabindex="-1" data-tab="sales">Sales intel</button>
+    <button class="ds-tab result-tab" type="button" role="tab" id="ar-tab-recommendation"
+      aria-selected="false" aria-controls="tab-recommendation" tabindex="-1" data-tab="recommendation">Recommendation</button>
+    <button class="ds-tab result-tab" type="button" role="tab" id="ar-tab-knowledge"
+      aria-selected="false" aria-controls="tab-knowledge" tabindex="-1" data-tab="knowledge">Learning</button>
+    <button class="ds-tab result-tab" type="button" role="tab" id="ar-tab-quiz"
+      aria-selected="false" aria-controls="tab-quiz" tabindex="-1" data-tab="quiz">Quiz</button>
   </div>
 
   <!-- Summary -->
-  <div id="tab-summary" class="result-panel">
+  <div id="tab-summary" class="result-panel" role="tabpanel" aria-labelledby="ar-tab-summary">
     <section class="ar__section">
       <p class="ds-eyebrow ar__label">Summary</p>
       <p id="result-summary" class="ds-body ar__prose"></p>
     </section>
     <section class="ar__section">
       <p class="ds-eyebrow ar__label">Concepts mentioned</p>
-      <div id="result-concepts" class="ar__tags"></div>
+      <div id="result-concepts" class="ds-tags"></div>
     </section>
-    <section>
-      <p class="ds-eyebrow ar__label">Next step</p>
-      <!-- Into the new front half: Research prefills the company and deliberately
-           does not auto-run, so an imprecise call title costs nothing. This used to
-           hand off to the retiring campaign builder, which dropped you out of the
-           new product mid-task. -->
-      <a class="ds-btn ds-btn--primary" id="ar-next-step" href="/work/agents/research">
-        Research this account
-      </a>
-    </section>
+    {researchReady && (
+      <section>
+        <p class="ds-eyebrow ar__label">Next step</p>
+        {/* Into the new front half: Research prefills the company and deliberately
+            does not auto-run, so an imprecise call title costs nothing. This used to
+            hand off to the retiring campaign builder, which dropped you out of the
+            new product mid-task. Gone entirely while Research is held back — an
+            offered next step that cannot be taken is worse than none. */}
+        <a class="ds-btn ds-btn--primary" id="ar-next-step" href="/work/agents/research">
+          Research this account
+        </a>
+      </section>
+    )}
   </div>
 
   <!-- Sales intel -->
-  <div id="tab-sales" class="result-panel" hidden>
+  <div id="tab-sales" class="result-panel" role="tabpanel" aria-labelledby="ar-tab-sales" hidden>
     <section class="ar__section">
       <p class="ds-eyebrow ar__label">Buying signals</p>
-      <ul id="result-signals" class="ar__list"></ul>
+      <ul id="result-signals" class="ds-list"></ul>
     </section>
     <section class="ar__section">
       <p class="ds-eyebrow ar__label">Objections</p>
-      <ul id="result-objections" class="ar__list"></ul>
+      <ul id="result-objections" class="ds-list"></ul>
     </section>
     <section>
       <p class="ds-eyebrow ar__label">Follow-up talking points</p>
-      <ul id="result-talking" class="ar__list"></ul>
+      <ul id="result-talking" class="ds-list"></ul>
     </section>
   </div>
 
   <!-- Recommendation. Opt-in: the rep usually knows the product already. -->
-  <div id="tab-recommendation" class="result-panel" hidden>
-    <section id="rec-generate" class="ds-well ar__well" hidden>
+  <div id="tab-recommendation" class="result-panel" role="tabpanel" aria-labelledby="ar-tab-recommendation" hidden>
+    <section id="rec-generate" class="ds-well ar__section" hidden>
       <p class="ds-eyebrow ar__label">Product recommendation</p>
       <p class="ds-small ar__prose">
         Not generated for this call. Name the product if you already know it — otherwise Owl
@@ -100,11 +143,13 @@ const { analysisId, showClear = true } = Astro.props;
       </div>
     </section>
 
-    <section id="result-primary-rec" class="ds-panel ar__panel" hidden>
-      <span class="ds-mark ds-mark--live">primary recommendation</span>
-      <p id="rec-product-name" class="ds-title ar__rec-name"></p>
-      <p id="rec-product-reasoning" class="ds-small ar__prose"></p>
-      <button id="rec-ask-claude" class="ds-btn ds-btn--secondary ds-btn--sm" type="button">Ask Owl more</button>
+    <section id="result-primary-rec" class="ds-panel ar__section" hidden>
+      <div class="ds-panel__body">
+        <span class="ds-mark ds-mark--live">primary recommendation</span>
+        <p id="rec-product-name" class="ds-title ar__rec-name"></p>
+        <p id="rec-product-reasoning" class="ds-small ar__prose"></p>
+        <button id="rec-ask-claude" class="ds-btn ds-btn--secondary ds-btn--sm" type="button">Ask Owl more</button>
+      </div>
     </section>
 
     <section id="rec-fits-section" hidden>
@@ -116,7 +161,7 @@ const { analysisId, showClear = true } = Astro.props;
   <!-- Learning. Two labelled halves rather than a sixth tab: the terms come
        from the same extraction on the same call, and a tab that is empty on most
        calls teaches people not to open it. -->
-  <div id="tab-knowledge" class="result-panel" hidden>
+  <div id="tab-knowledge" class="result-panel" role="tabpanel" aria-labelledby="ar-tab-knowledge" hidden>
     <section>
       <p class="ds-eyebrow ar__label">What this call taught</p>
       <div id="result-knowledge"></div>
@@ -131,19 +176,49 @@ const { analysisId, showClear = true } = Astro.props;
   </div>
 
   <!-- Quiz -->
-  <div id="tab-quiz" class="result-panel" hidden>
+  <div id="tab-quiz" class="result-panel" role="tabpanel" aria-labelledby="ar-tab-quiz" hidden>
     <div id="quiz-container"></div>
-    <div id="quiz-score" class="ds-panel ar__panel" hidden>
-      <p class="ds-eyebrow ar__label">Score</p>
-      <p class="ds-display ar__score" id="score-text"></p>
-      <p class="ds-small ar__prose">Keep practising to reinforce what you learned on this call.</p>
-      <button id="quiz-retry" class="ds-btn ds-btn--secondary ds-btn--sm" type="button">Retry</button>
+    <div id="quiz-score" class="ds-panel ar__section" hidden>
+      <div class="ds-panel__body">
+        <p class="ds-eyebrow ar__label">Score</p>
+        <p class="ds-display ar__score" id="score-text"></p>
+        <p class="ds-small ar__prose">Keep practising to reinforce what you learned on this call.</p>
+        <button id="quiz-retry" class="ds-btn ds-btn--secondary ds-btn--sm" type="button">Retry</button>
+      </div>
     </div>
   </div>
 </div>
 
 <style is:global>
   /* Layout only — every primitive above comes from the design system. */
+  /* `.ds-page` carries `margin-inline: auto`, and an auto cross-axis margin
+     stops a flex item stretching — so the page column is fit-content and takes
+     its width from whichever state is on screen. Without a floor the page head
+     visibly jumps between the wait, the absence and the reading. The reading is
+     wider than this and sets its own. A percentage would be circular against a
+     fit-content parent, so the cap is in viewport units: the rail plus the
+     page's own gutters. */
+  #ar-loading, #ar-problem { width: min(var(--measure-read), 100vw - 12rem); }
+  /* The 12rem above is the rail plus the desktop gutters. Below the shell's own
+     breakpoint the rail is gone and the gutters are narrower, so keeping it
+     would render the wait and the banner at half the column's width. */
+  @media (max-width: 60rem) {
+    #ar-loading, #ar-problem { width: min(var(--measure-read), 100vw - 2rem); }
+  }
+
+  /* The wait, shaped like the result. Widths are deliberate and uneven: a
+     skeleton of identical bars reads as a loading graphic, not as text. */
+  .ar__skeleton-head { padding-bottom: var(--space-3); border-bottom: 1px solid rgb(var(--rule)); }
+  .ar__skeleton-head .ds-skeleton { display: block; height: 1rem; width: 12rem; }
+  .ar__skeleton-tabs { display: flex; gap: var(--space-5); margin: var(--space-4) 0 var(--space-6); }
+  .ar__skeleton-tabs .ds-skeleton { height: 0.75rem; width: 5rem; }
+  .ar__skeleton-body { display: flex; flex-direction: column; gap: var(--space-3); max-width: var(--measure-read); }
+  .ar__skeleton-body .ds-skeleton { height: 0.75rem; }
+  .ar__skeleton-body .ds-skeleton:nth-child(1) { width: 96%; }
+  .ar__skeleton-body .ds-skeleton:nth-child(2) { width: 88%; }
+  .ar__skeleton-body .ds-skeleton:nth-child(3) { width: 92%; }
+  .ar__skeleton-body .ds-skeleton:nth-child(4) { width: 61%; }
+
   .ar__head {
     display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);
     padding-bottom: var(--space-3); border-bottom: 1px solid rgb(var(--rule));
@@ -158,20 +233,15 @@ const { analysisId, showClear = true } = Astro.props;
     color: rgb(var(--ink-secondary)); line-height: var(--leading-relaxed);
     max-width: var(--measure-read); margin: 0 0 var(--space-3);
   }
-  .ar__tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
-  /* A finding per row, drawn — the mark carries the meaning, not a tinted box. */
-  .ar__list { list-style: none; margin: 0; padding: 0; }
+  /* A finding per row, drawn — the mark carries the meaning, not a tinted box.
+     The rule between rows belongs to `.ds-list`, which draws it as a border-top
+     on every row but the first; a border-bottom here would draw it twice. */
   .ar__item {
     display: grid; grid-template-columns: auto 1fr; gap: var(--space-4);
     align-items: baseline; padding-block: var(--space-3);
-    border-bottom: 1px solid rgb(var(--rule-hairline));
   }
-  .ar__item:last-child { border-bottom: 0; }
   .ar__item-body { color: rgb(var(--ink-secondary)); line-height: var(--leading-relaxed); }
-  .ar__none { color: rgb(var(--ink-muted)); padding-block: var(--space-4); }
-
-  .ar__well, .ar__panel { padding: var(--space-5); margin-bottom: var(--space-6); }
   .ar__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
   .ar__state { color: rgb(var(--ink-muted)); }
   .ar__rec-name { color: rgb(var(--ink)); margin: var(--space-3) 0 var(--space-2); }
@@ -183,7 +253,7 @@ const { analysisId, showClear = true } = Astro.props;
   }
   .ar__fit:last-child { border-bottom: 0; }
   .ar__fit-name { color: rgb(var(--ink)); font-weight: var(--weight-medium); margin: 0; }
-  .ar__fit-why { color: rgb(var(--ink-secondary)); margin: 2px 0 0; line-height: var(--leading-relaxed); }
+  .ar__fit-why { color: rgb(var(--ink-secondary)); margin: calc(var(--space-px) * 2) 0 0; line-height: var(--leading-relaxed); }
 
   .ar__know { padding-block: var(--space-5); border-bottom: 1px solid rgb(var(--rule-hairline)); }
   .ar__know:last-child { border-bottom: 0; }
@@ -239,14 +309,50 @@ const { analysisId, showClear = true } = Astro.props;
       return node;
     };
 
+    /**
+     * The system's inline empty: the container plus the body that carries its
+     * type ramp. Stated once rather than hand-built at five call sites, which is
+     * how the sixth drifts.
+     */
+    const emptyNote = (tag, message) => {
+      const block = el(tag, 'ds-empty ds-empty--inline');
+      // The container holds a `<p>`, so it must not be one itself — callers
+      // pass `div` or, inside a list, `li`.
+      const body = el('p', 'ds-empty__body');
+      body.textContent = message;
+      block.append(body);
+      return block;
+    };
+
     // ── Tabs ────────────────────────────────────────────────────────────────
 
-    document.querySelectorAll('.result-tab').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.result-tab').forEach((b) => b.classList.remove('is-active'));
-        btn.classList.add('is-active');
-        document.querySelectorAll('.result-panel').forEach((p) => { p.hidden = true; });
-        byId('tab-' + btn.dataset.tab).hidden = false;
+    const tabs = [...document.querySelectorAll('.result-tab')];
+
+    /** Open one tab, stating the selection all three ways at once. */
+    function selectTab(tab) {
+      tabs.forEach((other) => {
+        const active = other === tab;
+        other.classList.toggle('is-active', active);
+        other.setAttribute('aria-selected', String(active));
+        other.tabIndex = active ? 0 : -1;
+      });
+      document.querySelectorAll('.result-panel').forEach((panel) => {
+        panel.hidden = panel.id !== 'tab-' + tab.dataset.tab;
+      });
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => selectTab(tab));
+
+      // The arrow keys walk the strip, wrapping at the ends, and activate as
+      // they move — a tablist is one control, not five.
+      tab.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        const step = event.key === 'ArrowRight' ? 1 : -1;
+        const next = tabs[(index + step + tabs.length) % tabs.length];
+        selectTab(next);
+        next.focus();
       });
     });
 
@@ -263,9 +369,7 @@ const { analysisId, showClear = true } = Astro.props;
       host.replaceChildren();
 
       if (!items || !items.length) {
-        const none = el('li', 'ds-caption ar__none');
-        none.textContent = 'none identified';
-        host.append(none);
+        host.append(emptyNote('li', 'none identified'));
         return;
       }
 
@@ -284,6 +388,7 @@ const { analysisId, showClear = true } = Astro.props;
 
     window.renderAnalysisResult = function (data) {
       currentAnalysis = data;
+      showOnly('analysis-result');
       const callId = data._call_id || data.id;
 
       // Owl, grounded in this call — analysis first, transcript on demand.
@@ -324,9 +429,7 @@ const { analysisId, showClear = true } = Astro.props;
           concepts.append(tag);
         });
       } else {
-        const none = el('p', 'ds-caption ar__none');
-        none.textContent = 'none identified';
-        concepts.append(none);
+        concepts.append(emptyNote('div', 'none identified'));
       }
 
       renderList('result-signals', data.buying_signals, 'live', 'signal');
@@ -348,9 +451,7 @@ const { analysisId, showClear = true } = Astro.props;
           knowledge.append(card);
         });
       } else {
-        const none = el('p', 'ds-caption ar__none');
-        none.textContent = 'no learning extracts found';
-        knowledge.append(none);
+        knowledge.append(emptyNote('div', 'no learning extracts found'));
       }
       byId('ar-extracts-filed').hidden = !(data.knowledge_extracts && data.knowledge_extracts.length);
 
@@ -368,7 +469,6 @@ const { analysisId, showClear = true } = Astro.props;
       }
 
       buildQuiz(data.flashcards || []);
-      byId('analysis-result').hidden = false;
     };
 
     // ── Recommendation ──────────────────────────────────────────────────────
@@ -454,9 +554,7 @@ const { analysisId, showClear = true } = Astro.props;
 
       const all = rec.all_fits || [];
       if (!all.length) {
-        const none = el('p', 'ds-caption ar__none');
-        none.textContent = 'no fits identified';
-        host.append(none);
+        host.append(emptyNote('div', 'no fits identified'));
         return;
       }
 
@@ -489,7 +587,11 @@ const { analysisId, showClear = true } = Astro.props;
         const res = await fetch('/api/sales/calls/' + encodeURIComponent(callId) + '/product-fit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ product_name: product || null }),
+          // The route declares `product_name: str = ""` and an empty string is
+          // what means "assess across the catalogue". Sending `null` fails
+          // validation with a 422, so leaving the field blank — the common
+          // case — could only ever report "failed — try again".
+          body: JSON.stringify({ product_name: product }),
         });
         if (!res.ok) throw new Error('request failed');
         const rec = await res.json();
@@ -508,15 +610,19 @@ const { analysisId, showClear = true } = Astro.props;
     const OPTION_KEYS = ['A', 'B', 'C', 'D'];
 
     function buildQuiz(cards) {
-      quizState = cards.map((c) => ({ ...c, answered: false, correct: false }));
+      // `correct` on a card is the **index** of the right option, from the
+      // model (`prompts.py` flashcard contract). The reader's verdict is a
+      // boolean, so it lives under its own name — spreading the card and then
+      // writing `correct: false` over it silently replaced the index with a
+      // boolean, and `oi === card.correct` was `0 === false` for every answer.
+      // `lib/quiz.ts` keeps the two apart the same way.
+      quizState = cards.map((c) => ({ ...c, answered: false, wasRight: false }));
       const container = byId('quiz-container');
       byId('quiz-score').hidden = true;
       container.replaceChildren();
 
       if (!cards.length) {
-        const none = el('p', 'ds-caption ar__none');
-        none.textContent = 'no quiz questions generated';
-        container.append(none);
+        container.append(emptyNote('div', 'no quiz questions generated'));
         return;
       }
 
@@ -573,7 +679,7 @@ const { analysisId, showClear = true } = Astro.props;
 
       const card = quizState[qi];
       const right = oi === card.correct;
-      quizState[qi].correct = right;
+      quizState[qi].wasRight = right;
 
       const wrap = document.querySelector('.ar__card[data-index="' + qi + '"]');
       wrap.querySelectorAll('.mcq-option').forEach((button, i) => {
@@ -593,7 +699,7 @@ const { analysisId, showClear = true } = Astro.props;
 
     function checkQuizComplete() {
       if (!quizState.every((q) => q.answered)) return;
-      const correct = quizState.filter((q) => q.correct).length;
+      const correct = quizState.filter((q) => q.wasRight).length;
       byId('score-text').textContent = correct + ' / ' + quizState.length;
       byId('quiz-score').hidden = false;
     }
@@ -607,22 +713,93 @@ const { analysisId, showClear = true } = Astro.props;
     // carries its own palette. The adherence gate allows the brand palette here and
     // nothing else; the values are the design system's own.
 
-    byId('download-report').addEventListener('click', () => {
+    /**
+     * The two faces, as `@font-face` rules carrying the file inside them.
+     *
+     * A downloaded report is opened from `file://`, offline, possibly long after
+     * it was made, so a `<link>` to a font CDN is a document that silently
+     * degrades to whatever the machine has. It carries its own colours for the
+     * same reason; fonts are values too. Returns an empty string if the faces
+     * cannot be read, and the fallback stack takes over — a report in the wrong
+     * face beats a button that does nothing.
+     */
+    async function embeddedFaces() {
+      const root = byId('analysis-result');
+
+      /** The file at `url`, as a base64 `src:` for a `@font-face`. */
+      async function source(url) {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('font ' + response.status);
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+        return "src:url(data:font/woff2;base64," + btoa(binary) + ") format('woff2-variations');";
+      }
+
+      // The family names are written out rather than interpolated: the
+      // adherence gate reads this file for fonts outside the system, and a name
+      // assembled at runtime is a name it cannot check.
+      try {
+        const [sans, mono] = await Promise.all([
+          source(root.dataset.fontSans),
+          source(root.dataset.fontMono),
+        ]);
+        return "@font-face{font-family:'Roboto';" + sans + "font-weight:100 900;font-style:normal}"
+          + "@font-face{font-family:'Kode Mono';" + mono + "font-weight:400 700;font-style:normal}";
+      } catch {
+        return '';
+      }
+    }
+
+    /**
+     * Text, made safe to write into the report's markup.
+     *
+     * Everything in a reading is model output derived from a pasted transcript,
+     * plus a title the rep typed. On screen that is safe because the renderer
+     * builds nodes and sets `textContent`; the report is a **string** template,
+     * so the same values would be parsed as markup. A transcript carrying an
+     * `<img onerror=…>` would otherwise become live script in a file the rep
+     * opens from `file://`, with the whole analysis in reach.
+     */
+    /** The faces, fetched once per page rather than on every click. */
+    let facesOnce = null;
+
+    function esc(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    byId('download-report').addEventListener('click', async () => {
       if (!currentAnalysis) return;
+      const button = byId('download-report');
+      // ~59KB of woff2 has to arrive before the file can be built. Saying so —
+      // and refusing a second click — beats a button that looks inert and hands
+      // back three identical downloads to an impatient reader.
+      if (button.disabled) return;
+      button.disabled = true;
+      const wasLabelled = button.textContent;
+      button.textContent = 'Preparing…';
+      let failed = false;
+
+      try {
       const d = currentAnalysis;
-      const title = d._title || 'Call Analysis';
+      facesOnce = facesOnce || embeddedFaces();
+      const faces = await facesOnce;
+      const title = esc(d._title || 'Call Analysis');
       const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-      const list = (items) => items.map((s) => '<li>' + s + '</li>').join('');
+      const list = (items) => items.map((s) => '<li>' + esc(s) + '</li>').join('');
 
       const html = `<!DOCTYPE html>
 <html lang="en-GB">
 <head>
   <meta charset="UTF-8"/>
   <title>${title} — Acme</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Kode+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <style>
+    ${faces}
     :root { --measure: 42rem; }
     body {
       font-family: 'Roboto', system-ui, sans-serif;
@@ -651,6 +828,8 @@ const { analysisId, showClear = true } = Astro.props;
     }
     .know-cat { text-transform: uppercase; letter-spacing: 0.11em; margin-bottom: 0.5rem; }
     .know-card { border-top: 1px solid #ecebe8; padding-top: 0.75rem; margin-bottom: 1rem; }
+    .know-title { display: block; margin-bottom: 0.25rem; font-size: 0.875rem; }
+    .body-sm { font-size: 0.875rem; line-height: 1.6; margin: 0; }
     .footer {
       font-family: 'Kode Mono', monospace; font-size: 0.6875rem; letter-spacing: 0.01em;
       color: #706d67; margin-top: 4rem; padding-top: 1rem; border-top: 1px solid #dddbd6;
@@ -666,7 +845,7 @@ const { analysisId, showClear = true } = Astro.props;
   <p class="meta">Generated by Cadence &nbsp;·&nbsp; ${date}</p>
 
   <h2>Summary</h2>
-  <div class="summary">${d.summary || '–'}</div>
+  <div class="summary">${esc(d.summary) || '–'}</div>
 
   ${d.buying_signals && d.buying_signals.length ? `<h2>Buying signals</h2><ul>${list(d.buying_signals)}</ul>` : ''}
   ${d.objections && d.objections.length ? `<h2>Objections</h2><ul>${list(d.objections)}</ul>` : ''}
@@ -675,20 +854,20 @@ const { analysisId, showClear = true } = Astro.props;
   ${d.product_recommendation && d.product_recommendation.primary ? `
   <h2>Product recommendation</h2>
   <div class="rec-box">
-    <div class="rec-name">${d.product_recommendation.primary}</div>
-    <p style="font-size:0.875rem;line-height:1.6;margin:0">${d.product_recommendation.reasoning || ''}</p>
+    <div class="rec-name">${esc(d.product_recommendation.primary)}</div>
+    <p class="body-sm">${esc(d.product_recommendation.reasoning)}</p>
   </div>
   ${d.product_recommendation.all_fits && d.product_recommendation.all_fits.length ? `
   <h2>All product fits</h2>
-  <ul>${d.product_recommendation.all_fits.map((f) => `<li><strong>${f.product}</strong> (${f.fit}) — ${f.reason}</li>`).join('')}</ul>
+  <ul>${d.product_recommendation.all_fits.map((f) => `<li><strong>${esc(f.product)}</strong> (${esc(f.fit)}) — ${esc(f.reason)}</li>`).join('')}</ul>
   ` : ''}` : ''}
 
   ${d.knowledge_extracts && d.knowledge_extracts.length ? `
   <h2>Learning points</h2>
-  ${d.knowledge_extracts.map((k) => `<div class="know-card"><span class="know-cat">${k.category}</span><strong style="display:block;margin-bottom:0.25rem;font-size:0.875rem">${k.title}</strong><p style="font-size:0.875rem;margin:0;line-height:1.6">${k.content}</p></div>`).join('')}
+  ${d.knowledge_extracts.map((k) => `<div class="know-card"><span class="know-cat">${esc(k.category)}</span><strong class="know-title">${esc(k.title)}</strong><p class="body-sm">${esc(k.content)}</p></div>`).join('')}
   ` : ''}
 
-  ${d.concepts_mentioned && d.concepts_mentioned.length ? `<h2>Concepts mentioned</h2><p>${d.concepts_mentioned.map((c) => `<span class="tag">${c}</span>`).join(' ')}</p>` : ''}
+  ${d.concepts_mentioned && d.concepts_mentioned.length ? `<h2>Concepts mentioned</h2><p>${d.concepts_mentioned.map((c) => `<span class="tag">${esc(c)}</span>`).join(' ')}</p>` : ''}
 
   <div class="footer">Cadence &nbsp;·&nbsp; For internal sales use only</div>
 </body>
@@ -701,41 +880,130 @@ const { analysisId, showClear = true } = Astro.props;
       link.download = title.replace(/[^a-z0-9]/gi, '-').toLowerCase() + '-report.html';
       link.click();
       URL.revokeObjectURL(url);
+      } catch (err) {
+        // The report is built from stored model output, so a malformed reading
+        // can throw here. The failure is reported on the button, because the
+        // reading itself is fine — swapping the page for a fault banner would
+        // throw away good content over a download that did not happen.
+        failed = true;
+        button.textContent = 'Report failed';
+      } finally {
+        button.disabled = false;
+        if (!failed) button.textContent = wasLabelled;
+      }
     });
 
     const clear = byId('clear-results');
     if (clear) {
       clear.addEventListener('click', () => {
-        byId('analysis-result').hidden = true;
+        // Through the switch, not around it — clearing a reading has to bring
+        // the host page's empty back rather than leave a blank where it was.
+        showOnly(null);
         currentAnalysis = null;
       });
     }
 
-    // Auto-load when an id was given at render time.
-    const root = byId('analysis-result');
-    const id = root && root.dataset.analysisId;
-    if (id) {
-      fetch('/api/sales/calls/' + encodeURIComponent(id))
-        .then((r) => { if (!r.ok) throw new Error('not found'); return r.json(); })
+    // ── Loading a stored call ───────────────────────────────────────────────
+    // The fetch had been written three times — here and in both detail pages —
+    // and this copy was unreachable. It is now the only one, and it owns the
+    // three states a load can end in.
+
+    /**
+     * Show exactly one of the wait, the problem and the reading — or, with no
+     * argument, none of them.
+     *
+     * A host page's own "nothing yet" is part of the same switch: mark it
+     * `data-analysis-empty` and it belongs to this state machine rather than a
+     * second one the page has to keep in step. Two switches over one region is
+     * how an empty state ends up sitting above a result.
+     */
+    function showOnly(id) {
+      ['ar-loading', 'ar-problem', 'analysis-result'].forEach((name) => {
+        const node = byId(name);
+        if (node) node.hidden = name !== id;
+      });
+      document.querySelectorAll('[data-analysis-empty]').forEach((node) => {
+        node.hidden = Boolean(id);
+      });
+    }
+
+    /** A call that is not there is an absence; a backend that is not there is a fault. */
+    function showProblem(kind, message) {
+      const host = byId('ar-problem');
+      host.replaceChildren();
+
+      if (kind === 'fault') {
+        const banner = el('div', 'ds-banner ds-banner--fault');
+        const label = el('span', 'ds-banner__label');
+        label.textContent = 'Could not load';
+        banner.append(label, document.createTextNode(message));
+        host.append(banner);
+      } else {
+        const empty = el('div', 'ds-empty');
+        const title = el('p', 'ds-empty__title');
+        title.textContent = 'No such call';
+        const body = el('p', 'ds-empty__body');
+        body.textContent = message;
+        empty.append(title, body);
+        host.append(empty);
+      }
+
+      showOnly('ar-problem');
+    }
+
+    /**
+     * Show or clear the wait, for a caller running the analysis itself rather
+     * than loading a stored one. The skeleton is the component's, so the agent
+     * surface does not draw a second one of its own shape.
+     */
+    window.showAnalysisWait = function (waiting) {
+      showOnly(waiting ? 'ar-loading' : null);
+    };
+
+    /**
+     * Fetch one stored call and render it, holding the wait and both failures.
+     *
+     * `endpoint` is the caller's, because the admin view reaches across users
+     * through a different route; `onSession` is how a page gets at the fields
+     * that are its own — its title, its timestamp, its owner mark.
+     */
+    window.loadAnalysis = function (id, options) {
+      const opts = options || {};
+      const endpoint = opts.endpoint || '/api/sales/calls/';
+
+      if (!id) {
+        showProblem('empty', 'No call was requested.');
+        return Promise.resolve();
+      }
+
+      showOnly('ar-loading');
+
+      return fetch(endpoint + encodeURIComponent(id))
+        .then((res) => {
+          if (res.status === 404) throw new Error('missing');
+          // A refusal is not a transport failure. The admin view deliberately
+          // carries no `requires` — the guard is server-side — so a signed-in
+          // non-admin lands here, and "is the backend running?" would be a lie.
+          if (res.status === 401 || res.status === 403) throw new Error('refused');
+          if (!res.ok) throw new Error('http ' + res.status);
+          return res.json();
+        })
         .then((session) => {
           const result = session.result || {};
-          result._title = session.title || 'Call Analysis';
+          result._title = session.title || 'Call analysis';
           result._call_id = session.id;
+          if (opts.onSession) opts.onSession(session);
           window.renderAnalysisResult(result);
-          const heading = byId('ar-heading');
-          if (heading) {
-            heading.textContent = (session.title || 'Call Analysis')
-              + (session.timestamp ? ' · ' + session.timestamp : '');
-          }
         })
-        .catch(() => {
-          root.replaceChildren();
-          const failed = el('p', 'ds-caption ar__none');
-          failed.style.color = 'rgb(var(--signal-fault))';
-          failed.textContent = 'analysis not found';
-          root.append(failed);
-          root.hidden = false;
+        .catch((err) => {
+          if (err && err.message === 'missing') {
+            showProblem('empty', 'It may have been deleted.');
+          } else if (err && err.message === 'refused') {
+            showProblem('fault', 'You do not have access to this call.');
+          } else {
+            showProblem('fault', 'The analysis could not be reached — is the backend running?');
+          }
         });
-    }
+    };
   })();
 </script>

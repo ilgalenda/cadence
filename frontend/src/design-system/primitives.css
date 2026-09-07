@@ -263,6 +263,10 @@
   color: rgb(var(--ink-secondary));
 }
 .ds-tag--accent { background: rgb(var(--accent-wash)); color: rgb(var(--accent-ink)); }
+/* Tags arrive in a set, so the set has a name. Owl's `.ds-sources` is the same
+   three declarations, but it is the *citation* container and its child is
+   `.ds-source`; borrowing it for tags would put the wrong word on the element. */
+.ds-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 /* ── Surfaces ─────────────────────────────────────────────────────────────────
    A panel and a card are lifted gently off the field by a soft shadow; a well

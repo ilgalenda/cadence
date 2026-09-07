@@ -101,9 +101,39 @@ def retire_high_intent() -> list[str]:
     return notes or ["   already retired  high-intent"]
 
 
+def match_the_avatar_to_the_name() -> list[str]:
+    """The preview screens draw an avatar as a single letter, hard-coded.
+
+    `genericise.py` renames the person in those screens, but it cannot touch a
+    bare initial — one letter matches nothing and could not safely be replaced by
+    substring anyway. So the published screenshots showed the original owner's
+    initial beside the invented name, which is the sort of detail a careful
+    reader notices and an incautious one does not.
+
+    Correct here and wrong upstream: internally the initial is right.
+    """
+    initial = "S"  # Sam, the invented owner these screens are genericised to.
+    preview = ROOT / "frontend" / "src" / "design-system" / "preview"
+    notes: list[str] = []
+
+    for screen in sorted(preview.glob("*.html")):
+        source = original = screen.read_text(encoding="utf-8")
+        for avatar in ('class="ws-user__avatar">', 'ds-avatar--ink">'):
+            # Only a single letter, and only inside an avatar: never prose.
+            for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+                source = source.replace(f"{avatar}{letter}<", f"{avatar}{initial}<")
+        if source != original:
+            screen.write_text(source, encoding="utf-8")
+            notes.append(f"   matched the avatar to the name  preview/{screen.name}")
+
+    return notes or ["   already matched  preview avatars"]
+
+
 def main() -> int:
     print(skip_persona_test_without_a_vault())
     for note in retire_high_intent():
+        print(note)
+    for note in match_the_avatar_to_the_name():
         print(note)
     return 0
 

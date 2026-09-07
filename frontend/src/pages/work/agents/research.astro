@@ -12,6 +12,10 @@
  */
 import PlatformLayout from '../../../layouts/PlatformLayout.astro';
 import AgentViewStyles from '../../../components/AgentViewStyles.astro';
+import ComingSoon from '../../../components/ComingSoon.astro';
+import { agentBySlug } from '../../../lib/platform';
+
+const ready = agentBySlug('research')!.built;
 ---
 <PlatformLayout title="Research" requires="lead">
   <div class="agent-page">
@@ -25,6 +29,10 @@ import AgentViewStyles from '../../../components/AgentViewStyles.astro';
           Every claim carries a source.
         </p>
       </header>
+
+      {!ready && (
+        <ComingSoon reason="The brief completes about two times in five attempts and takes two to five minutes, so it is being reworked before anyone depends on it. Owl cannot run it either." />
+      )}
 
       <div class="form ds-arrive" style="--arrive: var(--dur-step)">
         <div class="form__row">
@@ -43,7 +51,7 @@ import AgentViewStyles from '../../../components/AgentViewStyles.astro';
         </div>
 
         <div class="form__actions">
-          <button class="ds-btn ds-btn--accent" type="button" id="run">Research</button>
+          <button class="ds-btn ds-btn--accent" type="button" id="run" disabled={!ready}>Research</button>
           <span class="ds-mark ds-mark--live" id="running" hidden>searching</span>
           <span class="ds-error" id="error"></span>
         </div>

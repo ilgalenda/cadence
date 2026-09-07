@@ -64,8 +64,23 @@ def get_prospect_list(
 
 def save_prospect_list(
     record: dict, username: str | None = None, sandbox: bool = False,
-) -> dict:
-    """Insert or update a shortlist by id. Newest first, capped."""
+) -> dict | None:
+    """Insert or update a shortlist by id, or None when it is someone else's.
+
+    Newest first, capped.
+
+    **The id decides which record is replaced, and the id comes from the client**
+    — `ShortlistSave` accepts one, which the model it replaced did not. So the
+    owner has to be checked here: replacing purely on a matching id let anyone
+    who knew an id destroy that shortlist, including the emails and phone numbers
+    Lusha had already been paid for. `get_prospect_list` and
+    `delete_prospect_list` both check the owner; this was the write path that did
+    not.
+
+    Refusing rather than inserting matters too: dropping the ownership check from
+    the delete but keeping the insert would leave two records sharing one id, and
+    every later read would pick whichever came first.
+    """
     if not record.get("id"):
         record["id"] = new_prospect_id()
     if not record.get("created_at"):
@@ -74,9 +89,15 @@ def save_prospect_list(
     if username is not None:
         record["username"] = username
 
-    lists = [p for p in load_prospect_lists(sandbox) if p.get("id") != record["id"]]
-    lists.insert(0, record)
-    write_json(_prospects_file(sandbox), lists[:PROSPECT_CAP])
+    lists = load_prospect_lists(sandbox)
+    if username is not None and any(
+        p.get("id") == record["id"] and p.get("username") != username for p in lists
+    ):
+        return None
+
+    kept = [p for p in lists if p.get("id") != record["id"]]
+    kept.insert(0, record)
+    write_json(_prospects_file(sandbox), kept[:PROSPECT_CAP])
     return record
 
 

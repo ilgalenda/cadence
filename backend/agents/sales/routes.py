@@ -14,7 +14,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from agents.sales import tools
-from agents.sales.registry import register_all
+from agents.sales.registry import HELD_BACK, register_all
 from auth import require_authed
 
 # Mounting the sales surface is what puts the agents in Owl's hands.
@@ -56,11 +56,17 @@ from agents.sales.xray.routes import router as xray_router  # noqa: E402
 
 # Included in workflow order, so the surface reads like the path it serves —
 # front half first, then everything after the conversation has happened.
+#
+# A held-back agent's router is **not mounted**: its endpoints answer 404 rather
+# than running an agent whose own page says it is not ready. `HELD_BACK` names
+# them and says why; it is the same constant that keeps them out of Owl's hands.
 router.include_router(scoring_router)
 router.include_router(gtm_router)
 router.include_router(xray_router)
-router.include_router(research_router)
-router.include_router(signals_router)
+if "research" not in HELD_BACK:
+    router.include_router(research_router)
+if "signals" not in HELD_BACK:
+    router.include_router(signals_router)
 router.include_router(intel_router)
 router.include_router(campaign_router)
 router.include_router(composer_router)

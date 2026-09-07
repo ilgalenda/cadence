@@ -120,6 +120,106 @@ def parse_json_array(raw: str):
     raise ValueError("could not parse JSON array from model output")
 
 
+def _quote_bare_keys(raw: str) -> str:
+    """Put quotes round object keys a model left bare.
+
+    Sonnet writing a long object occasionally drops the quotes on a single key —
+    ``geography: "Sweden"`` in the middle of an otherwise perfect three-thousand
+    token answer — and strict JSON discards the whole thing for it. One slip
+    costing an entire run is the wrong trade when the slip is unambiguous.
+
+    Scanned rather than regexed, because the repair must never reach inside a
+    string: a note reading ``the site: Madrid`` is prose and must be left exactly
+    as written. So this tracks string state and escapes, and only acts where a key
+    is syntactically expected — immediately after ``{`` or after a ``,`` that is
+    inside an object rather than an array.
+
+    Conservative by construction: it inserts quotes and changes nothing else, so a
+    string it cannot repair simply fails to parse as it did before.
+    """
+    out: list[str] = []
+    # What each open bracket is, innermost last. A comma means "a key follows"
+    # only inside an object.
+    stack: list[str] = []
+    in_string = False
+    escaped = False
+    expecting_key = False
+    index = 0
+
+    while index < len(raw):
+        char = raw[index]
+
+        if in_string:
+            out.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+
+        if char == '"':
+            in_string = True
+            expecting_key = False
+            out.append(char)
+            index += 1
+            continue
+
+        if char in "{[":
+            stack.append(char)
+            expecting_key = char == "{"
+            out.append(char)
+            index += 1
+            continue
+
+        if char in "}]":
+            if stack:
+                stack.pop()
+            expecting_key = False
+            out.append(char)
+            index += 1
+            continue
+
+        if char == ",":
+            expecting_key = bool(stack) and stack[-1] == "{"
+            out.append(char)
+            index += 1
+            continue
+
+        if char == ":":
+            expecting_key = False
+            out.append(char)
+            index += 1
+            continue
+
+        if char.isspace():
+            out.append(char)
+            index += 1
+            continue
+
+        if expecting_key and (char.isalpha() or char == "_"):
+            end = index
+            while end < len(raw) and (raw[end].isalnum() or raw[end] in "_-"):
+                end += 1
+            # Only a bare *key* — the identifier must be followed by a colon.
+            after = end
+            while after < len(raw) and raw[after].isspace():
+                after += 1
+            if after < len(raw) and raw[after] == ":":
+                out.append('"' + raw[index:end] + '"')
+                expecting_key = False
+                index = end
+                continue
+
+        expecting_key = False
+        out.append(char)
+        index += 1
+
+    return "".join(out)
+
+
 def parse_json_object(raw: str):
     """Best-effort JSON-object extraction; falls back to slicing the first {...} span.
 
@@ -136,8 +236,15 @@ def parse_json_object(raw: str):
     if "{" in raw and "}" in raw:
         start = raw.index("{")
         end = raw.rindex("}") + 1
+        span = raw[start:end]
         try:
-            return json.loads(raw[start:end])
+            return json.loads(span)
+        except Exception:
+            pass
+        # Last resort, and only ever reached once strict parsing has failed: a
+        # single unquoted key must not cost a whole answer.
+        try:
+            return json.loads(_quote_bare_keys(span))
         except Exception:
             pass
     raise ValueError("could not parse JSON object from model output")

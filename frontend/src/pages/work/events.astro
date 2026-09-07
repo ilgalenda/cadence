@@ -1,0 +1,1018 @@
+---
+/**
+ * Events — the trade shows, who is going, and what they still need.
+ *
+ * Three questions, in the order somebody actually asks them: *when is it*,
+ * *are we going*, and *is everything done in time*. The table answers the
+ * first, the mark on each row answers the second, and the drawer answers the
+ * third.
+ *
+ * **Not an agent.** No model is called anywhere behind this page — it is a
+ * record and a set of deadlines counted backwards from a date. It sits in the
+ * rail under Operations rather than among the agents, and Owl cannot invoke it.
+ *
+ * **The checklist lives in the shared spreadsheet.** Cadence raises every line
+ * from the playbook's own timeline and computes when each is owed; whether one
+ * is done is ticked in the sheet, where the people doing the work are. So this
+ * page shows what Sam asked it to and no more — approved, and how much is left.
+ *
+ * **Registering interest is open to everybody; deciding is not.** Anyone signed
+ * in can propose an event and read their own shows. Approving one — which is
+ * what commits the money and raises the checklist — is admin only, enforced by
+ * the backend and merely hidden here.
+ */
+import PlatformLayout from '../../layouts/PlatformLayout.astro';
+import { icon } from '../../lib/icons';
+---
+<PlatformLayout title="Events">
+  <div class="agent-page">
+    <div class="agent-page__column agent-page__column--top">
+      <header class="agent-page__head ds-arrive">
+        <p class="ds-eyebrow">Operations</p>
+        <h1 class="ds-heading ds-page__title">Events</h1>
+        <p class="ds-lead ds-page__intro">
+          Which shows we are going to, who is on each one, and how much is left to
+          do before each one opens.
+        </p>
+      </header>
+
+      <div class="ev__oversight ds-arrive" id="oversight" style="--arrive: var(--dur-step)"></div>
+
+      <!-- The whole form, in one pass: the show, the case, and the person.
+           An earlier version asked only the six personal questions and left the
+           show's requirements to whoever approved it, which moved the work onto
+           the scarcer person. -->
+      <section class="propose ds-arrive" style="--arrive: calc(var(--dur-step) * 2)">
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow">Register interest</h2>
+        </div>
+
+        <div class="form">
+          <!-- Two ways in, on the system's segmented control: this is one mode
+               with two settings, not two independent choices. Somebody joining a
+               show already on the calendar answers only about themselves —
+               asking a second person to describe the show again invites two
+               different answers to one question. -->
+          <div class="ds-segment ev__mode" role="tablist" aria-label="Kind of registration">
+            <button class="ds-segment__item is-active" type="button" id="mode-new"
+                    role="tab" aria-selected="true">New show</button>
+            <button class="ds-segment__item" type="button" id="mode-join"
+                    role="tab" aria-selected="false">Join one listed</button>
+          </div>
+          <p class="ds-caption form__note ev__modenote" id="mode-note"></p>
+
+          <div class="form__row" id="join-block" hidden>
+            <div class="form__cell">
+              <label class="ds-label" for="join-event">Which show</label>
+              <select class="ds-select" id="join-event"></select>
+            </div>
+          </div>
+
+          <div id="show-block">
+            <div class="agent-page__sect form__legend"><h3 class="ds-eyebrow">The show</h3><span class="ds-caption">where, when, and what it needs</span></div>
+
+            <div class="form__row">
+              <div class="form__cell">
+                <label class="ds-label" for="name">Event name</label>
+                <input class="ds-field" id="name" placeholder="Northgate Expo 2026" autocomplete="off" />
+              </div>
+            </div>
+
+            <div class="form__row">
+              <div class="form__cell">
+                <label class="ds-label" for="location">Location</label>
+                <input class="ds-field" id="location" placeholder="Sødra Hallen" autocomplete="off" />
+              </div>
+              <div class="form__cell">
+                <label class="ds-label" for="country">Country</label>
+                <input class="ds-field" id="country" placeholder="Netherlands" autocomplete="off" />
+              </div>
+            </div>
+
+            <div class="form__row">
+              <div class="form__cell">
+                <label class="ds-label" for="starts">Starts</label>
+                <input class="ds-field" id="starts" type="date" />
+              </div>
+              <div class="form__cell">
+                <label class="ds-label" for="ends">Ends</label>
+                <input class="ds-field" id="ends" type="date" />
+              </div>
+            </div>
+
+            <div class="form__row form__row--choices">
+              <label class="ds-choice">
+                <input type="checkbox" class="ds-check" id="invited" />
+                <span class="ds-choice__text">We were invited<span class="ds-choice__hint">An invitation changes what it is worth.</span></span>
+              </label>
+              <label class="ds-choice">
+                <input type="checkbox" class="ds-check" id="exhibiting" />
+                <span class="ds-choice__text">We are exhibiting<span class="ds-choice__hint">A stand of our own, not just a ticket.</span></span>
+              </label>
+            </div>
+
+            <div id="exhibit-block" hidden>
+              <div class="form__row">
+                <div class="form__cell">
+                  <label class="ds-label" for="stand-cost">Stand cost</label>
+                  <input class="ds-field" id="stand-cost" type="number" min="0" step="1" placeholder="12500" />
+                  <p class="ds-help">0 if the space is free.</p>
+                </div>
+                <div class="form__cell">
+                  <label class="ds-label" for="stand-currency">Currency</label>
+                  <select class="ds-select" id="stand-currency">
+                    <option value="GBP">GBP</option>
+                    <option value="EUR">EUR</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form__row">
+                <div class="form__cell">
+                  <label class="ds-label" for="quote-name">Quote contact</label>
+                  <input class="ds-field" id="quote-name" placeholder="RAI stand sales" autocomplete="off" />
+                </div>
+                <div class="form__cell">
+                  <label class="ds-label" for="quote-email">Their email</label>
+                  <input class="ds-field" id="quote-email" type="email" placeholder="stands@acme.example" autocomplete="off" />
+                </div>
+              </div>
+            </div>
+
+            <div class="form__row form__row--choices">
+              <label class="ds-choice">
+                <input type="checkbox" class="ds-check" id="demo" />
+                <span class="ds-choice__text">We need a demo<span class="ds-choice__hint">Anything made for us needs three weeks.</span></span>
+              </label>
+              <label class="ds-choice">
+                <input type="checkbox" class="ds-check" id="has-submission" />
+                <span class="ds-choice__text">There is a submission deadline<span class="ds-choice__hint">A paper, a talk or a demo slot.</span></span>
+              </label>
+            </div>
+
+            <div class="form__row" id="demo-block" hidden>
+              <div class="form__cell">
+                <label class="ds-label" for="demo-type">What kind of demo</label>
+                <input class="ds-field" id="demo-type" placeholder="vGMC + OTA Mini, live holdover" autocomplete="off" />
+              </div>
+            </div>
+
+            <div class="form__row" id="submission-block" hidden>
+              <div class="form__cell">
+                <label class="ds-label" for="submission">Submit by</label>
+                <input class="ds-field" id="submission" type="date" />
+              </div>
+            </div>
+
+            <div class="agent-page__sect form__legend"><h3 class="ds-eyebrow">The case</h3><span class="ds-caption">why it is worth going</span></div>
+
+            <div class="form__row">
+              <div class="form__cell">
+                <label class="ds-label" for="rationale">Why we should go</label>
+                <textarea class="ds-textarea ds-field" id="rationale"
+                          placeholder="Who we would meet there, and the argument we would make."></textarea>
+                <p class="ds-help">Who we would meet, and what we would say.</p>
+              </div>
+            </div>
+
+            <div class="form__row">
+              <div class="form__cell">
+                <label class="ds-label" for="decide-by">Decide by</label>
+                <input class="ds-field" id="decide-by" type="date" />
+                <p class="ds-help">When waiting starts to cost — early-bird pricing, stand allocation, a paper deadline.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="agent-page__sect form__legend"><h3 class="ds-eyebrow">You</h3></div>
+
+          <div class="form__row">
+            <div class="form__cell">
+              <label class="ds-label" for="intent">Going as</label>
+              <select class="ds-select" id="intent">
+                <option value="attending">Attending</option>
+                <option value="presenting">Presenting</option>
+                <option value="exhibiting">Exhibiting</option>
+              </select>
+            </div>
+            <div class="form__cell">
+              <label class="ds-label" for="ticket">Your ticket cost</label>
+              <input class="ds-field" id="ticket" type="number" min="0" step="1" placeholder="0" />
+              <p class="ds-help">0 if it is free.</p>
+            </div>
+          </div>
+
+          <div class="form__row form__row--choices">
+            <label class="ds-choice">
+              <input type="checkbox" class="ds-check" id="material" />
+              <span class="ds-choice__text">I need material<span class="ds-choice__hint">Cards, clothing, anything printed. Tick and say which.</span></span>
+            </label>
+          </div>
+
+          <!-- Opened by the tick above. What is chosen here becomes Jo's
+               checklist for this person, so it is asked rather than assumed. -->
+          <div id="material-block" class="form__block" hidden>
+            <div class="form__row form__row--choices" id="material-options"></div>
+            <div class="form__row" id="material-other-block" hidden>
+              <div class="form__cell">
+                <label class="ds-label" for="material-note">What else do you need?</label>
+                <input class="ds-field" id="material-note" type="text"
+                       placeholder="An A3 poster of the sync topology" />
+                <p class="ds-help">Jo will price it. Say roughly how many if it matters.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="form__row form__row--choices">
+            <label class="ds-choice">
+              <input type="checkbox" class="ds-check" id="travel" />
+              <span class="ds-choice__text">I need travel arranged<span class="ds-choice__hint">Tick if it is not where you are.</span></span>
+            </label>
+          </div>
+
+          <!-- One row per arrangement. Operations books a flight differently
+               from a car, so each is asked for on its own terms. -->
+          <div id="travel-block" class="form__block" hidden>
+            <div id="legs"></div>
+            <div class="form__row ev__addleg">
+              <button class="ds-btn ds-btn--secondary ds-btn--sm" type="button" id="add-leg">Add another arrangement</button>
+              <span class="ds-caption">A train at the other end, a hire car, a second flight.</span>
+            </div>
+          </div>
+
+          <div class="form__actions">
+            <button class="ds-btn ds-btn--primary" type="button" id="submit">Register interest</button>
+            <span class="ds-mark ds-mark--live" id="sending" hidden>sending</span>
+            <span class="ds-error" id="form-error"></span>
+            <span class="ds-caption" id="form-note"></span>
+          </div>
+
+          <p class="ds-caption form__note">
+            Nothing is ordered until Sam approves it. He is emailed as soon as you submit.
+          </p>
+        </div>
+      </section>
+
+      <!-- The calendar sits behind one disclosure, closed. The form is what
+           somebody came to do; the calendar is what they consult. The banner
+           above stays out here — an alert nobody can see is not an alert. -->
+      <section class="ev__calendar ds-arrive" style="--arrive: calc(var(--dur-step) * 3)">
+        <div class="agent-page__sect">
+          <button class="ev__grouphead" type="button" id="calendar-toggle" aria-expanded="false"
+                  aria-controls="calendar-body">
+            <span class="ds-twisty" id="calendar-twisty" set:html={icon('chevron')} />
+            <span class="ds-eyebrow">The calendar</span>
+          </button>
+          <span class="ds-mono" id="count"></span>
+        </div>
+
+        <div id="calendar-body" hidden>
+          <div class="ev__controls">
+            <!-- Shown only to somebody who has both views. The scope on the
+                 backend is what actually decides what anybody can reach. -->
+            <div class="ds-segment ev__views" id="views" hidden>
+              <button class="ds-segment__item is-active" type="button" id="view-table">Table</button>
+              <button class="ds-segment__item" type="button" id="view-year">Timeline</button>
+            </div>
+            <label class="ds-label ev__filterlabel" for="year">Year</label>
+            <select class="ds-select ev__year" id="year"></select>
+            <span class="ds-error" id="list-error"></span>
+          </div>
+
+          <section class="ds-stagger" id="table"></section>
+          <section class="tl__wrap" id="timeline" hidden></section>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <style is:global>
+    /* The form only. Everything the calendar and its records are drawn with
+       lives in `styles/global.css` beside `.pl__`, because `lib/eventsView.ts`
+       renders it — the same split the people list already keeps. */
+
+    /* The calendar's own controls, on one row inside the opened section. */
+    .ev__controls {
+      display: flex; align-items: baseline; flex-wrap: wrap;
+      gap: var(--space-3) var(--space-4);
+      margin-bottom: var(--space-6);
+    }
+    .ev__filterlabel { margin-bottom: 0; }
+    .ev__year { width: 8rem; }
+
+    .ev__oversight { margin-bottom: var(--space-8); }
+    .ev__calendar { margin-top: var(--space-16); }
+
+    .agent-page__head { margin-bottom: var(--space-10); }
+
+    .propose { margin-top: var(--space-10); }
+    /* The form fills the reading column rather than sitting at the narrower
+       form measure inside it — at 30rem the paired fields were 14rem each and
+       every label wrapped. */
+    .form { max-width: 100%; }
+
+    /* `hidden` loses to any class that sets `display`, and every conditional
+       block here is a `.form__row`. Without this the exhibiting and demo blocks
+       render whatever the checkbox says — the cascade collision the rail's foot
+       hit in August, in a different costume. */
+    .form [hidden] { display: none; }
+
+    /* Top-aligned, not bottom. A cell carrying help text is taller than its
+       neighbour, and aligning the bottoms staggers both the labels and the
+       fields — which is what it did to "Going as" beside "Your ticket cost". */
+    .form__row { display: flex; align-items: flex-start; gap: var(--space-4); margin-bottom: var(--space-4); }
+    /* Paired choices sit on the same two columns the fields above them use, so
+       the second one starts where "Country" starts rather than wherever its
+       neighbour's text happened to end. */
+    .form__row--choices {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: var(--space-4) var(--space-4);
+    }
+    .form__cell { flex: 1; min-width: 0; }
+    .form__actions { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-8); }
+    .form__note { color: rgb(var(--ink-muted)); margin-top: var(--space-4); max-width: var(--measure-read); }
+    .ev__modenote { margin: var(--space-3) 0 var(--space-6); }
+
+    /* A block that a tick opened. The hairline and the indent say it belongs to
+       the question above it — without them the material choices read as a third
+       independent section rather than the answer to "I need material". */
+    .form__block {
+      border-left: 1px solid rgb(var(--rule));
+      padding-left: var(--space-5);
+      margin: 0 0 var(--space-5) var(--space-2);
+    }
+    .form__block > .form__row:last-child { margin-bottom: 0; }
+
+    /* One travel arrangement, on fixed columns rather than flow.
+       A car hire has no route, so two of the five cells go; with flow the
+       nights field slid left into where "From" had been and the row stopped
+       lining up with the one below it. Each cell holds its own column, so a
+       hidden one leaves a gap instead of moving its neighbours. */
+    .ev__leg {
+      display: grid; align-items: start; gap: var(--space-4);
+      grid-template-columns: 10rem 1fr 1fr 5.5rem auto;
+      margin-bottom: var(--space-5);
+    }
+    .ev__leg > :nth-child(1) { grid-column: 1; }
+    .ev__leg > :nth-child(2) { grid-column: 2; }
+    .ev__leg > :nth-child(3) { grid-column: 3; }
+    .ev__leg > :nth-child(4) { grid-column: 4; }
+    .ev__leg > :nth-child(5) { grid-column: 5; }
+    /* Aligned with the fields beside it rather than with their labels. */
+    .ev__leg-drop { margin-top: var(--space-6); }
+
+    .ev__addleg { display: flex; align-items: center; gap: var(--space-4); }
+
+    @media (max-width: 60rem) {
+      /* Two columns, and the route pair sits on its own line under the mode. */
+      .ev__leg { grid-template-columns: 1fr 1fr; }
+      .ev__leg > :nth-child(n) { grid-column: auto; }
+    }
+
+    /* Each block of the form is a section head, so the form reads as three
+       questions — the show, the case, you — rather than one long column. */
+    .form__legend { margin: var(--space-8) 0 var(--space-5); }
+    .form__legend:first-child { margin-top: 0; }
+
+    @media (max-width: 60rem) {
+      .form__row { flex-wrap: wrap; }
+    }
+  </style>
+
+  <script>
+    import {
+      legRow,
+      paintMaterial,
+      readLegs,
+      readMaterial,
+      wantsOther,
+      type MaterialOption,
+      type TravelMode,
+    } from '../../lib/eventsRequirements';
+    import {
+  paintOversight, paintRecord, paintTable, setSheetUrl,
+} from '../../lib/eventsView';
+    import { paintTimeline } from '../../lib/eventsTimeline';
+    import type { EventRow } from '../../lib/events';
+    import { isAdmin, requireSession } from '../../lib/session';
+    import { confirmAction, toast } from '../../lib/overlays';
+
+    const byId = (id: string) => document.getElementById(id)!;
+    const value = (id: string) => (byId(id) as HTMLInputElement).value.trim();
+    const checked = (id: string) => (byId(id) as HTMLInputElement).checked;
+
+    /** Whether this person may approve. Resolved once, at boot. */
+    let canDecide = false;
+    /** Which mode the form is in. The segmented control is the only writer. */
+    let mode: 'new' | 'join' = 'new';
+    /** Table or year. Non-admins have only the year, and no switcher. */
+    let view: 'table' | 'year' = 'table';
+    /** Whether both views are available. Set once, from what the list reports. */
+    let canSwitch = false;
+    /** Whether the calendar section is open. Closed is the resting state: the
+     *  form is what somebody came to do, the calendar is what they consult. */
+    let calendarOpen = false;
+    /** Whether that has been resolved yet. See `load` for why this is not a
+     *  comparison against `canSwitch` — its initial value *is* the non-admin
+     *  case, so a change check silently never fires for them. */
+    let viewSettled = false;
+
+    /** Errors from the backend carry a `detail` worth showing verbatim. */
+    async function reasonFor(res: Response, fallback: string): Promise<string> {
+      try {
+        return (await res.json()).detail || fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    async function api(path: string, init?: RequestInit): Promise<any> {
+      const res = await fetch(`/api/events${path}`, init);
+      if (!res.ok) throw new Error(await reasonFor(res, 'That did not work.'));
+      return res.json();
+    }
+
+    function fillYears(years: number[], selected: string): void {
+      const select = byId('year') as HTMLSelectElement;
+      select.replaceChildren();
+      const all = document.createElement('option');
+      all.value = '';
+      all.textContent = 'All years';
+      select.append(all);
+      for (const year of years) {
+        const option = document.createElement('option');
+        option.value = String(year);
+        option.textContent = String(year);
+        select.append(option);
+      }
+      select.value = selected;
+    }
+
+    // The material list and the travel modes, as the backend defines them.
+    // Held so `addLeg` can draw a row after the first load without asking again.
+    let travelModes: TravelMode[] = [];
+    let optionsPainted = false;
+
+    /** Draw the served vocabulary. Once — the lists do not change mid-session. */
+    function paintOptions(material: MaterialOption[], modes: TravelMode[]): void {
+      travelModes = modes;
+      if (optionsPainted || !material.length) return;
+      optionsPainted = true;
+      paintMaterial(byId('material-options'), material,
+                    (on) => reveal('material-other-block', on));
+    }
+
+    /** Add one travel arrangement, and remove it again on request. */
+    function addLeg(): void {
+      const legs = byId('legs');
+      const row = legRow(travelModes, () => {
+        row.remove();
+        // An empty block is a tick somebody no longer means. Clearing it here
+        // saves them unticking a box to explain a block they have emptied.
+        if (!legs.children.length) {
+          (byId('travel') as HTMLInputElement).checked = false;
+          reveal('travel-block', false);
+        }
+      });
+      legs.append(row);
+    }
+
+    /**
+     * Which `load()` is the current one.
+     *
+     * Five things call `load()` — the year select, a registration, a decision,
+     * an action and a delete — and two of them can be in flight at once. Without
+     * this the slower response repaints its own events *and* resets the year
+     * select to the year it was asked for, so the control visibly jumps back and
+     * disagrees with the table below it. The last caller wins; earlier ones drop
+     * their answer on the floor.
+     */
+    let loadToken = 0;
+
+    async function load(): Promise<void> {
+      const token = ++loadToken;
+      const year = (byId('year') as HTMLSelectElement).value;
+      try {
+        const data = await api(year ? `?year=${encodeURIComponent(year)}` : '');
+        if (token !== loadToken) return;
+        fillYears(data.years ?? [], year);
+        const events: EventRow[] = data.events ?? [];
+        byId('count').textContent = String(events.length);
+
+        // The table and the switcher belong to somebody who has both views.
+        // This is presentation: the scope on the backend decides what anybody
+        // can actually reach, whatever the page chooses to draw.
+        paintOptions(data.material ?? [], data.travel_modes ?? []);
+        setSheetUrl(data.sheet_url ?? null);
+
+        if (!viewSettled) {
+          viewSettled = true;
+          canSwitch = Boolean(data.admin);
+          byId('views').hidden = !canSwitch;
+          // Admin lands on the table — the working surface; everybody else has
+          // only the year, which is also the only thing the scope gives them.
+          syncView(canSwitch ? 'table' : 'year');
+        }
+
+        paintOversight(byId('oversight'), events);
+        paintTable(byId('table'), events, {
+          onOpen: (id) => api(`/${encodeURIComponent(id)}`),
+        }, record);
+        // Only this year's shows go on this year's track. `fraction()` clamps
+        // anything outside it to 0 or 1, so another year's show renders pinned
+        // to the left edge and reads as a real January date.
+        const track = trackYear(events, year);
+        const onTrack = events.filter((e) => e.year === track);
+        paintTimeline(byId('timeline'), onTrack, track, {
+          onOpen: (id) => api(`/${encodeURIComponent(id)}`),
+        }, record);
+        fillJoinable(events);
+        byId('list-error').textContent = '';
+      } catch (err: any) {
+        byId('list-error').textContent =
+          err?.message || 'Could not load the calendar — is the backend running?';
+      }
+    }
+
+    /**
+     * Which year the track draws.
+     *
+     * "All years" is not a track — a timeline needs one. With no year chosen,
+     * the nearest year that has a show in it is the useful answer, and the
+     * current year is the fallback when there are none at all.
+     */
+    function trackYear(events: EventRow[], selected: string): number {
+      if (selected) return Number(selected);
+      const years = events.map((e) => e.year).sort((a, b) => a - b);
+      const now = new Date().getUTCFullYear();
+      return years.find((y) => y >= now) ?? years[years.length - 1] ?? now;
+    }
+
+    /**
+     * Open a record by pressing its row's own twisty, wherever the request came
+     * from — the timeline, an emailed link, or a click on the row itself.
+     *
+     * One code path, so a bar can never open something a click cannot.
+     */
+    /**
+     * Open one show, in whichever view the person actually has.
+     *
+     * This looked only for a `.ev__row` with a `[data-toggle]` inside it, which
+     * is the **table** — a surface a non-admin never sees. So registering a show
+     * scrolled nothing, opened nothing and appeared to have done nothing, for
+     * everybody except an admin. The timeline's row is itself the button.
+     */
+    function openRow(id: string): void {
+      if (!calendarOpen) syncCalendar(true);
+      if (view !== 'table' && canSwitch) syncView('table');
+
+      const row = document.querySelector(
+        `#${view === 'table' ? 'table' : 'timeline'} [data-event="${CSS.escape(id)}"]`,
+      ) as HTMLElement | null;
+      if (!row) return;
+
+      if (!row.classList.contains('is-open')) {
+        const toggle = row.querySelector('[data-toggle]') as HTMLButtonElement | null;
+        (toggle ?? (row as HTMLButtonElement)).click();
+      }
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    /**
+     * Open or close the calendar.
+     *
+     * Nothing opens it on its own. It opens when somebody asks — the header,
+     * an emailed link, or their own registration landing, which is the one case
+     * where a person has just done something and needs to see the result of it.
+     */
+    function syncCalendar(open: boolean): void {
+      calendarOpen = open;
+      byId('calendar-body').hidden = !open;
+      byId('calendar-twisty').classList.toggle('is-open', open);
+      byId('calendar-toggle').setAttribute('aria-expanded', String(open));
+    }
+
+    function syncView(next: 'table' | 'year'): void {
+      view = next;
+      byId('table').hidden = view !== 'table';
+      byId('timeline').hidden = view !== 'year';
+      for (const id of ['view-table', 'view-year'] as const) {
+        const on = id === `view-${view}`;
+        byId(id).classList.toggle('is-active', on);
+        byId(id).setAttribute('aria-pressed', String(on));
+      }
+    }
+
+    /**
+     * Paint one opened record, and give its controls somewhere to go.
+     *
+     * Every write route answers with the event as it now stands, so the record
+     * repaints from the response rather than refetching — and the calendar is
+     * reloaded too, because a decision moves a row between groups.
+     */
+    function record(host: HTMLElement, event: EventRow): void {
+      paintRecord(host, event, {
+        onApprove: (id) => decide(id, 'approve'),
+        onDecline: (id) => decide(id, 'decline'),
+        onApproveRegistration: (id) => act(host,
+          () => api(`/registrations/${encodeURIComponent(id)}/approve`, { method: 'POST' })),
+        onDelete: remove,
+      }, canDecide);
+    }
+
+    async function act(host: HTMLElement, run: () => Promise<EventRow>): Promise<void> {
+      try {
+        // Repainted from the response *and then* reopened after the reload.
+        // `load()` calls `paintTable`/`paintTimeline`, both of which begin with
+        // `replaceChildren()` — so the confirmed state rendered for one frame
+        // and the row then snapped shut, and somebody had to reopen it to see
+        // whether their click had taken.
+        const updated = await run();
+        record(host, updated);
+        await load();
+        openRow(updated.id);
+      } catch (err: any) {
+        byId('list-error').textContent = err?.message || 'That did not work.';
+      }
+    }
+
+    /**
+     * Delete a show, once somebody has said so on purpose.
+     *
+     * The dialog names the show and what goes with it: the design system's rule
+     * is that a destructive action is named rather than generic, and "are you
+     * sure?" tells a reader nothing they did not already know.
+     */
+    async function remove(event: EventRow): Promise<void> {
+      const going = event.registrations?.length ?? 0;
+      const raised = event.checklist?.length ?? 0;
+      const carries = [
+        going ? `${going} ${going === 1 ? 'registration' : 'registrations'}` : '',
+        raised ? `${raised} checklist ${raised === 1 ? 'line' : 'lines'}` : '',
+      ].filter(Boolean).join(' and ');
+
+      const confirmed = await confirmAction({
+        title: `Delete ${event.name}?`,
+        body: carries
+          ? `It leaves the calendar with its ${carries}.`
+          : 'It leaves the calendar.',
+        confirm: 'Delete',
+        danger: true,
+      });
+      if (!confirmed) return;
+
+      try {
+        await api(`/${encodeURIComponent(event.id)}`, { method: 'DELETE' });
+        toast(`${event.name} deleted`);
+        // The row goes with it, so there is no record left to repaint.
+        await load();
+      } catch (err: any) {
+        byId('list-error').textContent = err?.message || 'That show could not be deleted.';
+      }
+    }
+
+    /**
+     * Approve or decline, then reload.
+     *
+     * The record is not repainted in place afterwards: the row it lives in has
+     * moved group, so the table it belonged to no longer exists.
+     */
+    async function decide(id: string, choice: 'approve' | 'decline'): Promise<void> {
+      try {
+        await api(`/${encodeURIComponent(id)}/${choice}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note: '' }),
+        });
+        await load();
+      } catch (err: any) {
+        byId('list-error').textContent = err?.message || 'That did not work.';
+      }
+    }
+
+
+    /**
+     * Show a block, or hide it, from the checkbox that governs it.
+     *
+     * `hidden` rather than a class, so a field that is not being asked for is
+     * genuinely not in the accessibility tree — a screen reader should not read
+     * out a stand cost to somebody attending a conference.
+     */
+    function reveal(blockId: string, on: boolean): void {
+      byId(blockId).hidden = !on;
+    }
+
+    function proposing(): boolean {
+      return mode === 'new';
+    }
+
+    const MODE_NOTE = {
+      new: 'Describe it once, so nobody has to chase the details later.',
+      join: 'It is already described. Answer for yourself only.',
+    };
+
+    function syncMode(next: 'new' | 'join' = mode): void {
+      mode = next;
+      for (const id of ['mode-new', 'mode-join'] as const) {
+        const on = id === `mode-${mode}`;
+        byId(id).classList.toggle('is-active', on);
+        byId(id).setAttribute('aria-selected', String(on));
+      }
+      reveal('show-block', proposing());
+      reveal('join-block', !proposing());
+      byId('mode-note').textContent = MODE_NOTE[mode];
+      byId('form-error').textContent = '';
+      clearInvalid();
+    }
+
+    /** Fill the join selector from the calendar already loaded on the page. */
+    function fillJoinable(events: EventRow[]): void {
+      const select = byId('join-event') as HTMLSelectElement;
+      const previous = select.value;
+      select.replaceChildren();
+      // Only what somebody could still usefully join: a declined show is closed,
+      // and one that has already happened cannot be attended.
+      const open = events.filter((e) => e.status !== 'declined' && e.days_until >= 0);
+      for (const event of open) {
+        const option = document.createElement('option');
+        option.value = event.id;
+        option.textContent = `${event.name} — ${event.starts_on}`;
+        select.append(option);
+      }
+      if (!open.length) {
+        const none = document.createElement('option');
+        none.value = '';
+        none.textContent = 'Nothing on the calendar to join';
+        select.append(none);
+      }
+      // Only restore a choice that is still on the list. Assigning a value no
+      // option carries sets `select.value` to '' — so a show being decided
+      // while somebody had it picked silently emptied the control, and the form
+      // then refused with "choose the show you are joining" against a select
+      // showing nothing.
+      const stillThere = [...select.options].some((o) => o.value === previous);
+      if (stillThere) select.value = previous;
+    }
+
+    /**
+     * The first thing wrong with the form, named and focused.
+     *
+     * The backend is authoritative and refuses the same things with the same
+     * words; this only saves a round trip. Where the two could drift, the
+     * message here is deliberately shorter and the backend's is the one that
+     * explains — so a mismatch reads as terse, never as contradictory.
+     */
+    function firstProblem(): { field: string; message: string } | null {
+      if (!proposing()) {
+        if (!(byId('join-event') as HTMLSelectElement).value) {
+          return { field: 'join-event', message: 'Choose the show you are joining.' };
+        }
+      } else {
+        if (!value('name')) return { field: 'name', message: 'What is the event called?' };
+        if (!value('location')) return { field: 'location', message: 'Where is it held?' };
+        if (!value('country')) return { field: 'country', message: 'Which country?' };
+        if (!value('starts')) return { field: 'starts', message: 'When does it start?' };
+        if (checked('exhibiting')) {
+          if (value('stand-cost') === '') {
+            return { field: 'stand-cost', message: 'How much is the stand? Put 0 if it is free.' };
+          }
+          if (!value('quote-email')) {
+            return { field: 'quote-email', message: 'Who do we ask for a quote?' };
+          }
+        }
+        if (checked('demo') && !value('demo-type')) {
+          return { field: 'demo-type', message: 'What kind of demo?' };
+        }
+        if (checked('has-submission') && !value('submission')) {
+          return { field: 'submission', message: 'When is the submission deadline?' };
+        }
+        if (value('rationale').length < 20) {
+          return { field: 'rationale', message: 'Say why we should go — a sentence or two.' };
+        }
+        if (!value('decide-by')) {
+          return { field: 'decide-by', message: 'When must we decide by?' };
+        }
+      }
+      if (value('ticket') === '') {
+        return { field: 'ticket', message: 'What does your ticket cost? Put 0 if it is free.' };
+      }
+      // Caught here as well as in the store: the store is what protects the
+      // record, and this is what stops somebody losing a long form to a round
+      // trip over a box they forgot to fill.
+      if (checked('material')) {
+        if (!readMaterial(byId('material-options')).length) {
+          return { field: 'material', message: 'Tell us what material you need, or untick the box.' };
+        }
+        if (wantsOther(byId('material-options')) && !value('material-note')) {
+          return { field: 'material-note', message: "You chose 'something else' — say what you need." };
+        }
+      }
+      if (checked('travel') && !readLegs(byId('legs')).length) {
+        // Focus lands on *Add another arrangement*, which is the fix, rather
+        // than on the tick that caused it.
+        return { field: 'add-leg', message: 'Add at least one travel arrangement, or untick the box.' };
+      }
+      return null;
+    }
+
+    /** Take the invalid mark off whatever last carried it. */
+    function clearInvalid(): void {
+      for (const field of document.querySelectorAll('.ds-field--invalid')) {
+        field.classList.remove('ds-field--invalid');
+      }
+    }
+
+    function formPayload(): Record<string, unknown> {
+      const person = {
+        intent: (byId('intent') as HTMLSelectElement).value,
+        ticket_cost: Number(value('ticket')),
+        needs_material: checked('material'),
+        material_items: checked('material') ? readMaterial(byId('material-options')) : [],
+        material_note: checked('material') ? value('material-note') : '',
+        needs_travel: checked('travel'),
+        travel_legs: checked('travel') ? readLegs(byId('legs')) : [],
+      };
+      if (!proposing()) {
+        return { ...person, event_id: (byId('join-event') as HTMLSelectElement).value };
+      }
+      return {
+        ...person,
+        name: value('name'),
+        location: value('location'),
+        country: value('country'),
+        starts_on: value('starts'),
+        ends_on: value('ends') || value('starts'),
+        invited: checked('invited'),
+        exhibiting: checked('exhibiting'),
+        exhibit_cost: checked('exhibiting') && value('stand-cost') !== ''
+          ? Number(value('stand-cost')) : null,
+        exhibit_currency: (byId('stand-currency') as HTMLSelectElement).value,
+        quote_contact_name: value('quote-name'),
+        quote_contact_email: value('quote-email'),
+        demo_required: checked('demo'),
+        demo_type: value('demo-type'),
+        has_submission_deadline: checked('has-submission'),
+        submission_deadline: value('submission') || null,
+        rationale: value('rationale'),
+        decide_by: value('decide-by'),
+      };
+    }
+
+    function clearForm(): void {
+      const text = ['name', 'location', 'country', 'starts', 'ends', 'ticket',
+                    'stand-cost', 'quote-name', 'quote-email', 'demo-type',
+                    'submission', 'rationale', 'decide-by'];
+      for (const id of text) (byId(id) as HTMLInputElement).value = '';
+      for (const id of ['travel', 'material', 'invited', 'exhibiting', 'demo',
+                        'has-submission']) {
+        (byId(id) as HTMLInputElement).checked = false;
+      }
+      for (const box of byId('material-options')
+             .querySelectorAll<HTMLInputElement>('input[data-material]')) {
+        box.checked = false;
+      }
+      (byId('material-note') as HTMLInputElement).value = '';
+      byId('legs').replaceChildren();
+      reveal('material-block', false);
+      reveal('material-other-block', false);
+      reveal('travel-block', false);
+      reveal('exhibit-block', false);
+      reveal('demo-block', false);
+      reveal('submission-block', false);
+    }
+
+    async function submit(): Promise<void> {
+      const button = byId('submit') as HTMLButtonElement;
+      byId('form-error').textContent = '';
+      byId('form-note').textContent = '';
+
+      clearInvalid();
+      const problem = firstProblem();
+      if (problem) {
+        // The message alone leaves the reader hunting for which field it means,
+        // which in a form this long is most of the work. `.ds-field--invalid` is
+        // the system's own answer and costs nothing to reach for.
+        const field = byId(problem.field);
+        byId('form-error').textContent = problem.message;
+        // The mark is the system's outline on a text field. A checkbox or a
+        // button carries no outline to redden, so it gets the focus and the
+        // message and not a class that paints nothing.
+        if (field.matches('.ds-field, .ds-select')) {
+          field.classList.add('ds-field--invalid');
+        }
+        field.focus();
+        return;
+      }
+
+      button.disabled = true;
+      byId('sending').hidden = false;
+      try {
+        const data = await api('', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formPayload()),
+        });
+
+        // Two facts, both worth saying. Whether the show was already listed —
+        // otherwise the form looks like it ignored what was typed — and what
+        // became of the email, in the three states the backend distinguishes.
+        // "Not configured" and "failed" both mean nobody was told and send you
+        // to fix different things.
+        const joined = data.joined_existing
+          ? `${data.event.name} was already on the calendar, so you have been added to it. `
+          : '';
+        const DELIVERY: Record<string, string> = {
+          sent: 'Sam has been emailed.',
+          unconfigured: 'Email is not set up here, so nobody was told.',
+          failed: 'The email did not send. Tell Sam directly.',
+        };
+        // The spreadsheet's three states, said as plainly as the email's. Only
+        // a failure is worth a sentence: a push that worked is the expected
+        // case and saying so on every registration is noise.
+        const SHEET: Record<string, string> = {
+          unconfigured: ' The shared spreadsheet is not connected yet.',
+          failed: ' The shared spreadsheet did not update — tell Sam.',
+        };
+        byId('form-note').textContent = joined
+          + (DELIVERY[data.delivery] ?? DELIVERY.failed)
+          + (SHEET[data.event?.sheet] ?? '');
+
+        clearForm();
+        await load();
+        // Open the show they just registered — the one case where the calendar
+        // opens itself, because a person has acted and needs to see the result.
+        if (data.event) openRow(data.event.id);
+      } catch (err: any) {
+        byId('form-error').textContent = err?.message || 'Could not register that.';
+      } finally {
+        byId('sending').hidden = true;
+        button.disabled = false;
+      }
+    }
+
+    byId('submit').addEventListener('click', submit);
+    byId('calendar-toggle').addEventListener('click', () => syncCalendar(!calendarOpen));
+    byId('view-table').addEventListener('click', () => syncView('table'));
+    byId('view-year').addEventListener('click', () => syncView('year'));
+    byId('mode-new').addEventListener('click', () => syncMode('new'));
+    byId('mode-join').addEventListener('click', () => syncMode('join'));
+    byId('material').addEventListener('change',
+      () => reveal('material-block', checked('material')));
+    byId('travel').addEventListener('change', () => {
+      const on = checked('travel');
+      reveal('travel-block', on);
+      // Opening the block with nothing in it asks a question with no answer
+      // box, so the first arrangement is there to fill in.
+      if (on && !byId('legs').children.length) addLeg();
+    });
+    byId('add-leg').addEventListener('click', addLeg);
+    byId('exhibiting').addEventListener('change', () => reveal('exhibit-block', checked('exhibiting')));
+    byId('demo').addEventListener('change', () => reveal('demo-block', checked('demo')));
+    byId('has-submission').addEventListener('change',
+      () => reveal('submission-block', checked('has-submission')));
+
+    byId('year').addEventListener('change', () => load());
+
+    /**
+     * Open the show an emailed link points at.
+     *
+     * Presses the row's own twisty rather than adding a second way to open a
+     * record — one code path, so a link can never open something the click
+     * cannot. An id that no longer exists opens nothing and says so quietly:
+     * arriving from an old email is not an error worth a red line.
+     */
+    function openFromLink(): void {
+      const wanted = new URLSearchParams(window.location.search).get('event');
+      if (!wanted) return;
+
+      syncCalendar(true);
+      const row = document.querySelector(
+        `[data-event="${CSS.escape(wanted)}"].ev__row`,
+      ) as HTMLElement;
+      const toggle = row?.querySelector('[data-toggle]') as HTMLButtonElement | undefined;
+      if (!toggle) {
+        byId('list-error').textContent =
+          'That show is no longer on the calendar — it may have been removed.';
+        return;
+      }
+      // A closed show sits in a band that starts collapsed, so its row is
+      // hidden and clicking the twisty would open something nobody can see.
+      // The section itself is opened by `openRow` before any of this.
+      if (row.hidden) {
+        const band = row.closest('tbody');
+        (band?.querySelector('.ev__grouphead') as HTMLButtonElement | undefined)?.click();
+      }
+      toggle.click();
+      row!.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    (async () => {
+      const user = await requireSession();
+      if (!user) return;
+      canDecide = isAdmin(user);
+      syncMode();
+      await load();
+      openFromLink();
+    })();
+  </script>
+</PlatformLayout>

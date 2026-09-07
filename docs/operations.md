@@ -4,6 +4,12 @@ Cadence began as two tracks. The sales track became the platform described in
 [the architecture](architecture.md): eleven thin agents on the Owl Mind. The
 operations track did not make that journey yet.
 
+> **"Operations" here means a release phase, not a domain.** These four are held
+> back because they are *old* — written against the layer the Mind replaced. Do
+> not read the event programme or the outbound tracker into this section: those
+> run, they are current, and they reach no model on purpose. They are described
+> in [Running without a model](without-a-model.md).
+
 Four agents sit here, kept in the repository on purpose:
 
 | Agent | What it does |

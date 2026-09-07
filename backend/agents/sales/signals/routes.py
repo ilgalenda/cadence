@@ -8,6 +8,13 @@ can spend anything.
 people showing a signal belongs where the signal is already the subject; X-ray now
 answers only the grounded question — *given an account and why it matters, who are
 the people*.
+
+**Admin-only, at the router.** The retired `/api/high-intent` router this replaces
+carried exactly this dependency, and the replacement was written without it: every
+endpoint gated on `require_authed`, so any signed-in person could start a sweep or a
+`/detect` and spend Opus and web-search credit that used to answer 403. The gate is
+per-router rather than per-endpoint because the whole surface spends; when Signals
+ships and the free reads are worth separating, split it then.
 """
 from __future__ import annotations
 
@@ -16,9 +23,10 @@ from pydantic import BaseModel
 
 from agents.sales.signals import agent
 from agents.sales.store import signals as store
-from auth import is_sandbox, require_authed
+from auth import is_sandbox, require_admin, require_authed
 
-router = APIRouter(prefix="/signals", tags=["sales-signals"])
+router = APIRouter(prefix="/signals", tags=["sales-signals"],
+                   dependencies=[Depends(require_admin)])
 
 
 class WatchRequest(BaseModel):

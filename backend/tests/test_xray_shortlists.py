@@ -192,6 +192,34 @@ def test_one_user_cannot_see_or_open_anothers_shortlist(client, prospects_file):
     assert client.get(f"{SHORTLISTS}/{mine['id']}").status_code == 200
 
 
+def test_saving_over_anothers_shortlist_is_refused_and_destroys_nothing(client, prospects_file):
+    """The write path was the one that did not check the owner.
+
+    `ShortlistSave` accepts a client-supplied `id`, which the model it replaced
+    did not — so posting somebody else's id replaced their record with yours,
+    taking the emails and phone numbers Lusha had been paid for with it. Reading
+    and deleting both checked; saving did not.
+    """
+    storage.save_prospect_list(
+        {"name": "Theirs", "people": [_person("Grace Hopper", _email="grace@northgate.com")]},
+        username=OTHER_USER,
+    )
+    theirs = next(s for s in storage.load_prospect_lists() if s["username"] == OTHER_USER)
+    before = json.dumps(theirs, sort_keys=True)
+
+    res = client.post(SHORTLISTS, json={
+        "id": theirs["id"],
+        "name": "Mine now",
+        "people": [_person("Ada Lovelace")],
+    })
+    # Answered as if it never existed, so a saved shortlist cannot be probed for.
+    assert res.status_code == 404, res.text
+
+    after = [s for s in storage.load_prospect_lists() if s["id"] == theirs["id"]]
+    assert len(after) == 1, "a refused save must not leave two records under one id"
+    assert json.dumps(after[0], sort_keys=True) == before
+
+
 # ── Refusals ────────────────────────────────────────────────────────────────
 
 

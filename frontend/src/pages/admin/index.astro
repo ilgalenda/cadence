@@ -431,7 +431,7 @@ import PlatformLayout from '../../layouts/PlatformLayout.astro';
                 body: JSON.stringify({ notes: notes.value.trim() }),
               });
               if (!r.ok) throw new Error(String(r.status));
-              li.remove();
+              card.remove();
               const left = list.querySelectorAll('li').length;
               setCount(left);
               if (!left) placeholder(list, 'no pending submissions');

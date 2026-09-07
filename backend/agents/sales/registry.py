@@ -6,6 +6,9 @@ surface rather than something a caller has to remember.
 
 Each entry is the *only* declaration of that agent as a tool: schema and runner
 together, so Owl can never be offered a tool that nothing can execute.
+
+`HELD_BACK` is the other half of that guarantee: an agent whose page says "coming
+soon" must not be runnable by asking Owl instead.
 """
 from __future__ import annotations
 
@@ -22,9 +25,35 @@ from agents.sales.signals import agent as signals
 from agents.sales.scoring import agent as scoring
 from agents.sales.xray import agent as xray
 
+#: Agents held back from the 2.0 release, by slug, with why.
+#:
+#: Both ride `tool_choice={"type": "any"}` on a non-streaming turn: the loop
+#: re-sends that choice every round, so once the search budget is spent the model
+#: is still compelled to call a tool it can no longer call, thrashes to
+#: `max_rounds` and never emits its terminal JSON. GTM was measured on exactly
+#: this configuration at two successes in five attempts and two to five minutes,
+#: and was moved off it; these two were not.
+#:
+#: Signals carries a second reason. It has no scheduler — `maybe_sweep()` fires
+#: when somebody opens the page — so an agent whose promise is "what changed
+#: while you were not looking" only looks while you are.
+#:
+#: **This constant is the whole gate, and it reaches three places**: the tool is
+#: not registered here, the router is not mounted (`agents/sales/routes.py`), and
+#: the page says so (`frontend/src/lib/platform.ts`, `built: false`). A page that
+#: says "coming soon" over a live route and a live Owl tool is not a held-back
+#: agent, it is a hidden one.
+HELD_BACK = {
+    "research": "The brief completes about two times in five and takes two to five minutes.",
+    "signals": "Same, and there is no scheduler — it only checks while you are watching.",
+}
+
 
 def register_all() -> None:
-    """Register the agents that have migrated. Idempotent across imports."""
+    """Register the agents that have migrated, less those in `HELD_BACK`.
+
+    Idempotent across imports.
+    """
     if tools.names():
         return
 
@@ -53,6 +82,22 @@ def register_all() -> None:
         writes=False,
     ))
 
+    # The one GTM entry that writes. What it writes is a *request for a decision*:
+    # the list is queued for review, never put straight on a tracker, because the
+    # review queue is currently the only exclusion check that exists.
+    tools.register(tools.SalesTool(
+        name="build_target_tracker",
+        description=(
+            "Build a classified target list for the outbound tracker — accounts with a "
+            "tier, a campaign, and how a first deal would be shaped. Queues the list for "
+            "the user's review; approving it is what creates the tracker. Use when the "
+            "user wants a list to work through rather than names to look at."
+        ),
+        input_schema=gtm.TRACKER_TOOL_SCHEMA,
+        run=gtm.run_as_tool_tracker,
+        writes=True,
+    ))
+
     tools.register(tools.SalesTool(
         name="xray",
         description=(
@@ -67,20 +112,21 @@ def register_all() -> None:
         writes=False,
     ))
 
-    tools.register(tools.SalesTool(
-        name="research_account",
-        description=(
-            "Research a company, and optionally one decision-maker at it, into a single "
-            "brief: what they do, why timing matters to them now, the product angle, and "
-            "how to approach the person. Searches the web and cites sources. Use before "
-            "writing outreach, or whenever the user asks what we know about an account."
-        ),
-        input_schema=research.TOOL_SCHEMA,
-        run=research.run_as_tool,
-        # It records the account in the user's memory, which is a write — a caller
-        # deciding what is safe to run unattended needs to know that.
-        writes=True,
-    ))
+    if "research" not in HELD_BACK:
+        tools.register(tools.SalesTool(
+            name="research_account",
+            description=(
+                "Research a company, and optionally one decision-maker at it, into a single "
+                "brief: what they do, why timing matters to them now, the product angle, and "
+                "how to approach the person. Searches the web and cites sources. Use before "
+                "writing outreach, or whenever the user asks what we know about an account."
+            ),
+            input_schema=research.TOOL_SCHEMA,
+            run=research.run_as_tool,
+            # It records the account in the user's memory, which is a write — a caller
+            # deciding what is safe to run unattended needs to know that.
+            writes=True,
+        ))
 
     tools.register(tools.SalesTool(
         name="recall_market",
@@ -127,20 +173,21 @@ def register_all() -> None:
         writes=True,
     ))
 
-    tools.register(tools.SalesTool(
-        name="check_signals",
-        description=(
-            "Report what is new at the accounts on the watchlist — funding, contracts, "
-            "build-outs, timing work, compliance deadlines. Every finding carries a "
-            "source. Pass a company to check one now whether or not it is watched. Use "
-            "when the user asks what has changed at their accounts, or before targeting."
-        ),
-        input_schema=signals.TOOL_SCHEMA,
-        run=signals.run_as_tool,
-        # Records what was checked and what was found, so a later sweep does not
-        # report the same event again.
-        writes=True,
-    ))
+    if "signals" not in HELD_BACK:
+        tools.register(tools.SalesTool(
+            name="check_signals",
+            description=(
+                "Report what is new at the accounts on the watchlist — funding, contracts, "
+                "build-outs, timing work, compliance deadlines. Every finding carries a "
+                "source. Pass a company to check one now whether or not it is watched. Use "
+                "when the user asks what has changed at their accounts, or before targeting."
+            ),
+            input_schema=signals.TOOL_SCHEMA,
+            run=signals.run_as_tool,
+            # Records what was checked and what was found, so a later sweep does not
+            # report the same event again.
+            writes=True,
+        ))
 
     # ── The back half: after the conversation has happened ──────────────────
 

@@ -16,6 +16,8 @@ from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
 from agents.admin.routes import router as admin_router
+from agents.events.routes import router as events_router
+from agents.outbound.routes import router as outbound_router
 from agents.learn.routes import router as learn_router
 from agents.owl.routes import router as owl_router
 from agents.sales.routes import router as sales_router
@@ -25,7 +27,7 @@ from auth import current_user, is_sandbox, public_user, require_admin, verify_lo
 
 # Cadence auth config — set in backend/.env:
 #   SESSION_SECRET=<long random string>
-#   IVAN_PASSWORD, IAN_PASSWORD, etc. — plaintext, used by seed_users.py to
+#   <USER>_PASSWORD, one per person, — plaintext, used by seed_users.py to
 #     write the gitignored ${DATA_ROOT}/agents/users_credentials.json.
 # User profiles (name, role, access, agents) live in backend/agents/users.json
 # and ARE committed; credentials live in users_credentials.json and are NOT.
@@ -140,6 +142,13 @@ app.include_router(owl_router)
 app.include_router(sales_router)
 app.include_router(learn_router)
 app.include_router(wiki_router)
+
+# Not a sales agent — trade-show readiness, no LLM call, not an Owl tool.
+app.include_router(events_router)
+
+# Not an agent either — the ABM tracker. GTM fills one; the record and its counters
+# call no model and are not an Owl tool.
+app.include_router(outbound_router)
 
 # Not an agent — a shared connection agents borrow. Gmail joins it at Phase 4.
 app.include_router(google_router)

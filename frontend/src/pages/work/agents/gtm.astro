@@ -57,6 +57,11 @@ import PlatformLayout from '../../../layouts/PlatformLayout.astro';
         </div>
         <div class="gtm__actions">
           <button class="ds-btn ds-btn--accent" id="run" type="submit">Find companies</button>
+          <!-- The same scope, asked as a list to work rather than names to read.
+               A second button rather than a mode switch: these produce different
+               things and one of them writes, so making them look like one control
+               with two settings would hide that. -->
+          <button class="ds-btn ds-btn--secondary" id="build" type="button">Build a tracker</button>
           <span class="ds-mark ds-mark--live" id="running" hidden>proposing</span>
         </div>
         <!-- Not filling the form in is not a failure, and does not get the red
@@ -69,6 +74,18 @@ import PlatformLayout from '../../../layouts/PlatformLayout.astro';
       <div class="ds-banner ds-banner--fault gtm__banner" id="error" hidden>
         <span class="ds-banner__label">Could not propose</span>
         <span id="error-text"></span>
+      </div>
+
+      <!-- A queued list, and what it does not yet know. Nothing is on a tracker
+           until it is approved: the queue is currently the only check standing
+           between a generated list and an account Acme already sells to. -->
+      <div class="ds-banner ds-banner--drift gtm__banner" id="queued" hidden>
+        <span class="ds-banner__label">Queued for review</span>
+        <span id="queued-text"></span>
+        <span class="gtm__queuedacts">
+          <button class="ds-btn ds-btn--accent ds-btn--sm" id="approve" type="button">Approve</button>
+          <button class="ds-btn ds-btn--ghost ds-btn--sm" id="discard" type="button">Discard</button>
+        </span>
       </div>
 
       <section class="gtm__result ds-arrive" id="result" hidden style="--arrive: calc(var(--dur-step) * 2)">
@@ -92,6 +109,85 @@ import PlatformLayout from '../../../layouts/PlatformLayout.astro';
         <p class="ds-empty__title">Nothing proposed yet</p>
         <p class="ds-empty__body">Name a vertical to target, or a company to find look-alikes of.</p>
       </div>
+
+      <!-- The campaign, when there is one.
+           This is where a proposal ends up once it is approved: the same accounts,
+           now with sequence state against them. It is a section of this page
+           rather than a surface of its own because proposing and working the list
+           are two halves of one job — you look at what GTM suggested, then you
+           work it, and walking to another page between those is the seam nobody
+           needed. Hidden until a tracker exists, because an empty table of eight
+           columns explains nothing. -->
+      <section class="camp ds-arrive" id="campaign" hidden>
+        <div class="agent-page__sect">
+          <h2 class="ds-eyebrow">Active campaign</h2>
+        </div>
+
+        <!-- One tab per live campaign, however many there are. The strip is the
+             campaign's identity band rather than a switcher: it names what is
+             open and says how far it has got, so a single tab still earns its
+             place — and the header keeps one shape as campaigns come and go. -->
+        <div id="camp-tabs" hidden></div>
+
+        <div class="ob__tiles" id="tiles"></div>
+        <p class="ds-caption ob__coverage" id="coverage"></p>
+
+        <div class="ob__controls">
+          <div class="ob__filters">
+            <div class="ob__filter">
+              <label class="ds-label" for="f-tier">Tier</label>
+              <select class="ds-select" id="f-tier">
+                <option value="">All tiers</option>
+                <option value="1">Spec authors</option>
+                <option value="2">Trigger-qualified</option>
+                <option value="3">OEM / embed</option>
+              </select>
+            </div>
+            <div class="ob__filter">
+              <label class="ds-label" for="f-campaign">Campaign</label>
+              <select class="ds-select" id="f-campaign">
+                <option value="">All campaigns</option>
+                <option value="A-jamming">Jamming</option>
+                <option value="B-tdd">5G TDD</option>
+                <option value="C-finance">Finance</option>
+              </select>
+            </div>
+            <div class="ob__filter">
+              <label class="ds-label" for="f-status">Status</label>
+              <select class="ds-select" id="f-status">
+                <option value="">Any status</option>
+                <option value="not_started">Not started</option>
+                <option value="sequencing">In sequence</option>
+                <option value="replied">Replied</option>
+                <option value="meeting">Meeting booked</option>
+                <option value="qualified">Qualified</option>
+                <option value="dead">Closed out</option>
+              </select>
+            </div>
+            <div class="ob__filter ob__filter--grow">
+              <label class="ds-label" for="f-query">Search</label>
+              <input class="ds-field" id="f-query" type="search"
+                     placeholder="Account, segment, geography, trigger" autocomplete="off" />
+            </div>
+          </div>
+
+          <div class="ob__acts">
+            <button class="ds-btn ds-btn--secondary ds-btn--sm" type="button" id="watch">
+              Watch on Signals
+            </button>
+            <button class="ds-btn ds-btn--secondary ds-btn--sm" type="button" id="reprice">
+              Reprice
+            </button>
+            <!-- The one destructive control on the page, so it wears the
+                 system's danger register and asks first. -->
+            <button class="ds-btn ds-btn--ghost ds-btn--sm camp__delete" type="button" id="delete">
+              Delete campaign
+            </button>
+          </div>
+        </div>
+
+        <div id="table"></div>
+      </section>
     </div>
   </div>
 
@@ -115,6 +211,7 @@ import PlatformLayout from '../../../layouts/PlatformLayout.astro';
     .gtm__note { margin-top: var(--space-3); color: rgb(var(--ink-muted)); max-width: var(--measure-read); }
 
     .gtm__banner { margin-top: var(--space-6); max-width: var(--measure-read); }
+    .gtm__queuedacts { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
     .gtm__result { margin-top: var(--space-12); }
     .gtm__result .gtm__banner { margin-top: 0; margin-bottom: var(--space-5); }
 
@@ -152,17 +249,175 @@ import PlatformLayout from '../../../layouts/PlatformLayout.astro';
     .gtm__skeleton span:nth-child(1) { width: 32%; }
     .gtm__skeleton span:nth-child(2) { width: 92%; }
     .gtm__skeleton span:nth-child(3) { width: 64%; }
+    /* ── The active campaign ─────────────────────────────────────────────────
+       Namespaced `.ob__*` and `.camp__*` because these rules are the tracker's,
+       shared with nothing else on the page.
+
+       The section is deliberately **wider than the column it sits in**. The form
+       above is sized to the reading column on purpose — its two cells need 32rem
+       to stay side by side — so widening the whole page would break the form to
+       fit a table. The column is itself centred, so a merely wider child overflows
+       to the right and takes the last counter tile and the buttons off screen;
+       pulling half the extra width back centres the section on the viewport
+       instead, and the `min()` keeps it inside the room actually available. */
+    .camp {
+      margin-top: var(--space-16);
+      --camp-width: min(84rem, calc(100vw - 9rem));
+      width: var(--camp-width);
+      margin-left: calc((100% - var(--camp-width)) / 2);
+    }
+    /* A tab is two lines: the campaign's name, and how far it has got. The
+       second line is why you are looking at the strip at all. */
+    .camp__tabs { margin-bottom: var(--space-4); }
+    .camp__tabs .ds-tab { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-px); text-align: left; }
+    .camp__tabname { font-weight: var(--weight-medium); }
+    .camp__tabprogress { color: rgb(var(--ink-muted)); }
+    .ds-tab.is-active .camp__tabprogress { color: rgb(var(--ink-secondary)); }
+    #camp-tabs[hidden] { display: none; }
+    .camp[hidden] { display: none; }
+
+    /* The counter strip. A row of figures on the canvas rather than cards: the
+       strip is a readout, and seven bordered boxes above a table compete with the
+       thing they are describing. */
+    .ob__tiles {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+      gap: var(--space-1) var(--space-5);
+      padding-top: var(--space-4);
+      border-top: 1px solid rgb(var(--rule-hairline));
+    }
+
+    .ob__tile { display: flex; flex-direction: column; gap: var(--space-1); }
+    .ob__tilenum { font-size: var(--text-title); line-height: var(--leading-tight); }
+    .ob__tilelabel { color: rgb(var(--ink-muted)); }
+
+    .ob__coverage { color: rgb(var(--ink-muted)); max-width: var(--measure-read); }
+
+    /* Controls: filters left, the two actions right, wrapping to their own line
+       before either group has to shrink. */
+    .ob__controls {
+      display: flex; flex-wrap: wrap; align-items: flex-end;
+      gap: var(--space-4);
+      padding: var(--space-6) 0 var(--space-5);
+    }
+    .ob__filters {
+      display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3);
+      flex: 1 1 var(--measure-form);
+    }
+    .ob__filter { display: flex; flex-direction: column; gap: var(--space-1); flex: 0 0 9.5rem; }
+    .ob__filter--grow { flex: 1 1 16rem; }
+    .ob__filter .ds-label { margin: 0; }
+    .ob__acts { display: flex; gap: var(--space-2); }
+    /* Destructive, and last in the row. Ghost rather than filled: it must be
+       reachable without being the thing the eye lands on. */
+    .camp__delete { color: rgb(var(--signal-fault)); }
+    .camp__delete:hover { background: rgb(var(--signal-fault-wash)); }
+
+    /* Scrolls in its own container, and wears no border. The studio is a white
+       field with soft grey wells pressed into it — depth comes from the group
+       bands and the hairline row rules `.ds-table` already draws, not from an
+       outline round the whole thing. Nothing else on the platform frames a table,
+       and the box read as a card competing with the page. The page body must
+       never scroll sideways, because that takes the rail with it. */
+    .ob__tablewrap { overflow-x: auto; }
+
+    /* Wide enough for eight columns and no wider, so the value column is not
+       pushed off the right edge at the section's own width. */
+    .ob__table { min-width: 68rem; }
+
+    /* A group heading is a row in the table rather than a heading above it, so
+       one scroll container holds the whole list and the columns stay aligned
+       across groups. */
+    .ob__grouphead th {
+      position: static;
+      background: rgb(var(--surface-sunken));
+      backdrop-filter: none; -webkit-backdrop-filter: none;
+      padding-top: var(--space-3); padding-bottom: var(--space-3);
+    }
+    .ob__groupnote { margin-left: var(--space-3); color: rgb(var(--ink-muted)); }
+
+    /* A tier or campaign tag is a label, not prose: wrapped over two lines it
+       doubles the row height at narrow widths for no gain. */
+    .ob__table .ds-tag { white-space: nowrap; }
+
+    .ob__marks { display: flex; flex-wrap: wrap; gap: var(--space-1); margin-top: var(--space-1); }
+    .ob__trigger { max-width: var(--measure-form); color: rgb(var(--ink-secondary)); }
+    /* Muted ink alone, no italic. `fonts.css` declares no italic face for
+       Roboto, so `font-style: italic` synthesises an oblique — and it was the
+       only italic anywhere in the platform. The studio's register for an absent
+       value is muted ink. */
+    .ob__unpriced { color: rgb(var(--ink-muted)); }
+
+    .ob__touches { display: flex; gap: var(--space-2); }
+    .ob__status { min-width: 9rem; }
+
+    /* The twisty is a bare button: the caret is the affordance and a bordered
+       control in the first column would out-weigh the account name. */
+    .ob__twisty {
+      display: grid; place-items: center;
+      background: none; border: 0; padding: 0;
+      color: rgb(var(--ink-muted)); cursor: pointer;
+    }
+    .ob__twisty:hover { color: rgb(var(--ink)); }
+
+    .ob__detail > td { background: rgb(var(--surface-sunken)); }
+    .ob__panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(var(--measure-form), 1fr));
+      gap: var(--space-6);
+      padding: var(--space-2) 0 var(--space-4);
+    }
+    .ob__panelcol { display: flex; flex-direction: column; gap: var(--space-2); }
+    .ob__panelcol .ds-eyebrow { margin-top: var(--space-3); }
+    .ob__panelcol .ds-eyebrow:first-child { margin-top: 0; }
+
+    .ob__field { display: flex; flex-direction: column; gap: var(--space-1); }
+    .ob__deal { display: flex; flex-direction: column; gap: var(--space-1); align-items: flex-start; }
+    .ob__trail { margin: 0; padding: 0; list-style: none; }
+    .ob__trail li { display: flex; gap: var(--space-3); }
+    .ob__stamp { color: rgb(var(--ink-muted)); flex: 0 0 3.5rem; }
   </style>
 
   <script>
     import { el } from '../../../lib/dom';
     import { startElapsed, type StopElapsed } from '../../../lib/elapsed';
+    import { confirmAction, toast } from '../../../lib/overlays';
+    import {
+      counterTiles,
+      coverageNote,
+      type Counters,
+      type RowStatus,
+      type TrackerRow,
+    } from '../../../lib/outbound';
+    import {
+      NO_FILTERS,
+      counterTile,
+      groupRows,
+      matches,
+      renderCampaignTabs,
+      renderTable,
+      campaignTabs,
+      type Filters,
+      type RowHandlers,
+    } from '../../../lib/outboundView';
 
     const form = el<HTMLFormElement>('form');
     const runBtn = el<HTMLButtonElement>('run');
     const running = el('running');
     const validation = el('validation');
     const errorBox = el('error');
+    const buildBtn = el<HTMLButtonElement>('build');
+    const queued = el('queued');
+
+    /** The review item the last tracker run produced, if it is still undecided. */
+    let queuedId = '';
+    // True once the decision is recorded but the accounts did not reach the
+    // tracker. The decision is terminal and must not be retaken, so the button
+    // switches to retrying the landing alone — the shape Composer uses when a
+    // Gmail draft fails after an approval it cannot undo.
+    let landingFailed = false;
+
+
     const result = el('result');
     const unverified = el('unverified');
     const empty = el('empty');
@@ -230,6 +485,383 @@ import PlatformLayout from '../../../layouts/PlatformLayout.astro';
         endRun();
       }
     });
+
+    /**
+     * The same scope, asked as a target list.
+     *
+     * The result is deliberately *not* rendered as a list of accounts here. It has
+     * already been queued, and drawing it twice — once as a proposal to read and
+     * once in the tracker — invites somebody to work from the copy that has no
+     * state. So the page reports what was queued and what it does not know, and
+     * sends you to the tracker to work it.
+     */
+    buildBtn.addEventListener('click', async () => {
+      const scope = {
+        vertical: verticalField.value.trim(),
+        seed_company: seedField.value.trim(),
+        notes: notesField.value.trim(),
+      };
+      if (!scope.vertical && !scope.seed_company) {
+        validation.textContent = 'Name a vertical, or a company to find look-alikes of.';
+        validation.hidden = false;
+        return;
+      }
+
+      startRun();
+      buildBtn.disabled = true;
+      queued.hidden = true;
+      try {
+        const res = await fetch('/api/sales/gtm/targets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(scope),
+        });
+        const body = await res.json();
+        if (!res.ok || body.error) {
+          el('error-text').textContent = body.detail || body.error || 'The list could not be built.';
+          errorBox.hidden = false;
+          return;
+        }
+        if (!body.review) {
+          el('error-text').textContent =
+            'No accounts came out of that scope, so nothing was queued.';
+          errorBox.hidden = false;
+          return;
+        }
+
+        queuedId = body.review.id;
+        landingFailed = false;
+        const rows = body.final.rows as Array<{ trigger_text: string; deal_lines: unknown[] }>;
+        const untriggered = rows.filter((row) => !row.trigger_text).length;
+        const unshaped = rows.filter((row) => !row.deal_lines.length).length;
+
+        const said = [`${rows.length} accounts. Nothing is on a tracker yet.`];
+        if (untriggered) {
+          said.push(
+            `${untriggered} carry no trigger — nothing on the Signals watchlist covers them.`,
+          );
+        }
+        if (unshaped) {
+          said.push(`${unshaped} could not be shaped, so they will land unpriced.`);
+        }
+        el('queued-text').textContent = said.join(' ');
+        queued.hidden = false;
+      } catch (err) {
+        el('error-text').textContent = (err as Error)?.message || 'The request did not complete.';
+        errorBox.hidden = false;
+      } finally {
+        buildBtn.disabled = false;
+        endRun();
+      }
+    });
+
+    el('approve').addEventListener('click', async () => {
+      if (!queuedId) return;
+      const step = landingFailed ? 'retry' : 'approve';
+      const res = await fetch(`/api/sales/gtm/targets/${queuedId}/${step}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        // The proposal is untouched — the tracker is resolved before the decision
+        // is recorded — so pressing again is the right thing to do and the panel
+        // stays live for it. Only a 404 means there is nothing left to press.
+        el('queued-text').textContent = await reason(res, 'That could not be approved.');
+        if (res.status === 404) {
+          queuedId = '';
+          landingFailed = false;
+          queued.hidden = true;
+        }
+        return;
+      }
+
+      // Approved, but the accounts may still not have landed — a row the store
+      // refuses is caught rather than thrown, so the decision survives it. Say so
+      // rather than opening a campaign with nothing on it.
+      const landed = await res.json().catch(() => ({}));
+      if (landed?.tracker_error) {
+        landingFailed = true;
+        el('queued-text').textContent =
+          `${landed.tracker_error} The list is approved — press again to try landing it.`;
+        return;
+      }
+
+      landingFailed = false;
+      queuedId = '';
+      queued.hidden = true;
+      // The campaign is a section of this page, so approving reveals the work
+      // rather than navigating to it — which is the whole reason it lives here.
+      await loadCampaign();
+      // The system gates every animation it owns on `prefers-reduced-motion`, and
+      // a scroll it does not own is no different. Motion here is critically
+      // damped — things arrive and stop — or it does not happen at all.
+      const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      campaign.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' });
+    });
+
+    el('discard').addEventListener('click', async () => {
+      if (!queuedId) return;
+      await fetch(`/api/sales/gtm/targets/${queuedId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: 'Discarded from the GTM page.' }),
+      });
+      queuedId = '';
+      queued.hidden = true;
+    });
+
+    async function reason(res: Response, fallback: string): Promise<string> {
+      try {
+        return (await res.json()).detail || fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    // ── The active campaign ───────────────────────────────────────────────────
+    //
+    // Reads the same API the proposal writes to, so there is exactly one record
+    // and this section can never disagree with it. Every tick is a request;
+    // nothing here is client-only state.
+
+    const campaign = el('campaign');
+
+    /** Every live campaign, and which one is open. */
+    interface CampaignSummary { id: string; name: string; counters: Counters }
+    let campaigns: CampaignSummary[] = [];
+    let trackerId = '';
+    let campaignRows: TrackerRow[] = [];
+    let counters: Counters | null = null;
+    let filters: Filters = { ...NO_FILTERS };
+
+    /**
+     * Which campaign to open when the page loads.
+     *
+     * Remembered per person in the browser, because switching campaign is a
+     * change of what you are working on for the afternoon, not for one page view
+     * — being dropped back on the first one after every reload is the kind of
+     * small friction that stops a tool being used. Falls back to the newest.
+     */
+    const REMEMBERED = 'cadence.campaign';
+
+    function remembered(): string {
+      try {
+        return localStorage.getItem(REMEMBERED) ?? '';
+      } catch {
+        return '';
+      }
+    }
+
+    function forget(): void {
+      try {
+        localStorage.removeItem(REMEMBERED);
+      } catch {
+        // See `remember`: nothing here is worth reporting.
+      }
+    }
+
+    function remember(id: string): void {
+      try {
+        localStorage.setItem(REMEMBERED, id);
+      } catch {
+        // A private window or blocked site data is not a failure worth reporting;
+        // the page simply opens on the newest campaign next time.
+      }
+    }
+
+    /**
+     * Send a change, then re-read the campaign.
+     *
+     * The counters are derived from the trail on the server, so a tick cannot be
+     * reflected by editing one number here — a re-read is the only way the strip
+     * and the row can agree, and it is what stops this section drifting from the
+     * record the way the page it replaces did.
+     */
+    async function change(url: string, body: unknown, method = 'POST'): Promise<void> {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) toast(await reason(res, 'That change did not save.'));
+      // Re-read either way: the checkbox has already drawn the new state, and
+      // leaving it there would show a touch the server refused.
+      await loadCampaign();
+    }
+
+    const handlers: RowHandlers = {
+      onTouch: (row, index, fired) =>
+        void change(`/api/outbound/rows/${row.id}/touch`, { index, fired }),
+      onStatus: (row, status: RowStatus) =>
+        void change(`/api/outbound/rows/${row.id}/status`, { status }),
+      onEdit: (row, field, value) =>
+        void change(`/api/outbound/rows/${row.id}`, { changes: { [field]: value } }, 'PATCH'),
+      onOpen: () => {},
+    };
+
+    function paintCampaign(): void {
+      if (!counters) return;
+      el('tiles').replaceChildren(...counterTiles(counters).map(counterTile));
+      el('coverage').textContent = coverageNote(counters);
+      const visible = campaignRows.filter((row) => matches(row, filters));
+      el('table').replaceChildren(renderTable(groupRows(visible), handlers));
+    }
+
+    /**
+     * Read the campaign, and show the section only if there is one.
+     *
+     * A tracker nobody has created yet is not an error and gets no message: until
+     * then the page's job is the form above, and an empty eight-column table under
+     * a "nothing here" line explains less than showing nothing at all.
+     */
+    async function loadCampaign(preferred = ''): Promise<void> {
+      const list = await fetch('/api/outbound/trackers');
+      if (!list.ok) return;
+
+      campaigns = (await list.json()).trackers as CampaignSummary[];
+      if (!campaigns.length) {
+        campaign.hidden = true;
+        return;
+      }
+
+      // Whichever was asked for, else the one last worked, else the newest. A
+      // remembered id that has since been deleted must not leave the section
+      // blank, so it is only honoured if it is still in the list.
+      const wanted = preferred || trackerId || remembered();
+      const chosen = campaigns.find((c) => c.id === wanted) ?? campaigns[0];
+      trackerId = chosen.id;
+      remember(trackerId);
+
+      paintTabs();
+
+      const res = await fetch(`/api/outbound/trackers/${trackerId}`);
+      if (!res.ok) {
+        toast('Could not read the campaign.');
+        return;
+      }
+      const body = await res.json();
+      campaignRows = body.rows;
+      counters = body.counters;
+      campaign.hidden = false;
+      paintCampaign();
+    }
+
+    function paintTabs(): void {
+      const tabs = campaignTabs(campaigns, trackerId);
+      const strip = el('camp-tabs');
+      if (!tabs.length) {
+        strip.hidden = true;
+        strip.replaceChildren();
+        return;
+      }
+      strip.hidden = false;
+      strip.replaceChildren(renderCampaignTabs(tabs, (id) => {
+        if (id === trackerId) return;
+        // The filters belong to the campaign you were reading, not to the one you
+        // are switching to: carrying a tier filter across makes the new campaign
+        // look emptier than it is.
+        filters = { ...NO_FILTERS };
+        resetFilterControls();
+        void loadCampaign(id);
+      }));
+    }
+
+    function resetFilterControls(): void {
+      for (const id of ['f-tier', 'f-campaign', 'f-status', 'f-query']) {
+        el<HTMLInputElement>(id).value = '';
+      }
+    }
+
+    function wireCampaign(): void {
+      const bind = (id: string, key: keyof Filters) => {
+        const control = el<HTMLInputElement>(id);
+        control.addEventListener(control.tagName === 'SELECT' ? 'change' : 'input', () => {
+          filters = { ...filters, [key]: control.value };
+          paintCampaign();
+        });
+      };
+      bind('f-tier', 'tier');
+      bind('f-campaign', 'campaign');
+      bind('f-status', 'status');
+      bind('f-query', 'query');
+
+      el('watch').addEventListener('click', async () => {
+        if (!trackerId) return;
+        const res = await fetch(`/api/outbound/trackers/${trackerId}/watch`, { method: 'POST' });
+        if (!res.ok) {
+          toast(await reason(res, 'Could not reach the watchlist.'));
+          return;
+        }
+        const body = await res.json();
+        // The watchlist is capped, so a long campaign is watched as far as it
+        // goes. Saying only "watching 50" would hide that the rest are not
+        // watched at all, and the trigger column is what depends on it.
+        toast(
+          body.refused.length
+            ? `Watching ${body.count}. ${body.refused.length} would not fit — the watchlist is full.`
+            : `Watching ${body.count} accounts.`,
+        );
+      });
+
+      el('delete').addEventListener('click', async () => {
+        if (!trackerId || !counters) return;
+        const open = campaigns.find((c) => c.id === trackerId);
+
+        // Say what goes, in the numbers that matter. The touch trail is the
+        // suppression record for a manual sequence: without it there is no
+        // evidence of what was already sent to whom, and that is a worse loss
+        // than the account list, which can be proposed again.
+        const worked = counters.touches
+          ? `${counters.touches} recorded ${counters.touches === 1 ? 'touch' : 'touches'} and the trail behind them`
+          : 'no touches have been recorded yet';
+        const confirmed = await confirmAction({
+          title: `Delete ${open?.name ?? 'this campaign'}?`,
+          body:
+            `${counters.targets} accounts go with it, and ${worked}. `
+            + 'There is no undo — the accounts can be proposed again, but what was '
+            + 'already sent cannot be reconstructed.',
+          confirm: 'Delete',
+          danger: true,
+        });
+        if (!confirmed) return;
+
+        const res = await fetch(`/api/outbound/trackers/${trackerId}`, { method: 'DELETE' });
+        if (!res.ok) {
+          toast(await reason(res, 'That campaign could not be deleted.'));
+          return;
+        }
+        const removed = await res.json();
+        toast(`Deleted ${removed.name} — ${removed.accounts} accounts.`);
+
+        // Fall to whatever is left rather than to the remembered id, which is now
+        // the campaign that has just gone.
+        trackerId = '';
+        forget();
+        filters = { ...NO_FILTERS };
+        resetFilterControls();
+        await loadCampaign();
+      });
+
+      el('reprice').addEventListener('click', async () => {
+        if (!trackerId) return;
+        const res = await fetch(`/api/outbound/trackers/${trackerId}/reprice`, { method: 'POST' });
+        if (!res.ok) {
+          toast(await reason(res, 'Could not reprice.'));
+          return;
+        }
+        const body = await res.json();
+        toast(
+          body.repriced
+            ? `${body.repriced} ${body.repriced === 1 ? 'figure' : 'figures'} changed.`
+            : 'No figure changed.',
+        );
+        await loadCampaign();
+      });
+    }
+
+    wireCampaign();
+    void loadCampaign();
 
     /** Hold the page's shape while the model thinks, and say how long it has been. */
     function startRun(): void {

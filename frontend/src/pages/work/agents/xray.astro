@@ -46,6 +46,12 @@
  * arrived at, the index of saved shortlists, and the search itself.
  */
 import PlatformLayout from '../../../layouts/PlatformLayout.astro';
+import { agentBySlug } from '../../../lib/platform';
+
+//: X-ray hands sideways to Signals and onward to Research. Neither offer is made
+//: while that agent is held back — a link to a stated wait is not a way onward.
+const signalsReady = agentBySlug('signals')!.built;
+const researchReady = agentBySlug('research')!.built;
 ---
 <PlatformLayout title="X-ray" requires="lead">
   <div class="agent-page">
@@ -96,7 +102,9 @@ import PlatformLayout from '../../../layouts/PlatformLayout.astro';
           <button class="xr__link" type="button" id="lead-drop" hidden>use a different lead</button>
           <!-- Sweeping for people showing a signal lives in Signals now: it has
                no account, so X-ray would have no grounding to search from. -->
-          <a class="xr__link" href="/work/agents/signals" id="signals-link">looking for a buying signal?</a>
+          {signalsReady && (
+            <a class="xr__link" href="/work/agents/signals" id="signals-link">looking for a buying signal?</a>
+          )}
         </div>
 
         <div id="ground-panel-mount"></div>

@@ -9,7 +9,8 @@
     "build": "npm run test && npm run check:design && astro build",
     "build:watch": "astro build --watch",
     "preview": "astro preview",
-    "check:symbols": "node scripts/check-symbols.mjs"
+    "check:symbols": "node scripts/check-symbols.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@astrojs/tailwind": "^5.1.0",
@@ -20,6 +21,7 @@
     "tailwindcss": "^3.4.0"
   },
   "devDependencies": {
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "playwright": "^1.62.0"
   }
 }

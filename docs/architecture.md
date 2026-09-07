@@ -12,14 +12,14 @@ about the layer underneath them, because that is where the work went.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Astro frontend, one shell, 26 pages                         │
-│  workspace · agent pages · knowledge wiki · call library     │
+│  Astro frontend, one shell, 27 pages                         │
+│  workspace · agents · wiki · library · events · tracker      │
 └───────────────────────────┬──────────────────────────────────┘
                             │  REST + SSE
 ┌───────────────────────────▼──────────────────────────────────┐
 │  FastAPI backend                                             │
 │                                                              │
-│   eleven agents, each also a tool on Owl                     │
+│   eleven agents, nine of them also a tool on Owl             │
 │                                      ▼                       │
 │   ┌──────────────────────────────────────────────────────┐   │
 │   │  OWL, the platform brain                             │   │
@@ -156,6 +156,13 @@ number on a second run, nobody can act on it and nobody can improve it. The same
 reasoning covers the campaign shape. The model's job in both cases is to read raw
 signal into structure, not to decide the answer.
 
+Two whole subsystems follow the same argument to its end and reach no model at
+all: the event programme and the outbound tracker. A deadline counted backwards
+from a date is not an opinion, and a record of what happened to an account is not
+a judgement. They are described in
+[Running without a model](without-a-model.md), and they are the reason the
+request lifecycle below says *most* rather than *every*.
+
 ## The two rules the platform enforces
 
 Both are built into the code rather than written in a policy.
@@ -182,6 +189,11 @@ browser  →  /api/sales/<agent>/…            FastAPI route
 Long running agent work streams over SSE. There is one exception, recorded under
 known limitations below rather than hidden.
 
+**Not every surface reaches the Mind.** `/api/events` and `/api/outbound` stop at
+the third line — a route, the job, and deterministic work with side effects. There
+is no model call in either, by design rather than by omission; see
+[Running without a model](without-a-model.md).
+
 ## Data model: `DATA_ROOT`
 
 `backend/paths.py` resolves every mutable path through `DATA_ROOT`. This is the
@@ -206,7 +218,7 @@ them, which keeps the page code declarative.
 
 ## Testing
 
-`backend/tests/` holds 42 suites, all green in this build.
+`backend/tests/` holds 56 suites, all green in this build.
 
 The discipline is that the acceptance bar gets written or refreshed before a
 change is trusted, and that it is contract shaped wherever the contract is the
@@ -228,6 +240,11 @@ retries. This is why GTM was deliberately moved off grounded search; see
 keeps forcing a tool call after `max_uses` is spent. The model thrashes and never
 emits its terminal JSON. `research/agent.py` and `signals/agent.py` still ride
 it. `services/name_sources.py` already uses `"auto"`, which is the fix.
+
+This is why **Research and Signals are held back from this release**: measured at
+about two completions in five attempts, taking two to five minutes each. The code
+is here and current, its pages say so, and neither router is mounted. It is a
+different thing from Phase 2 below, where the code is old rather than unreliable.
 
 **There is no reply or bounce detection.** `gmail.compose` cannot read the
 mailbox, so suppression is manual.

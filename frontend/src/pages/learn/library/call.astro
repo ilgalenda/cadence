@@ -7,6 +7,11 @@
  * it to restyle this one page would leave four copies of the same reading to keep
  * in step. It moves with them when the `calls` section is retired.
  *
+ * The fetch is the component's, not this page's. It used to be written here and
+ * again in the admin view, while a third unreachable copy sat inside the
+ * component itself; `window.loadAnalysis` is that copy, now the only one. What
+ * is left here is what is genuinely this page's: its own head.
+ *
  * Addressed by `?id=` as it always was — the site builds static, so the id cannot
  * be a path segment.
  */
@@ -21,9 +26,7 @@ import AnalysisResult from '../../../components/AnalysisResult.astro';
       <p class="ds-mono page__when" id="when"></p>
     </header>
 
-    <div id="state" class="ds-small state">loading analysis…</div>
-
-    <!-- The shared reading, hidden until it has something to show. -->
+    <!-- The shared reading, which holds its own wait, absence and fault. -->
     <AnalysisResult showClear={false} />
   </div>
 
@@ -31,43 +34,23 @@ import AnalysisResult from '../../../components/AnalysisResult.astro';
     /* Screen-level layout only. The head sits on `.ds-page`; the shared
        `AnalysisResult` carries its own styling. */
     .page__when { color: rgb(var(--ink-muted)); }
-    .state { color: rgb(var(--ink-muted)); padding-block: var(--space-8); }
   </style>
 
   <script>
-    const state = document.getElementById('state')!;
+    import { el } from '../../../lib/dom';
+
     const id = new URLSearchParams(window.location.search).get('id');
 
-    function fail(message: string): void {
-      state.textContent = message;
-    }
-
-    if (!id) {
-      fail('no call requested');
-    } else {
-      fetch(`/api/sales/calls/${encodeURIComponent(id)}`)
-        .then((res) => {
-          if (res.status === 404) throw new Error('missing');
-          if (!res.ok) throw new Error(String(res.status));
-          return res.json();
-        })
-        .then((session) => {
-          const result = session.result || {};
-          result._title = session.title || 'Call analysis';
-          result._call_id = session.id;
-
-          document.title = `${result._title} — Cadence`;
-          document.getElementById('title')!.textContent = result._title;
-          document.getElementById('when')!.textContent = session.timestamp || '';
-
-          (window as any).renderAnalysisResult(result);
-          state.hidden = true;
-        })
-        .catch((err: Error) => {
-          fail(err.message === 'missing'
-            ? 'no such call — it may have been deleted'
-            : 'could not load this analysis — is the backend running?');
-        });
-    }
+    // The page head is the page's; the component's head is the component's. A
+    // page reaching in to overwrite `#ar-heading` duplicates the title two
+    // inches above it, which is how that convention drifted apart.
+    (window as any).loadAnalysis(id, {
+      onSession(session: { title?: string; timestamp?: string }) {
+        const title = session.title || 'Call analysis';
+        document.title = `${title} — Cadence`;
+        el('title').textContent = title;
+        el('when').textContent = session.timestamp || '';
+      },
+    });
   </script>
 </PlatformLayout>

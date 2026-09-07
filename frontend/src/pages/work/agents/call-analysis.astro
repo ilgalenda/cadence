@@ -11,9 +11,19 @@
  * had ever produced a stored transcript. The segmented source switch went with
  * them — there is one source now, so a switch would offer a choice of one.
  *
- * The results themselves are the shared `AnalysisResult` component, unchanged —
- * three other surfaces render it, and it moves with them when the Learn section
- * is built. Rebuilding it here would fork it.
+ * **Composition is the platform's, not this page's.** `.agent-page` ›
+ * `.agent-page__column` › eyebrow-title-lead head › the source › the run › the
+ * result under an `.agent-page__sect` head, shared with the other ten agent
+ * surfaces. Its closest sibling is `gtm.astro`.
+ *
+ * The wait is held the way GTM and X-ray hold theirs: a `.ds-mark--live` on the
+ * action and a ticking elapsed count in the section head's mono slot
+ * (`lib/elapsed`). No spinner — the system does not have one. The skeleton is the
+ * shared component's, borrowed through `showAnalysisWait`, so there is one
+ * result-shaped skeleton rather than two drawings of the same thing.
+ *
+ * The results themselves are the shared `AnalysisResult` component — three other
+ * surfaces render it, and rebuilding it here would fork it.
  */
 import PlatformLayout from '../../../layouts/PlatformLayout.astro';
 import AnalysisResult from '../../../components/AnalysisResult.astro';
@@ -34,10 +44,10 @@ import AnalysisResult from '../../../components/AnalysisResult.astro';
       <section class="source ds-arrive" style="--arrive: var(--dur-step)">
         <div class="source__head">
           <label class="ds-label" for="transcript">Transcript</label>
-          <label class="ds-btn ds-btn--ghost ds-btn--sm">
-            Upload .txt or .md
-            <input id="transcript-file" type="file" accept=".txt,.md" hidden />
-          </label>
+          <!-- A real button, not a label wrapping the input: a label is not
+               focusable, so the upload could not be reached from the keyboard. -->
+          <button class="ds-btn ds-btn--ghost ds-btn--sm" id="pick-file" type="button">Upload .txt or .md</button>
+          <input id="transcript-file" type="file" accept=".txt,.md" hidden />
         </div>
         <textarea class="ds-field ds-textarea ds-textarea--resizable transcript" id="transcript"
           placeholder="Paste the call transcript here…"></textarea>
@@ -55,7 +65,23 @@ import AnalysisResult from '../../../components/AnalysisResult.astro';
         </div>
       </div>
 
+      <!-- The result region. Three states, only ever one of them on screen: this
+           empty, the section head over the component's skeleton, and the reading.
+           The reading brings its own head, so the section head belongs to the
+           wait — stacking both would draw two heads over one thing. -->
       <div class="result">
+        <div class="agent-page__sect" id="run-head" hidden>
+          <h2 class="ds-eyebrow">Reading the call</h2>
+          <span class="ds-mono" id="run-elapsed"></span>
+        </div>
+
+        <div class="ds-empty ds-arrive" id="result-empty" data-analysis-empty>
+          <p class="ds-empty__title">Nothing read yet</p>
+          <p class="ds-empty__body">
+            Paste a transcript above and Owl will read it for signals, objections and next steps.
+          </p>
+        </div>
+
         <AnalysisResult showClear={true} />
       </div>
     </div>
@@ -84,16 +110,23 @@ import AnalysisResult from '../../../components/AnalysisResult.astro';
   <script>
     import { notify } from '../../../lib/overlays';
     import { el } from '../../../lib/dom';
+    import { startElapsed, type StopElapsed } from '../../../lib/elapsed';
 
     const transcript = el<HTMLTextAreaElement>('transcript');
     const titleField = el<HTMLInputElement>('title');
     const analyseBtn = el<HTMLButtonElement>('analyse');
     const state      = el('state');
-    const resultBox  = el('analysis-result');
+    const runHead    = el('run-head');
+    const runElapsed = el('run-elapsed');
+    const fileInput  = el<HTMLInputElement>('transcript-file');
+
+    let stopElapsed: StopElapsed | null = null;
 
     // ── Source ──────────────────────────────────────────────────────────────
 
-    el('transcript-file').addEventListener('change', (e) => {
+    el('pick-file').addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', (e) => {
       const input = e.target as HTMLInputElement;
       const file = input.files?.[0];
       if (!file) return;
@@ -105,15 +138,30 @@ import AnalysisResult from '../../../components/AnalysisResult.astro';
 
     // ── Running ─────────────────────────────────────────────────────────────
 
-    function setState(message: string): void {
-      state.textContent = message;
-      state.hidden = false;
+    /**
+     * Enter the wait. The empty goes, the section head arrives over the shared
+     * skeleton, and the count starts — there is no denominator for a model call,
+     * so the honest readout is how long, not how far.
+     */
+    function beginRun(): void {
       analyseBtn.disabled = true;
+      state.textContent = 'reading the call';
+      state.hidden = false;
+
+      runHead.hidden = false;
+      (window as any).showAnalysisWait(true);
+
+      stopElapsed?.();
+      stopElapsed = startElapsed((seconds) => { runElapsed.textContent = `${seconds}s`; });
     }
 
-    function clearState(): void {
-      state.hidden = true;
+    /** Leave the wait, whatever it ended in. */
+    function endRun(): void {
+      stopElapsed?.();
+      stopElapsed = null;
       analyseBtn.disabled = false;
+      state.hidden = true;
+      runHead.hidden = true;
     }
 
     /** The reason a request failed, in the backend's own words where it gave one. */
@@ -129,8 +177,7 @@ import AnalysisResult from '../../../components/AnalysisResult.astro';
 
     async function analyse(text: string): Promise<void> {
       const title = titleField.value.trim() || 'Call analysis';
-      setState('reading the call');
-      resultBox.hidden = true;
+      beginRun();
 
       try {
         const res = await fetch('/api/sales/calls/analyse', {
@@ -145,11 +192,22 @@ import AnalysisResult from '../../../components/AnalysisResult.astro';
         // The analysis is injected by the shared component, so it arrives like
         // any other run result.
         (window as any).renderAnalysisResult(analysis);
-        resultBox.classList.add('ds-arrive');
+        // The arrival replays on every reading, not just the first: the class is
+        // already there after run one, and CSS animations do not restart on a
+        // class that never left. Dropping it and forcing a reflow is what makes
+        // the second reading arrive the same way the first did.
+        const reading = el('analysis-result');
+        reading.classList.remove('ds-arrive');
+        void reading.offsetWidth;
+        reading.classList.add('ds-arrive');
       } catch (err: any) {
+        // Nothing was read, so the page goes back to saying so rather than
+        // leaving a skeleton of a result that is not coming. Clearing the wait
+        // brings the empty back with it — one switch, not two.
+        (window as any).showAnalysisWait(false);
         notify({ title: 'Analysis failed', body: err?.message || 'The call was not read.' });
       } finally {
-        clearState();
+        endRun();
       }
     }
 

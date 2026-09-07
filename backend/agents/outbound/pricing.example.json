@@ -1,0 +1,67 @@
+{
+  "_comment": [
+    "The SHAPE of the price catalogue, with deliberately fake figures.",
+    "The real catalogue is commercially confidential and never enters this repository.",
+    "Copy this to $DATA_ROOT/agents/outbound/data/pricing.json and put the real list in it.",
+    "Every figure here is a round number so that nobody can mistake it for a price.",
+    "`enterprise_grade` gates whether the Standard support line may attach at all — it does",
+    "not decide whether it does. That is the caller's choice per account, because the same",
+    "quorum is sold with and without support and only the account says which."
+  ],
+  "currency": "GBP",
+  "updated": "1970-01-01",
+  "shapes": {
+    "primary_quorum": {
+      "composition": "3x appliance, rubidium, plus rack kit",
+      "price_gbp": 1000,
+      "enterprise_grade": true,
+      "primary": true
+    },
+    "defence_grade_quorum": {
+      "composition": "3x appliance, rubidium plus, plus rack kit",
+      "price_gbp": 2000,
+      "enterprise_grade": true,
+      "primary": true
+    },
+    "brownfield_backup": {
+      "composition": "1x appliance, rubidium, into existing sync",
+      "price_gbp": 300,
+      "enterprise_grade": true,
+      "primary": false
+    },
+    "brownfield_entry": {
+      "composition": "1x appliance, oscillator",
+      "price_gbp": 100,
+      "enterprise_grade": false,
+      "primary": false
+    },
+    "wr_poc_kit": {
+      "composition": "1x appliance plus 2x sub-nanosecond node",
+      "price_gbp": 1500,
+      "enterprise_grade": true,
+      "primary": true
+    },
+    "wr_early_adopter": {
+      "composition": "sub-nanosecond node early-adopter commitment",
+      "price_gbp": 4000,
+      "enterprise_grade": true,
+      "primary": true
+    },
+    "portable": {
+      "composition": "1x mini appliance, full module, per vehicle",
+      "price_gbp": 100,
+      "enterprise_grade": false,
+      "primary": true
+    }
+  },
+  "support": {
+    "standard_gbp_per_year": 500,
+    "premium_gbp_per_year": 900
+  },
+  "fleet_insight_annual_gbp": {
+    "10": 200,
+    "50": 900,
+    "100": 1600,
+    "200": 3000
+  }
+}

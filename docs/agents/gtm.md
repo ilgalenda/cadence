@@ -5,7 +5,7 @@
 | **Module** | `backend/agents/sales/gtm/` |
 | **Routes** | `/api/sales/gtm` |
 | **Mind profile** | `analyze` |
-| **Human gate** | the user selects targets |
+| **Human gate** | the user selects a target list, and approving it creates the tracker |
 
 **Prompts: in this build.** This is one of the three exemplar agents, published with its prompts intact so the prompt engineering is readable, not just described.
 

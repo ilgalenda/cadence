@@ -99,3 +99,28 @@ def mind_data() -> Path:
 
 
 # High-Intent
+
+
+# Events — trade-show and conference readiness. Not a sales agent: no LLM call,
+# no Owl tool. Its own SQLite file, because the record is relational (a series
+# holds editions, an edition holds registrations, and material hangs off both).
+def events_data() -> Path:
+    return data_root() / "agents" / "events" / "data"
+
+
+# Outbound — the ABM tracker: which accounts are being worked, how far each
+# sequence has got, and what each one is worth. Its own SQLite file for the same
+# reason Events has one, and its **price catalogue lives here rather than in the
+# repo**: list prices are commercially confidential, so they follow the same rule
+# as every other piece of mutable state and are never committed.
+def outbound_data() -> Path:
+    return data_root() / "agents" / "outbound" / "data"
+
+
+def outbound_pricing_file() -> Path:
+    """The price catalogue the valuation reads, or an absent path.
+
+    Named separately because its absence is a supported state: a clone with no
+    catalogue prices nothing and says so, rather than guessing a figure.
+    """
+    return outbound_data() / "pricing.json"

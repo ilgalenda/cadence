@@ -17,15 +17,20 @@ run it twice and nothing changes.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 SKIP_DIRS = {".git", "node_modules", ".astro", "dist", "__pycache__", ".venv", "docs"}
 # LICENSE keeps the author's real name: it is the copyright line, not branding.
 SKIP_FILES = {"genericise.py", "genericise.map.json", "sync-from-internal.sh", "leak-gate.sh", "LICENSE"}
 DOTFILES = {".gitignore", ".env.example"}
 TEXT_SUFFIXES = {
-    ".py", ".ts", ".js", ".astro", ".css", ".html", ".md", ".json", ".txt",
+    # `.mjs` was missing until 2026-09-07, so every ES-module script in
+    # `frontend/scripts/` went through un-genericised. The smoke test names the
+    # employer and a colleague in its fixture transcript; nothing had rewritten it.
+    ".py", ".ts", ".js", ".mjs", ".astro", ".css", ".html", ".md", ".json", ".txt",
     ".sh", ".ini", ".tmpl", ".example", ".yml", ".yaml",
 }
 
@@ -37,14 +42,54 @@ TEXT_SUFFIXES = {
 MAP_PATH = Path(__file__).resolve().parent / "genericise.map.json"
 
 
-def load_substitutions() -> list[tuple[str, str]]:
+class Substitution(NamedTuple):
+    """One replacement, and whether it may land inside a longer word.
+
+    Most finds are long and distinctive — a company name, a hostname, a filename —
+    and a plain substring replacement is right for them.
+
+    A **short** find is a different problem. A two-letter first name cannot be
+    replaced by substring: it would rewrite `Model`, `Module`, `Monitor` and
+    `Moment` throughout the build. Those entries set ``word``, which anchors the
+    match to word boundaries so only the name itself is touched.
+    """
+
+    find: str
+    replace: str
+    word: bool = False
+
+    def apply(self, text: str) -> str:
+        if not self.word:
+            return text.replace(self.find, self.replace)
+        return re.sub(rf"\b{re.escape(self.find)}\b", self.replace, text)
+
+
+def load_substitutions() -> list[Substitution]:
+    """Read the map. Entries take either form:
+
+        ["find", "replace"]                              substring
+        {"find": …, "replace": …, "word": true}          whole word only
+    """
     if not MAP_PATH.exists():
         raise SystemExit(
             f"No substitution map at {MAP_PATH}.\n"
             "It is deliberately not committed — see the note above. Recreate it as a\n"
-            'JSON array of ["find", "replace"] pairs, ordered longest-first.'
+            'JSON array of ["find", "replace"] pairs, ordered longest-first.\n'
+            'A short name that would match inside longer words takes the object\n'
+            'form instead: {"find": "..", "replace": "..", "word": true}.'
         )
-    return [(find, replace) for find, replace in json.loads(MAP_PATH.read_text(encoding="utf-8"))]
+
+    entries = json.loads(MAP_PATH.read_text(encoding="utf-8"))
+    substitutions = []
+    for entry in entries:
+        if isinstance(entry, dict):
+            substitutions.append(
+                Substitution(entry["find"], entry["replace"], bool(entry.get("word")))
+            )
+        else:
+            find, replace = entry
+            substitutions.append(Substitution(find, replace))
+    return substitutions
 
 
 def candidate_files(root: Path) -> list[Path]:
@@ -61,9 +106,9 @@ def candidate_files(root: Path) -> list[Path]:
     return files
 
 
-def genericise(text: str, substitutions: list[tuple[str, str]]) -> str:
-    for find, replace in substitutions:
-        text = text.replace(find, replace)
+def genericise(text: str, substitutions: list[Substitution]) -> str:
+    for substitution in substitutions:
+        text = substitution.apply(text)
     return text
 
 

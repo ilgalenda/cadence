@@ -14,6 +14,11 @@
  */
 import PlatformLayout from '../../../layouts/PlatformLayout.astro';
 import AgentViewStyles from '../../../components/AgentViewStyles.astro';
+import { agentBySlug } from '../../../lib/platform';
+
+//: Composer is grounded in a Research brief, so its empty state points at
+//: Research — but only while Research can actually be run.
+const researchReady = agentBySlug('research')!.built;
 ---
 <PlatformLayout title="Composer" requires="lead">
   <div class="agent-page">
@@ -28,16 +33,39 @@ import AgentViewStyles from '../../../components/AgentViewStyles.astro';
       </header>
 
       <div class="form ds-arrive" style="--arrive: var(--dur-step)">
-        <div class="form__cell">
-          <label class="ds-label" for="brief">Write from</label>
-          <select class="ds-select" id="brief">
-            <option value="">— choose a research brief —</option>
-          </select>
-          <p class="ds-help" id="brief-help">
-            No briefs kept yet. <a href="/work/agents/research">Research an account</a> first — the
-            touches are only as grounded as the brief behind them.
-          </p>
-        </div>
+        {researchReady ? (
+          <div class="form__cell">
+            <label class="ds-label" for="brief">Write from</label>
+            <select class="ds-select" id="brief">
+              <option value="">— choose a research brief —</option>
+            </select>
+            <p class="ds-help" id="brief-help">
+              No briefs kept yet. <a href="/work/agents/research">Research an account</a> first — the
+              touches are only as grounded as the brief behind them.
+            </p>
+          </div>
+        ) : (
+          /* Research is what normally feeds this page, and while it is held back
+             there are no briefs to choose — so the page takes the company
+             directly, exactly as Owl's `compose_outreach` does from a
+             conversation that has no brief either. The touches are written from
+             the market rather than from the account, and the page says so
+             instead of leaving an empty menu and a disabled button. */
+          <div class="form__row">
+            <div class="form__cell">
+              <label class="ds-label" for="company">Company</label>
+              <input class="ds-field" id="company" placeholder="Northgate Nordics" autocomplete="off" />
+            </div>
+            <div class="form__cell">
+              <label class="ds-label" for="person">Who it addresses <span class="form__optional">optional</span></label>
+              <input class="ds-field" id="person" placeholder="Lena Ohlsson" autocomplete="off" />
+            </div>
+            <p class="ds-help form__cell--wide">
+              Research is not available in this release, so these are written from what this market
+              has told us rather than from what is happening at this account.
+            </p>
+          </div>
+        )}
 
         <div class="form__cell">
           <span class="ds-label">Channels</span>
@@ -165,7 +193,18 @@ import AgentViewStyles from '../../../components/AgentViewStyles.astro';
       }
     }
 
-    (byId('brief') as HTMLSelectElement).addEventListener('change', async (event) => {
+    /**
+     * Which half of the form is on the page.
+     *
+     * Normally Composer writes from a kept Research brief. While Research is held
+     * back there are none to keep, so the page asks for the company instead and
+     * builds the same thin brief Owl's `compose_outreach` builds from a
+     * conversation. Read from the DOM rather than passed in, because the two
+     * halves are mutually exclusive by construction.
+     */
+    const chooser = document.getElementById('brief') as HTMLSelectElement | null;
+
+    chooser?.addEventListener('change', async (event) => {
       const id = (event.target as HTMLSelectElement).value;
       (byId('run') as HTMLButtonElement).disabled = !id;
       if (!id || briefs.has(id)) return;
@@ -184,12 +223,27 @@ import AgentViewStyles from '../../../components/AgentViewStyles.astro';
       }
     });
 
+    // Without a chooser the company is the input, so the button follows it.
+    document.getElementById('company')?.addEventListener('input', (event) => {
+      const typed = (event.target as HTMLInputElement).value.trim();
+      (byId('run') as HTMLButtonElement).disabled = !typed;
+    });
+
+    /** The brief to write from: the one that was chosen, or one made of a name. */
+    function briefToWriteFrom(): Record<string, unknown> | null {
+      if (chooser) return briefs.get(chooser.value) ?? null;
+
+      const company = (byId('company') as HTMLInputElement).value.trim();
+      if (!company) return null;
+      const person = (byId('person') as HTMLInputElement).value.trim();
+      return { subject: { company, person }, person: { name: person } };
+    }
+
     // ── Writing ─────────────────────────────────────────────────────────────
 
     byId('run').addEventListener('click', async () => {
-      const id = (byId('brief') as HTMLSelectElement).value;
-      const brief = briefs.get(id);
-      if (!brief) { fail('Choose a brief to write from.'); return; }
+      const brief = briefToWriteFrom();
+      if (!brief) { fail(chooser ? 'Choose a brief to write from.' : 'Name the company to write to.'); return; }
       if (!channels.length) { fail('Choose at least one channel to write.'); return; }
 
       const button = byId('run') as HTMLButtonElement;
@@ -204,6 +258,12 @@ import AgentViewStyles from '../../../components/AgentViewStyles.astro';
           body: JSON.stringify({
             brief,
             channels,
+            // Sent explicitly, as the path runner already does (`lib/paths.ts`):
+            // the brief's own `person` is Research's profile of them, not the
+            // X-ray row that was enriched, so an address never survives inside
+            // it. Without this the field was collected and dropped, and every
+            // approval reported that no Gmail draft could be created.
+            recipient: (byId('recipient') as HTMLInputElement).value.trim(),
             notes: (byId('notes') as HTMLInputElement).value.trim(),
           }),
         });
@@ -344,7 +404,10 @@ import AgentViewStyles from '../../../components/AgentViewStyles.astro';
     }
 
     applyArrivingMix();
-    loadBriefs();
+    // Only when there is a chooser to fill. Fetching briefs with Research held
+    // back would 404 and report "is the backend running?", which is both wrong
+    // and alarming.
+    if (chooser) loadBriefs();
     loadWaiting();
   </script>
 </PlatformLayout>

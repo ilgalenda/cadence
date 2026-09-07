@@ -49,9 +49,9 @@ def test_includes_archived_conversations():
 
 def test_never_reaches_another_user():
     _conversation("sam", "mine")
-    _conversation("lasse", "theirs")
+    _conversation("nils", "theirs")
     assert storage.delete_all_conversations("sam") == 1
-    assert len(storage.list_conversations("lasse")) == 1
+    assert len(storage.list_conversations("nils")) == 1
 
 
 def test_is_idempotent():

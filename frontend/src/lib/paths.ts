@@ -88,7 +88,20 @@ const CONTRACTS: Record<string, StepContract> = {
 /** Whether a step can be run at all, as opposed to being a stated stop. */
 export const isRunnable = (agent: Agent): boolean => agent.built && agent.slug in CONTRACTS;
 
-/** The agent a path stops at — its first step that cannot be run. */
+/**
+ * The agent a path stops at — its first step that cannot be run, or nothing.
+ *
+ * **This is also what makes a path "coming soon", derived rather than flagged.**
+ * A path carries no readiness of its own: it is waiting exactly when one of its
+ * steps is, so the two cannot drift apart and there is no second thing to
+ * remember to flip. Research heads Inbound and sits mid-way through the other
+ * two, so while it is held back all three say so.
+ *
+ * Dropping the step instead would be worse than leaving it in: both
+ * `campaign-intelligence` and `composer` declare `needs: 'brief'` and Research is
+ * the only step that gives one, so a path without it would render and never
+ * become runnable — which is a harder thing to explain than a stated stop.
+ */
 export const stopsAt = (path: Path): Agent | undefined => stepsOf(path).find((a) => !isRunnable(a));
 
 /** Whether this step's precondition is met by what the run has so far. */

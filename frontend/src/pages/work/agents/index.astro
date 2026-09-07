@@ -70,7 +70,12 @@ let arrival = 0;
           </div>
           <div class="ag-grid">
             {members.map((agent) => (
-              <article class="ag-tile ds-tip ds-arrive" style={`--arrive: calc(var(--dur-step) * ${arrival += 1})`}
+              /* An agent that is not ready keeps its tile and its link. The grid
+                 is the roster, and the page it opens is where the wait is
+                 explained — so the tile marks it and gets out of the way rather
+                 than becoming a dead square that says nothing about why. */
+              <article class:list={['ag-tile', 'ds-tip', 'ds-arrive', { 'ag-tile--soon': !agent.built }]}
+                       style={`--arrive: calc(var(--dur-step) * ${arrival += 1})`}
                        data-agent={agent.slug} data-name={agent.name.toLowerCase()}
                        data-does={agent.does.toLowerCase()}>
                 <a class="ag-tile__open" href={agent.href}>
@@ -79,9 +84,16 @@ let arrival = 0;
                         set:html={appSymbol(agent.slug)} />
                   <span class="ag-tile__name">{agent.name}</span>
                 </a>
-                <button class="ds-icon-btn ag-tile__pin" type="button"
-                        data-pin={agent.slug} aria-pressed="false"
-                        aria-label={`Pin ${agent.name} to the rail`} set:html={icon('pin')} />
+                {agent.built ? (
+                  <button class="ds-icon-btn ag-tile__pin" type="button"
+                          data-pin={agent.slug} aria-pressed="false"
+                          aria-label={`Pin ${agent.name} to the rail`} set:html={icon('pin')} />
+                ) : (
+                  /* The pin's slot, not a row of its own, so the tile keeps the
+                     same height as the ones beside it. Not pinnable: three rail
+                     slots should not be spent on something that cannot run. */
+                  <span class="ds-mono ag-tile__soon">soon</span>
+                )}
                 <span class="ds-tip__body ag-tile__does">{agent.does}</span>
               </article>
             ))}
@@ -188,6 +200,23 @@ let arrival = 0;
     .ag-tile__pin[aria-pressed='true'] { opacity: 1; }
     .ag-tile__pin[aria-pressed='true'] { background: rgb(var(--ink)); color: rgb(var(--ink-on-ink)); }
 
+    /* An agent that is not ready yet. It keeps its place, its mark and its link —
+       the grid is the roster, and a hole in it says less than a stated wait — but
+       it recedes: the wash drops back so the ten that work read first. */
+    .ag-tile--soon .ag-tile__mark { opacity: 0.55; }
+    .ag-tile--soon .ag-tile__name { color: rgb(var(--ink-muted)); }
+
+    .ag-tile__soon {
+      position: absolute; top: 0; left: calc(50% + 1.375rem);
+      display: inline-flex; align-items: center;
+      height: 1.375rem; padding: 0 var(--space-2);
+      background: rgb(var(--surface));
+      color: rgb(var(--ink-muted));
+      font-size: var(--text-caption);
+      border-radius: var(--radius-full);
+      box-shadow: var(--shadow-flat);
+    }
+
     .ag-empty { color: rgb(var(--ink-muted)); }
 
     @media (max-width: 60rem) {
@@ -209,6 +238,7 @@ let arrival = 0;
     const sections = [...document.querySelectorAll<HTMLElement>('.ag-section[data-stage]')];
     const tiles = () => [...document.querySelectorAll<HTMLElement>('.ag-tile')];
     const total = document.querySelectorAll('.ag-section[data-stage] .ag-tile').length;
+    const soon = document.querySelectorAll('.ag-section[data-stage] .ag-tile--soon').length;
 
     /**
      * The pinned row is a live copy of the tiles it mirrors, so an agent's mark,
@@ -275,7 +305,11 @@ let arrival = 0;
 
       const shown = sections.filter((section) => !section.hidden)
         .reduce((n, section) => n + section.querySelectorAll('.ag-tile:not([hidden])').length, 0);
-      count.textContent = query ? `${shown} of ${total}` : `${total} agents`;
+      // The roster is `total`; how many of it you can actually open is the part a
+      // bare count would quietly overstate.
+      count.textContent = query
+        ? `${shown} of ${total}`
+        : soon ? `${total} agents · ${soon} soon` : `${total} agents`;
       empty.hidden = shown > 0;
     }
     filter.addEventListener('input', applyFilter);

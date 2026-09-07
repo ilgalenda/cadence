@@ -21,7 +21,7 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '2.0.0',
-    date: '2026-08-14',
+    date: '2026-09-04',
     headline: 'One platform: Owl Core, the sales section, and the design system',
     sections: [
       {
@@ -32,21 +32,30 @@ export const CHANGELOG: ChangelogEntry[] = [
           '**Per-user working memory** (`mind/memory.py`, SQLite + WAL): preferences, ongoing context, accounts, deals and per-account topics, persisted per user and injected on Owl’s uncached system tail so the cached persona+vault prefix stays byte-stable. `topics_for_vertical` cross-references what has already resonated on similar-vertical accounts. Idempotent backfill from existing research briefs and legacy campaigns.',
           '**One Persona** (`mind/persona.py`): a single owned identity, house voice and knowledge-governance stance, with a thin role overlay per agent — ending the three separately-drifting Owl prompts.',
           '**Owl organisation**: projects carrying standing instructions that ride into every conversation filed under them, nested folders, placement and search. Containment is soft — deleting a container never destroys the conversations inside it.',
-          '**The sales section** (`agents/sales`, `/api/sales`): eleven agents, each its own module with its own routes — Call Analysis, Knowledge Capture, Recap, Research, Campaign Intelligence, Campaign Selection, Composer, GTM, X-ray, Signals, Scoring. Every one is reachable two ways, through its own page and by asking Owl, from a single registration that pairs the tool schema with the runner so Owl can never be offered a tool nothing can execute.',
+          '**The sales section** (`agents/sales`, `/api/sales`): eleven agents, each its own module with its own routes — Call Analysis, Knowledge Capture, Recap, Research, Campaign Intelligence, Campaign Selection, Composer, GTM, X-ray, Signals, Scoring. Each is reachable two ways, through its own page and by asking Owl, from a single registration that pairs the tool schema with the runner so Owl can never be offered a tool nothing can execute. **Nine ship in this release**; Research and Signals are held back, for the reason given under Changed.',
           '**Capability services** (`agents/services`): the shared skills agents compose rather than duplicate — behavioural lead scoring and campaign selection (both deterministic, no LLM), web discovery, Lusha enrichment, the two-pass outreach composer, per-user style personalisation, the sitemap and name-source providers.',
-          '**The review gate** (`services/review.py`): the platform’s one human-in-the-loop primitive. Consequential output is submitted as `pending` and does nothing until a human approves it; the primitive has no send or execute action at all, so *agents draft, the human decides* is enforced structurally rather than by convention.',
+          '**The review gate** (`services/review.py`): the platform’s one human-in-the-loop primitive. Consequential output is submitted as `pending` and does nothing until a human approves it; the primitive has no send or execute action at all, so **agents draft, the human decides** is enforced structurally rather than by convention.',
           '**Integrations layer** (`backend/integrations`): the Google grant split out of the Calendar client and shared, with per-user tokens and its own surface at `/api/integrations/google`; Gmail **drafts only** — the grant requested cannot send, so the fence sits outside our code; Lusha person enrichment with a two-tier reveal (email automatically, phone only on explicit request) so credits are spent deliberately.',
           '**Signals**: a lean watchlist that notices funding rounds and timing technographics on named accounts, keeping a fingerprint of every finding already reported so a sweep returns what is new rather than repeating the same search.',
           '**Acme Learning** (`agents/learn`, `/learn`): the quiz pool, the certification quiz and the client-facing newsletter questions, moved out of the calls module and anonymised as a rule; plus the call library and the knowledge reader.',
           '**The wiki** (`agents/wiki`, `/api/wiki`): the vault made readable by a human instead of a prompt — every knowledge page indexed with its provenance, ranked search, and one page as structured blocks with its links and backlinks.',
           '**The Cadence Design System, in the repo** (`frontend/src/design-system`): tokens, primitives, components, the spring motion vocabulary, fonts and previews, mirroring the design project. Enforced by an adherence gate (`npm run check:design`) with three severities — errors for off-inventory tokens, colours and fonts, a per-file ratchet for raw px so debt can never deepen, and loudly-reported gaps in the system itself. It runs in the build.',
           '**The platform shell**: one rail for the whole product — Work · Owl · Learn — built from `lib/platform.ts` so it cannot advertise a surface that does not exist, with a breadcrumb and a home surface.',
+          '**The event programme** (`agents/events`, `/work/events`): the trade-show surface — which shows we are going to, who is going, and what they still need. A registration is gated `proposed` → `approved` → `confirmed`, and every material deadline is counted **backwards from the show’s own dates**, so moving a show moves its checklist with it. Role-scoped: the organiser sees every show and both views, everybody else sees only the shows they are on, enforced as a predicate on the reads **and** the writes. Reasons about no data and calls no model — it is a record and a set of deadlines, not an agent.',
+          '**The shared spreadsheet**: four tabs — Read me, Events, Requests, Checklist — written by Cadence for the people who have no Cadence account. Every Cadence column is protected with a single editor, order-by dates colour against today, and the checkbox column is re-ranged on every push so a newly-approved show’s lines can actually be ticked. Written, never read back, except for the ticks.',
+          '**The outbound tracker** (`agents/outbound`): one campaign’s account list and the goals it is measured against, in SQLite. What has happened to a row — a touch fired, a status moved — is **appended, never rewritten**, because a tracker is the safety mechanism for a manual sequence and suppression depends on knowing what was already sent. Plus a read-only export: a dated photograph of the list, with no way to record anything into it.',
+          '**GTM’s tracker mode**: a classified target list — tier, campaign, and how a first deal would be shaped — queued for review rather than put straight on a tracker. Approving is what creates the tracker, and until a customer register exists that queue is the only exclusion check there is, which is recorded as the weak control it is rather than dressed up. A `/targets/{id}/retry` alongside it, for a list whose decision stands but whose accounts did not land.',
+          '**Registration email** (`agents/shared/notifications.py`): plain SMTP, multipart, sent when somebody registers interest in a show — carrying the case, the decide-by date and a link that opens that show.',
           '**A backend test suite**: around forty pytest modules covering the Mind, memory, persona, routing, the tool registry, every sales agent, the capability services, the integrations, the wiki and quizzes, X-ray output quality against a rubric, request shape, and a test that pins the model generation.',
         ],
       },
       {
         label: 'Changed',
         items: [
+          '**Research and Signals are held back from this release.** Both drove a web-search turn that was compelled to call a tool after its search budget was spent, so the turn thrashed and never produced its answer — measured at two completions in five attempts, taking two to five minutes. Signals has a second reason: there is no scheduler, so it would only check while somebody was watching it, which is not what a watchlist should mean. Held back means held back everywhere — the page says so, the router is not mounted, and Owl is not offered the tool, all decided by one constant (`HELD_BACK`). The three paths run through Research, so they say so too, derived from the roster rather than flagged separately.',
+          'Composer takes a company directly while Research is held back, building the same thin brief Owl already builds from a conversation that has none. The touches are then written from what the market has told us rather than from what is happening at the account, and the page says which it is.',
+          'The review queue locks per **file** rather than per instance. Every caller builds a queue per call — deliberately — so the lock it held guarded nothing between requests. It also writes through a temporary file and a rename, so a reader sees the whole queue or the previous one, never half of it.',
+          'Putting accounts on a tracker is now one transaction. A row the store refuses rolls the whole list back instead of leaving the first six committed and the caller believing none of them landed.',
           'Information architecture rebuilt around the job rather than the code: `/work`, `/owl` and `/learn` replace `/dashboard` and the per-agent `/agents/*` trees. `main.py` now mounts four routers and stops changing as agents land.',
           'Call Analysis does one job — reading the transcript. The follow-up email, the learnings filed into the vault and the product-fit read are their own agents now, so a failure in one can no longer cost the analysis somebody is waiting for.',
           'No module builds its own Anthropic client or names a model any more; upgrading the whole platform is an edit to `MODELS`.',
@@ -58,9 +67,24 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         label: 'Fixed',
         items: [
+          '**Pushing a show no longer clears the ticks on the shared spreadsheet.** The checkbox column is re-ranged from the last row that carries an id, read from the tab itself. It used to be sized from the rows the push had just written, which describes one show rather than the tab — so a show with no checklist of its own reported row 2 and wiped every tick below it.',
+          '**Approving a target list no longer strands it.** The tracker is resolved before the decision is recorded, so an unknown tracker refuses and leaves the list decidable. Landing the accounts happens after, cannot raise, and records what went wrong, so a list can be landed again instead of being re-run from the model. A terminal decision has no way back to pending, which is what made the old order unrecoverable rather than merely wrong.',
+          '**A torn review-queue file is reported, not read as an empty queue.** A parse failure was folded in beside "the file does not exist yet", so a read racing a write answered "no items" and the next save wrote that back over every pending draft.',
+          '**Approving a knowledge correction works.** The handler named an element that did not exist, so the approval was recorded, the error swallowed, and the admin told it had failed — and pressing again failed for real.',
+          'Composer sends the recipient it collects, so approving a composition puts an addressed draft in Gmail instead of reporting that none could be created.',
+          'Every agent that is not ready says so on the launcher, in the rail and on its own page, and the counts say how many can actually be opened.',
+          'A path whose first step is not ready states which agent it is waiting on, rather than painting a progress meter reading "0 of 0".',
+          'No page offers a way onward into an agent that is not available — the handoffs from a read call, from X-ray and from Composer check the roster rather than hard-coding a link.',
           'A reply that hits the token ceiling now continues instead of being cut mid-sentence.',
           'One rail implementation for every surface. The second, hand-rolled one — a mono wordmark the design system bans, typed glyphs where the system draws icons, no search or collapsed state — is what the misaligned menus were.',
           'The changelog now renders its own inline formatting rather than printing the asterisks and backticks.',
+        ],
+      },
+      {
+        label: 'Security',
+        items: [
+          '**A shortlist can only be overwritten by the person who saved it.** The save path matched on an id the client supplies and checked no owner, so posting somebody else’s id replaced their shortlist — and the contact details already paid for with it. Reading and deleting had always checked; saving had not. A shortlist that is not yours now answers exactly as one that never existed, so a saved list cannot be probed for.',
+          '**Signals is admin-only again.** The surface it replaced was gated at the router; the replacement was written without it, so any signed-in person could start a sweep and spend search and model credit where they used to be refused. Every endpoint there spends, so the gate is on the router rather than on each route.',
         ],
       },
       {
@@ -209,7 +233,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         items: [
           'Calls and Lead storage helpers are now sandbox-aware throughout; every route threads the request so sandbox state propagates end-to-end.',
           'Lead Owl system prompt extended for the knowledge architecture.',
-          'Seed users: replaced placeholder `test` user with real users — `ian` (Co-Founder, admin) and `martin` (Head of Sales); env vars renamed to `IVAN_/IAN_/MARTIN_/JAKUB_PASSWORD`.',
+          'Seed users: replaced placeholder `test` user with real users — `alex` (Co-Founder, admin) and `robin` (Head of Sales); env vars renamed to `<USER>_PASSWORD`.',
           'Credentials split from profiles: password hashes moved out of the committed `users.json` into a gitignored `users_credentials.json` under `DATA_ROOT`, so each environment (laptop, server) carries its own credentials and `seed_users.py` never touches the committed profile file.',
           'Dashboard, Calls analyze page, Dashboard layout, and Agent layout updated to surface the new admin link, sandbox toggle, and Meet-capture entry point.',
           'README refreshed for the v1.1.0 surface and the new deployment model.',

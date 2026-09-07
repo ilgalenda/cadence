@@ -107,13 +107,14 @@ def test_every_migrated_agent_declares_a_runnable_tool():
 
     assert tools.names() == [
         "analyse_call",
+        # GTM's second mode: the classified list a tracker is built from. The only
+        # GTM entry that writes, and what it writes is a review item.
+        "build_target_tracker",
         "capture_learnings",
-        "check_signals",
         "compose_outreach",
         "draft_recap",
         "find_target_companies",
         "recall_market",
-        "research_account",
         "score_lead",
         "select_campaign",
         "xray",
@@ -123,6 +124,36 @@ def test_every_migrated_agent_declares_a_runnable_tool():
         assert callable(tool.run)
         assert tool.input_schema.get("type") == "object"
         assert tool.description.strip()
+
+
+def test_a_held_back_agent_is_not_reachable_by_asking_owl():
+    """The gate has to reach the conversation, not just the page.
+
+    An agent whose tile says "coming soon" while `research_account` is still on
+    Owl's tool list is not held back — it has simply lost its page. `HELD_BACK` is
+    the one constant that decides, and this is the half of it Owl sees.
+    """
+    from agents.sales.registry import HELD_BACK, register_all
+
+    register_all()
+
+    for slug, tool_name in (("research", "research_account"), ("signals", "check_signals")):
+        if slug in HELD_BACK:
+            assert HELD_BACK[slug].strip(), "a held-back agent has to say why"
+            assert tool_name not in tools.names()
+        else:
+            assert tool_name in tools.names()
+
+
+def test_a_held_back_agents_endpoints_are_not_mounted():
+    """The third place the gate reaches: the route answers 404, not an agent."""
+    import main
+    from agents.sales.registry import HELD_BACK
+
+    mounted = {getattr(route, "path", "") for route in main.app.routes}
+    for slug, prefix in (("research", "/api/sales/research"), ("signals", "/api/sales/signals")):
+        reachable = any(path.startswith(prefix) for path in mounted)
+        assert reachable is (slug not in HELD_BACK), f"{prefix} disagrees with HELD_BACK"
 
 
 def test_recall_market_is_read_only_and_says_it_does_not_search_the_web():

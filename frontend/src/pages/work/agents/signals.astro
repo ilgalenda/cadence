@@ -24,6 +24,10 @@
  */
 import PlatformLayout from '../../../layouts/PlatformLayout.astro';
 import AgentViewStyles from '../../../components/AgentViewStyles.astro';
+import ComingSoon from '../../../components/ComingSoon.astro';
+import { agentBySlug } from '../../../lib/platform';
+
+const ready = agentBySlug('signals')!.built;
 ---
 <PlatformLayout title="Signals" requires="lead">
   <div class="agent-page">
@@ -38,17 +42,21 @@ import AgentViewStyles from '../../../components/AgentViewStyles.astro';
         </p>
       </header>
 
+      {!ready && (
+        <ComingSoon reason="A check completes about two times in five attempts, and there is no scheduler yet — so it would only look while you are looking, which is not what a watchlist should mean. Owl cannot run it either." />
+      )}
+
       <div class="form ds-arrive" style="--arrive: var(--dur-step)">
         <div class="form__row">
           <div class="form__cell">
             <label class="ds-label" for="company">Watch an account</label>
             <input class="ds-field" id="company" placeholder="Halden Engineering" autocomplete="off" />
           </div>
-          <button class="ds-btn ds-btn--accent form__add" type="button" id="add">Watch</button>
+          <button class="ds-btn ds-btn--accent form__add" type="button" disabled={!ready} id="add">Watch</button>
         </div>
 
         <div class="form__actions">
-          <button class="ds-btn ds-btn--secondary ds-btn--sm" type="button" id="check">Check now</button>
+          <button class="ds-btn ds-btn--secondary ds-btn--sm" type="button" disabled={!ready} id="check">Check now</button>
           <span class="ds-mark ds-mark--live" id="running" hidden>checking</span>
           <span class="ds-error" id="error"></span>
         </div>
@@ -75,7 +83,7 @@ import AgentViewStyles from '../../../components/AgentViewStyles.astro';
             <label class="ds-label" for="signal">Buying signal</label>
             <select class="ds-select" id="signal"></select>
           </div>
-          <button class="ds-btn ds-btn--secondary form__add" type="button" id="sweep">Sweep</button>
+          <button class="ds-btn ds-btn--secondary form__add" type="button" disabled={!ready} id="sweep">Sweep</button>
         </div>
 
         <div class="form__actions">

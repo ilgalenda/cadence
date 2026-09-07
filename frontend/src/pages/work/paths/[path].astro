@@ -17,7 +17,9 @@
  */
 import PlatformLayout from '../../../layouts/PlatformLayout.astro';
 import { PATHS, pathBySlug, stepsOf } from '../../../lib/platform';
+import { stopsAt } from '../../../lib/paths';
 import AgentViewStyles from '../../../components/AgentViewStyles.astro';
+import ComingSoon from '../../../components/ComingSoon.astro';
 
 export function getStaticPaths() {
   return PATHS.map((path) => ({ params: { path: path.slug } }));
@@ -25,6 +27,9 @@ export function getStaticPaths() {
 
 const path = pathBySlug(Astro.params.path!)!;
 const steps = stepsOf(path);
+//: The agent this path is waiting on, if any. Derived rather than declared, so a
+//: path can never claim to be ready while one of its steps is not.
+const waitingOn = stopsAt(path);
 ---
 <PlatformLayout title={path.name} requires={path.grant}>
   <!-- The run spine owns one centred working column, anchored to the top: a
@@ -38,6 +43,10 @@ const steps = stepsOf(path);
         <p class="ds-lead ds-page__intro">{path.when}</p>
         <p class="ds-caption page__channel">{path.channel}</p>
       </header>
+
+      {waitingOn && (
+        <ComingSoon reason={`This path runs through ${waitingOn.name}, which is not ready yet, so the run stops there.`} />
+      )}
 
       <!-- The run's own section head: name left, progress right, a hairline to
            sit on — the same grammar as the launcher's stage heads. -->
@@ -295,7 +304,11 @@ const steps = stepsOf(path);
       const { done, runnable } = progress(path, carry);
       const fill = document.getElementById('progress-fill')!;
       fill.style.width = runnable ? `${(done / runnable) * 100}%` : '0%';
-      document.getElementById('progress-label')!.textContent = `${done} of ${runnable}`;
+      // A path whose first step is not ready has nothing to count. "0 of 0" is
+      // the shape of a meter that has broken, not one that is waiting — and the
+      // banner above already says which agent it is waiting on.
+      document.getElementById('progress-label')!.textContent =
+        runnable ? `${done} of ${runnable}` : '';
 
       const restart = document.getElementById('restart') as HTMLButtonElement;
       restart.hidden = done === 0;

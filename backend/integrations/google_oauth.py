@@ -50,10 +50,16 @@ EMAIL_SCOPE = "https://www.googleapis.com/auth/userinfo.email"
 #: re-consent attached, not a convenience; see the Phase 4a plan for why the
 #: draft-vs-sent learning that would need a read scope is deferred.
 GMAIL_COMPOSE_SCOPE = "https://www.googleapis.com/auth/gmail.compose"
+#: Read and write spreadsheets — the shared events working document, which the
+#: people who decide and deliver an event use because most of them have no
+#: Cadence account. **Not** a Drive scope: the Sheets API creates the file under
+#: the connecting account, and sharing it is a permissions decision a person
+#: should make once in Drive rather than one an API makes on their behalf.
+SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets"
 
 #: Everything the grant asks for. Adding to this list makes every user re-consent,
 #: so it is asserted by test rather than left to a reviewer to notice.
-SCOPES = [CALENDAR_SCOPE, EMAIL_SCOPE, GMAIL_COMPOSE_SCOPE]
+SCOPES = [CALENDAR_SCOPE, EMAIL_SCOPE, GMAIL_COMPOSE_SCOPE, SHEETS_SCOPE]
 
 
 class GoogleAuthError(RuntimeError):

@@ -112,3 +112,94 @@ def test_no_agent_facing_send_or_execute_action(queue):
     # human-owned approve/reject.
     forbidden = {"send", "execute", "action", "dispatch", "fire", "commit"}
     assert forbidden.isdisjoint(dir(queue))
+
+
+# ── Surviving itself ────────────────────────────────────────────────────────
+#
+# The queue is the platform's only human-in-the-loop gate, and three of its
+# behaviours had no coverage at all: what happens when two requests write at
+# once, what happens when the file is torn, and whether the lock it holds guards
+# anything. All three answers were wrong, and none of them raised.
+
+
+def test_two_queues_on_one_file_share_a_lock(tmp_path):
+    """The lock lived on the instance, and every caller builds its own.
+
+    Composer, Recap and GTM each construct a `ReviewQueue` per call — deliberately,
+    so a test pointing the data root elsewhere is honoured — so a per-instance lock
+    was two locks over one file, guarding nothing.
+    """
+    path = tmp_path / "queue.json"
+    assert ReviewQueue(path)._lock is ReviewQueue(path)._lock
+    assert ReviewQueue(path)._lock is not ReviewQueue(tmp_path / "other.json")._lock
+
+
+def test_concurrent_submits_all_survive(tmp_path):
+    """Submit is a read-modify-write; without a shared lock the losers vanish."""
+    import threading
+
+    path = tmp_path / "queue.json"
+    barrier = threading.Barrier(8)
+
+    def submit(n: int) -> None:
+        barrier.wait()
+        ReviewQueue(path).submit(kind="outreach_email", payload={"n": n}, submitted_by="sam")
+
+    threads = [threading.Thread(target=submit, args=(n,)) for n in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(ReviewQueue(path).list()) == 8
+
+
+def test_a_torn_file_raises_rather_than_reading_as_an_empty_queue(tmp_path):
+    """The failure that silently destroyed the queue.
+
+    `JSONDecodeError` was folded into `{}` next to the missing-file case, so a
+    read racing a write answered "no items" — and the next save wrote that empty
+    dict back over every pending draft.
+    """
+    path = tmp_path / "queue.json"
+    queue = ReviewQueue(path)
+    item = _draft(queue)
+
+    path.write_text('{"half": ', encoding="utf-8")  # truncated mid-write
+
+    with pytest.raises(review.QueueUnreadable):
+        queue.list()
+
+    # And nothing has overwritten it: the item is still recoverable by hand.
+    assert item.id not in path.read_text(encoding="utf-8")
+
+
+def test_a_missing_file_is_still_simply_empty(tmp_path):
+    assert ReviewQueue(tmp_path / "never-written.json").list() == []
+
+
+def test_a_save_is_never_seen_half_written(tmp_path):
+    """Readers see the old queue or the new one, never a truncated file."""
+    path = tmp_path / "queue.json"
+    queue = ReviewQueue(path)
+    _draft(queue)
+    before = path.read_text(encoding="utf-8")
+
+    seen: list = []
+    original = review.os.replace
+
+    def watch(src, dst):
+        # The moment before the swap is the whole window a truncate-then-write
+        # would have left open.
+        seen.append(path.read_text(encoding="utf-8"))
+        return original(src, dst)
+
+    review.os.replace = watch
+    try:
+        _draft(queue)
+    finally:
+        review.os.replace = original
+
+    assert seen == [before]
+    assert len(queue.list()) == 2
+    assert not list(path.parent.glob("*.tmp")), "the temporary file must not be left behind"

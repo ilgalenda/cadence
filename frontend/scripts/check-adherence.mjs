@@ -295,6 +295,96 @@ if (found.gap.length) {
   }
 }
 
-const failures = inventory.errors.length + found.error.length + (ratchetOk ? 0 : 1);
+// ── Every `byId('x')` in a page has an `id="x"` in that page ────────────────
+//
+// A page script is the one thing nothing typechecks: `astro build` compiles it
+// without looking, and vitest does not open a page. `byId` is
+// `getElementById(id)!` — a non-null assertion that lies at runtime — so a
+// reference left behind by an earlier design throws on the line it sits on and
+// silently kills the handler around it.
+//
+// That is not hypothetical: `events.astro` set `.hidden` on a `#detail` that had
+// been deleted, and the year filter did nothing at all for as long as it took
+// somebody to notice. This is the cheapest gate that catches it, and it needs
+// neither a browser nor a dependency.
+function checkElementIds() {
+  const problems = [];
+  for (const file of walk('src/pages').filter((f) => f.endsWith('.astro'))) {
+    const source = readFileSync(file, 'utf8');
+    const declared = new Set(
+      [...source.matchAll(/\bid=["']([A-Za-z0-9_-]+)["']/g)].map((m) => m[1]),
+    );
+    // Ids the page creates at runtime rather than writing in its markup.
+    for (const m of source.matchAll(/\.id\s*=\s*[`'"]([A-Za-z0-9_-]+)/g)) {
+      declared.add(m[1]);
+    }
+
+    const used = new Set(
+      [...stripComments(source).matchAll(/\bbyId\(\s*['"]([A-Za-z0-9_-]+)['"]\s*\)/g)]
+        .map((m) => m[1]),
+    );
+    for (const id of used) {
+      if (!declared.has(id)) {
+        problems.push(`${file}: byId('${id}') — no element with that id in this page`);
+      }
+    }
+  }
+  return problems;
+}
+
+// ── A scroller must not be told to stop scrolling ───────────────────────────
+//
+// A container given `overflow-y: auto` and then `overflow: visible` by a state
+// rule does not scroll — it **spills**, and paints its overflow over whatever
+// sits below it, which is usually something you can no longer click.
+//
+// The rail did exactly this: `.ws-rail__scroll` scrolled, and a leftover
+// `.is-compact` rule made it visible so a row's old `::after` tooltip could
+// escape. The tooltip had long since moved to a portal; the override outlived
+// it, and on a 700px-tall window the nav painted over the account button, so a
+// hit test on the avatar returned the *Events* link.
+function checkScrollersStillScroll() {
+  const problems = [];
+  const files = [...walk('src/components'), ...walk('src/layouts'),
+                 ...walk('src/pages'), ...walk('src/design-system')]
+    .filter((f) => /\.(astro|css)$/.test(f));
+
+  for (const file of files) {
+    const css = stripComments(readFileSync(file, 'utf8'));
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .map(([, selector, body]) => ({ selector: selector.trim(), body }));
+
+    // Class names this file makes scrollable.
+    const scrollers = new Set();
+    for (const { selector, body } of rules) {
+      if (!/overflow(-y)?\s*:\s*(auto|scroll)/.test(body)) continue;
+      for (const m of selector.matchAll(/\.([A-Za-z0-9_-]+)/g)) scrollers.add(m[1]);
+    }
+
+    for (const { selector, body } of rules) {
+      if (!/overflow(-y)?\s*:\s*visible/.test(body)) continue;
+      const classes = [...selector.matchAll(/\.([A-Za-z0-9_-]+)/g)].map((m) => m[1]);
+      const hit = classes.find((c) => scrollers.has(c));
+      if (hit) {
+        problems.push(
+          `${file}: \`${selector}\` sets overflow: visible on .${hit}, `
+          + 'which another rule here makes scrollable — it will spill, not scroll',
+        );
+      }
+    }
+  }
+  return problems;
+}
+
+const spillers = checkScrollersStillScroll();
+console.log(`  scrollers   ${spillers.length ? 'FAIL' : 'ok  '}  no scroller is told to spill`);
+spillers.forEach((p) => console.log(`              ${p}`));
+
+const orphanIds = checkElementIds();
+console.log(`  element ids ${orphanIds.length ? 'FAIL' : 'ok  '}  every byId() resolves`);
+orphanIds.forEach((p) => console.log(`              ${p}`));
+
+const failures = inventory.errors.length + found.error.length
+  + (ratchetOk ? 0 : 1) + orphanIds.length + spillers.length;
 console.log(failures ? `FAILED — ${failures} problem(s)\n` : 'PASSED\n');
 process.exit(failures ? 1 : 0);

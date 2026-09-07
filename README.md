@@ -4,19 +4,19 @@ Cadence is a sales and operations platform: eleven agents sharing one brain, mad
 up of a single gateway to the model, one writing voice, a knowledge vault of what
 the company knows, and a memory of each user's accounts and deals.
 
-It was built for Timebeat, the company it was developed for, and this repository
+It was built for Acme, the company it was developed for, and this repository
 is the architecture behind it.
 
 ![Cadence home](docs/images/screen-cadence-home.png)
 
 ## About the name "Acme"
 
-The code refers to a company called Acme. It is a stand in for Timebeat, the
+The code refers to a company called Acme. It is a stand in for Acme, the
 company Cadence was built for and whose product knowledge fills the vault the
 platform reads from. The branding came out because the platform is the
 interesting part, not whose logo sits on it. Point a clone at a different
 knowledge base and Acme is where that company's name goes. Anywhere Acme appears,
-read Timebeat.
+read Acme.
 
 ## What this repository is
 
@@ -27,10 +27,10 @@ preparation and a person does the deciding.
 Parts of it are genuinely usable and worth testing:
 
 - **The frontend runs.** `npm run build` in `frontend/` executes the unit tests,
-  the design system adherence check and 28 routes. The design system itself, in
+  the design system adherence check and 29 routes. The design system itself, in
   `frontend/src/design-system/`, is complete and self contained. Its preview
   pages open in a browser with no backend at all.
-- **The backend suite passes.** `pytest` in `backend/` runs 42 suites green.
+- **The backend suite passes.** `pytest` in `backend/` runs 56 suites green.
 - **Three agents are complete**, prompts and all: Lead Scoring, GTM and X-ray.
   The scoring logic in `services/lead_scoring.py` is deterministic and runs
   without a model.
@@ -38,6 +38,14 @@ Parts of it are genuinely usable and worth testing:
 What will not work is the platform end to end. Eight of the eleven agents have
 had their prompts removed, and there is no knowledge in the vault for them to
 reason over.
+
+Two of the eleven — Research and Signals — are **held back from this release**
+rather than redacted. Their code is here and current; their routers are not
+mounted and Owl is not offered them. Both drove a web-search turn that was
+compelled to call a tool after its search budget was spent, so the turn thrashed
+and never produced its answer: about two completions in five attempts. Shipping
+an agent at that rate would teach a reader the wrong lesson about the
+architecture.
 
 ## How it's built
 
@@ -68,11 +76,11 @@ What is left in an agent is the job itself, which is why the modules are short
 and most of what is worth reading sits in the layer underneath.
 
 ```
-Astro frontend, one shell, 26 pages
+Astro frontend, one shell, 27 pages
         │  REST + SSE
 FastAPI backend
         │
-    eleven agents, each also registered as a tool on Owl
+    eleven agents, nine of them also registered as a tool on Owl
         │
     Owl:  Mind · Persona · Knowledge · Memory
         │
@@ -116,16 +124,38 @@ The agents are there to remove the hour of preparation, not the judgement.
 | | |
 |---|---|
 | [Lead Scoring](docs/agents/scoring.md) | How warm a lead is, and why. The number is calculated rather than generated. A model that could nudge the score would make the score worth less |
-| [GTM](docs/agents/gtm.md) | Suggests companies worth approaching. Fast, and unverified on purpose: checking happens a step later |
+| [GTM](docs/agents/gtm.md) | Suggests companies worth approaching — fast, and unverified on purpose, because checking happens a step later. Its second mode builds the classified list a tracker is made from, queued for a person to approve |
 | [X-ray](docs/agents/xray.md) | Given a company and a reason it matters, works out who there might own the problem |
-| [Research](docs/agents/research.md) | The briefing to read before writing anything |
+| [Research](docs/agents/research.md) | The briefing to read before writing anything. **Held back from this release** |
 | [Campaign Intelligence](docs/agents/campaign-intelligence.md) | What this market has already said on previous calls |
 | [Campaign Selection](docs/agents/campaign-selection.md) | The shape of the campaign. No model involved anywhere in it |
 | [Composer](docs/agents/composer.md) | Writes the outreach, for a person to send |
 | [Call Analysis](docs/agents/call-analysis.md) | Reads a transcript the way a colleague would |
 | [Recap](docs/agents/recap.md) | Drafts the follow up email after a call |
 | [Knowledge Capture](docs/agents/knowledge-capture.md) | Files what a call taught the company |
-| [Signals](docs/agents/signals.md) | Watches a list of accounts and reports when something happens |
+| [Signals](docs/agents/signals.md) | Watches a list of accounts and reports when something happens. **Held back from this release** |
+
+Two of them are marked *soon* in the launcher and on their own pages, which is
+what a held-back agent looks like from the inside.
+
+![The agent launcher](docs/images/screen-agents.png)
+
+*The running platform, on seeded demo data. Unlike the design-system screenshots, this is the software — the names and figures in it are invented.*
+
+## Running without a model
+
+Two subsystems reason about nothing and call no model at all — not lesser
+agents, and not agents in waiting. The **event programme** records the trade
+shows, who is going, and what they still need, counting every deadline backwards
+from the show's own dates. The **outbound tracker** holds a campaign's account
+list with an append-only trail of what has happened to each row, and publishes it
+as a dated read-only page.
+
+A deadline counted backwards from a date is not an opinion, and a record of what
+happened to an account is not a judgement. The same argument the platform already
+makes about lead scoring: a number a model could move is a number worth less.
+
+See [Running without a model](docs/without-a-model.md).
 
 ## Phase 2
 
@@ -158,7 +188,7 @@ and geometric, space is generous, and the palette is restrained enough that
 colour states a condition instead of decorating. Someone works in this for hours
 at a time, and a screen that shouts loses that person by mid afternoon.
 
-One system covers all 26 pages. `tokens.css` holds every colour, size and timing
+One system covers all 27 pages. `tokens.css` holds every colour, size and timing
 value, and a build step fails on a raw pixel value anywhere in the app. That is
 the only reason the pages still match each other after a year of changes.
 
@@ -173,7 +203,7 @@ how go to market work should run. The knowledge a company already owns, compiled
 and kept current, does the preparation. The person spends their time on the
 conversation instead of on getting ready for it.
 
-Because it is a showcase rather than a deployment, four things are absent by
+Because it is a showcase rather than a deployment, five things are absent by
 design:
 
 - **The vault contents.** Real product and customer knowledge. It ships as empty
@@ -183,9 +213,12 @@ design:
   `DATA_ROOT` outside it, which is why none of it has ever appeared in
   `git status`.
 - **Most of the prompts.** They took a long time to get right and they belong to
-  Timebeat. The eight redacted modules keep their signatures and docstrings, so
+  Acme. The eight redacted modules keep their signatures and docstrings, so
   what each prompt is asked to produce is still readable. The bodies raise
   `NotImplementedError`.
+- **Two agents, held back.** Research and Signals ship as code and as pages
+  that say so, but their routers are not mounted and Owl is not offered them.
+  Unlike the four Phase 2 agents, this is not about age — see above.
 - **Credentials.** `.env.example` shows what is required and nothing else.
 
 `tools/` keeps that boundary mechanical rather than remembered: the sync script
@@ -204,15 +237,17 @@ backend/
   agents/mind/          the model gateway, persona, memory
   agents/services/      scoring, review, selection, discovery, enrichment
   agents/sales/         the eleven agents
+  agents/events/        trade shows and their deadlines — no model
+  agents/outbound/      a campaign's account list — no model
   agents/owl/           workspace: projects, threads, search
   agents/learn/ wiki/ admin/
   agents/duty/ forecast/ onboarding/    Phase 2, not wired up
   integrations/         Google OAuth, Gmail, Calendar, contact enrichment
-  tests/                42 suites
+  tests/                56 suites
 frontend/src/
   design-system/        tokens, primitives, previews
   lib/                  behaviour, with its tests next to it
-  pages/                the 26 pages
+  pages/                the 27 pages
 docs/
 tools/
 ```

@@ -29,9 +29,13 @@ KEEP_BY_MODULE = {"backend/agents/sales/prompts.py": {
     # Lead Scoring — the deterministic-core exemplar
     "CLAUDE_BASE_SYSTEM",
     "claude_signal_prompt",
-    # GTM — the ungrounded analyze exemplar
+    # GTM — the ungrounded analyze exemplar. Both modes: proposing names to look
+    # at, and building the classified list a tracker is made from. Publishing one
+    # and withholding the other would leave the agent's own tests unable to run.
     "GTM_TARGETS_SYSTEM",
     "gtm_targets_user_prompt",
+    "GTM_TRACKER_SYSTEM",
+    "gtm_tracker_user_prompt",
     # X-ray — the checker that verifies GTM
     "XRAY_SYSTEM_PROMPT",
     "GROUNDING_SYSTEM_PROMPT",

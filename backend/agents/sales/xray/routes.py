@@ -217,6 +217,11 @@ def save_shortlist(req: ShortlistSave, request: Request, user: dict = Depends(re
         username=user["username"],
         sandbox=is_sandbox(request),
     )
+    if record is None:
+        # Somebody else's id. Answered the same way as an id that never existed,
+        # and in the same words as `get_shortlist`, so a saved shortlist cannot be
+        # probed for by watching which ids come back differently.
+        raise HTTPException(status_code=404, detail="That shortlist no longer exists.")
     return {"id": record["id"], "name": record["name"], "count": len(req.people)}
 
 

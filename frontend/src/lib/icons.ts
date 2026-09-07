@@ -221,6 +221,13 @@ const CLOCK = box(
   + '<path d="M7 4.2V7l2 1.4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>',
 );
 
+/** ADDED — a dated square with one day marked: an event fixed in the calendar. */
+const DATED = box(
+  '<rect x="2" y="3.2" width="10" height="8.6" rx="1.2" stroke="currentColor" stroke-width="1.1"/>'
+  + '<path d="M2 6h10" stroke="currentColor" stroke-width="1.1"/>'
+  + '<path d="M7 8.4v1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>',
+);
+
 // ── The set ─────────────────────────────────────────────────────────────────
 
 export const ICONS = {
@@ -254,6 +261,8 @@ export const ICONS = {
   history: CLOCK,
   pin: PIN,
   more: ELLIPSIS,
+  // Operations
+  events: DATED,
   // Chrome
   integrations: LINK,
   admin: GEAR,

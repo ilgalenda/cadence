@@ -24,7 +24,14 @@ from typing import NamedTuple
 
 SKIP_DIRS = {".git", "node_modules", ".astro", "dist", "__pycache__", ".venv", "docs"}
 # LICENSE keeps the author's real name: it is the copyright line, not branding.
-SKIP_FILES = {"genericise.py", "genericise.map.json", "sync-from-internal.sh", "leak-gate.sh", "LICENSE"}
+#
+# README.md is hand-written and never synced, so there is nothing in it to
+# genericise — and running over it does damage. It explains what the Acme
+# placeholder stands for, and substituting inside that explanation turned it into
+# "Acme is a stand in for Acme" and shipped it (2026-09-07). A file a person
+# writes and reads is not the same problem as a file the sync copies.
+SKIP_FILES = {"genericise.py", "genericise.map.json", "sync-from-internal.sh",
+              "leak-gate.sh", "LICENSE", "README.md"}
 DOTFILES = {".gitignore", ".env.example"}
 TEXT_SUFFIXES = {
     # `.mjs` was missing until 2026-09-07, so every ES-module script in

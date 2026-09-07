@@ -4,19 +4,18 @@ Cadence is a sales and operations platform: eleven agents sharing one brain, mad
 up of a single gateway to the model, one writing voice, a knowledge vault of what
 the company knows, and a memory of each user's accounts and deals.
 
-It was built for Acme, the company it was developed for, and this repository
-is the architecture behind it.
+It was built for one company, in production use, and this repository is the
+architecture behind it.
 
 ![Cadence home](docs/images/screen-cadence-home.png)
 
 ## About the name "Acme"
 
-The code refers to a company called Acme. It is a stand in for Acme, the
-company Cadence was built for and whose product knowledge fills the vault the
-platform reads from. The branding came out because the platform is the
-interesting part, not whose logo sits on it. Point a clone at a different
-knowledge base and Acme is where that company's name goes. Anywhere Acme appears,
-read Acme.
+The code refers to a company called Acme. It is a stand in for the company
+Cadence was built for, whose product knowledge fills the vault the platform reads
+from. The branding came out because the platform is the interesting part, not
+whose logo sits on it. Point a clone at a different knowledge base and Acme is
+where that company's name goes.
 
 ## What this repository is
 
